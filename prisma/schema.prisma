@@ -23,47 +23,6 @@ model Category {
 }
 
 model Post {
-<<<<<<< HEAD
-  id       Int     @id @default(autoincrement())
-  title    String
-  slug     String  @unique
-  badge    String?
-  excerpt  String?
-  content  String  @db.LongText
-  imageUrl String?
-
-  facebookUrl    String?
-  linkedinUrl    String?
-  twitterUrl     String?
-  youtubeUrl     String?
-  email          String?
-  whatsappNumber String?
-
-  authorId   Int?
-  companyId  Int?
-  categoryId Int
-
-  // 🔐 ADMIN APPROVAL
-  status       PostStatus @default(PENDING)
-  createdById  Int?
-  approvedById Int?
-  approvedAt   DateTime?
-
-  publishedAt DateTime?
-  views       Int       @default(0)
-  shares      Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  author   Author?  @relation(fields: [authorId], references: [id])
-  company  Company? @relation(fields: [companyId], references: [id])
-  category Category @relation(fields: [categoryId], references: [id])
-
-  createdBy  User? @relation("CreatedPosts", fields: [createdById], references: [id])
-  approvedBy User? @relation("ApprovedPosts", fields: [approvedById], references: [id])
-
-  comments Comment[]
-=======
   id                           Int         @id @default(autoincrement())
   title                        String
   slug                         String      @unique
@@ -101,7 +60,6 @@ model Post {
   @@index([categoryId], map: "Post_categoryId_fkey")
   @@index([companyId], map: "Post_companyId_fkey")
   @@index([createdById], map: "Post_createdById_fkey")
->>>>>>> b8da047 (backend issue solved)
 }
 
 model Comment {
@@ -116,161 +74,6 @@ model Comment {
   @@index([postId], map: "Comment_postId_fkey")
 }
 
-<<<<<<< HEAD
-model Industry {
-  id       Int     @id @default(autoincrement())
-  name     String
-  slug     String  @unique
-  parentId Int?
-
-  parent   Industry?  @relation("IndustryHierarchy", fields: [parentId], references: [id])
-  children Industry[] @relation("IndustryHierarchy")
-
-  companies Company[]
-
-  createdAt DateTime @default(now())
-
-  @@index([parentId])
-}
-model Company {
-  id            Int      @id @default(autoincrement())
-  name          String
-  slug          String   @unique
-  tagline       String?
-  description   String?
-  
-  industryId Int?
-  industry   Industry? @relation(fields: [industryId], references: [id])
-  location      String?
-  address  String?   // ✅ Full manual address (single field)
-
-  companySize   String?
-  website       String?
-  logoUrl       String?
-  coverImageUrl String?
-  isVerified    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-
-  // ✅ ADD THIS
-  recruiters User[]
-
-  jobs                Job[]
-  followers           CompanyFollower[]
-  articles            Post[]
-  supplierDirectories SupplierDirectory[]
-}
-
-model CompanyFollower {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  userId    Int
-  createdAt DateTime @default(now())
-
-  company Company @relation(fields: [companyId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-
-  @@unique([companyId, userId])
-}
-
-model Job {
-  id             Int     @id @default(autoincrement())
-  title          String
-  slug           String  @unique
-  description    String  @db.LongText
-  employmentType String // Full-time, Part-time
-  experience     String?
-  salaryRange    String?
-  location       String
-  isRemote       Boolean @default(false)
-  isActive       Boolean @default(true)
-  views          Int     @default(0)
-
-   companyName    String?   // Just plain text (Infosys, TCS, etc.)
-  applyUrl       String?
-  linkedinUrl    String?
-  isExternal     Boolean   @default(false)
-
-  companyId  Int?
-  postedById Int
-
-  createdAt DateTime @default(now())
-
-  company      Company?          @relation(fields: [companyId], references: [id])
-  postedBy     User             @relation(fields: [postedById], references: [id])
-  applications JobApplication[]
-}
-
-model JobApplication {
-  id        Int      @id @default(autoincrement())
-  jobId     Int
-  userId    Int
-  resumeUrl String?
-  coverNote String?
-  status    String   @default("applied")
-  createdAt DateTime @default(now())
-
-  job  Job  @relation(fields: [jobId], references: [id])
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([jobId, userId])
-}
-
-model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  password String
-  role     String @default("candidate")
-
-  // Email Verification
-  emailVerified Boolean   @default(false)
-  otpHash       String?
-  otpExpiry     DateTime?
-
-  // Forgot Password
-  resetOtpHash   String?
-  resetOtpExpiry DateTime?
-
-  // Security
-  failedLoginAttempts Int       @default(0)
-  lockUntil           DateTime?
-
-  createdAt DateTime @default(now())
-
-  username   String  @unique
-  fullName   String?
-  headline   String?
-  about      String? @db.LongText
-  location   String?
-  avatarUrl  String?
-  websiteUrl String?
-
-  isOnboarded Boolean @default(false)
-
-  companyId Int?
-  company   Company? @relation(fields: [companyId], references: [id])
-
-  createdEvents  Event[] @relation("CreatedEvents")
-  approvedEvents Event[] @relation("ApprovedEvents")
-
-  jobsPosted        Job[]
-  jobApplications   JobApplication[]
-  followedCompanies CompanyFollower[]
-
-  magazines Magazine[]
-
-  // ✅ FIXED RELATIONS
-  submittedDirectories SupplierDirectory[] @relation("SubmittedDirectories")
-  approvedDirectories  SupplierDirectory[] @relation("ApprovedDirectories")
-
-  createdPosts  Post[] @relation("CreatedPosts")
-  approvedPosts Post[] @relation("ApprovedPosts")
-
-  createdBanners AdvertisementBanner[] @relation("CreatedBanners")
-}
-
-model AuditLog {
-  id        Int      @id @default(autoincrement())
-=======
 model User {
   id                                                      Int                   @id @default(autoincrement())
   email                                                   String                @unique
@@ -331,7 +134,6 @@ model AdvertisementBanner {
 
 model AuditLog {
   id        Int      @id @default(autoincrement())
->>>>>>> b8da047 (backend issue solved)
   action    String
   entity    String
   entityId  Int?
@@ -339,173 +141,6 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
-<<<<<<< HEAD
-enum DirectoryStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model SupplierDirectory {
-  id            Int      @id @default(autoincrement())
-  name          String
-  slug          String   @unique
-  // ✅ ADD THIS
-  companyId     Int?
-  company       Company? @relation(fields: [companyId], references: [id])
-  phoneNumber   String?
-  email         String?
-  // ✅ JSON ARRAYS
-  tradeNames    Json? // ["AMBA", "US Mold Builders"]
-  videoGallery  Json? // ["https://youtube.com/...", "..."]
-  description   String   @db.LongText
-  website       String?
-  logoUrl       String?
-  coverImageUrl String?
-  // ✅ SOCIAL MEDIA LINKS
-  socialLinks   Json?
-
-  // ✅ PRODUCTS / SUPPLIES
-  productSupplies Json?
-  // ["Injection Molds", "Hot Runner Systems", "Tooling Design"]
-  isFeatured    Boolean  @default(false)
-
-  status         DirectoryStatus @default(PENDING)
-  isLiveEditable Boolean         @default(false)
-
-  views       Int @default(0)
-  connections Int @default(0)
-
-  submittedById Int
-  approvedById  Int?
-
-  createdAt  DateTime  @default(now())
-  approvedAt DateTime?
-
-  // ✅ FIXED RELATIONS
-  submittedBy User  @relation("SubmittedDirectories", fields: [submittedById], references: [id])
-  approvedBy  User? @relation("ApprovedDirectories", fields: [approvedById], references: [id])
-}
-
-enum PostStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum BannerStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum BannerPlacement {
-  HOME_TOP
-  HOME_MIDDLE
-  HOME_BOTTOM
-
-  ARTICLE_TOP
-  ARTICLE_MIDDLE
-  ARTICLE_BOTTOM
-
-  SUPPLIER_TOP
-  SUPPLIER_AFTER_VIDEO
-  SIDEBAR
-  FOOTER
-}
-
-model AdvertisementBanner {
-  id        Int             @id @default(autoincrement())
-  title     String
-  imageUrl  String
-  targetUrl String?
-  placement BannerPlacement
-  status    BannerStatus    @default(INACTIVE)
-
-  position Int @default(0)
-
-  startDate DateTime?
-  endDate   DateTime?
-
-  impressions Int @default(0)
-  clicks      Int @default(0)
-
-  createdById Int
-  createdBy   User @relation("CreatedBanners", fields: [createdById], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-enum EventStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-model Event {
-  id    Int    @id @default(autoincrement())
-  title String
-  slug  String @unique
-
-  logoUrl   String?
-  bannerUrl String?
-
-  startDate DateTime
-  endDate   DateTime
-
-  description String @db.LongText
-
-  websiteUrl  String?
-  registerUrl String?
-  location    String?
-
-  // Calendar helpers
-  calendarUrl String?
-
-  status EventStatus @default(DRAFT)
-  views  Int         @default(0)
-
-  createdById  Int
-  approvedById Int?
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-
-  createdBy  User  @relation("CreatedEvents", fields: [createdById], references: [id])
-  approvedBy User? @relation("ApprovedEvents", fields: [approvedById], references: [id])
-
-  registrations EventRegistration[]
-}
-
-model EventRegistration {
-  id Int @id @default(autoincrement())
-
-  eventId Int
-  event   Event @relation(fields: [eventId], references: [id])
-
-  fullName String
-  email    String
-  phone    String
-
-  companyName String?
-  jobTitle    String?
-  country     String?
-  city        String?
-
-  industry     String?
-  experience   String?
-  attendeeType String?
-
-  ticketType String?
-  interests  Json?
-
-  specialRequirements String? @db.LongText
-
-  status String @default("REGISTERED")
-
-  createdAt DateTime @default(now())
-=======
 model Company {
   id                Int                 @id @default(autoincrement())
   name              String
@@ -609,21 +244,10 @@ model EventRegistration {
   status              String   @default("REGISTERED")
   createdAt           DateTime @default(now())
   Event               Event    @relation(fields: [eventId], references: [id])
->>>>>>> b8da047 (backend issue solved)
 
   @@index([eventId])
 }
 
-<<<<<<< HEAD
-enum MagazineStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-model MagazineAuthor {
-  id              Int     @id @default(autoincrement())
-=======
 model Industry {
   id             Int        @id @default(autoincrement())
   name           String
@@ -706,75 +330,10 @@ model Magazine {
 
 model MagazineAuthor {
   id              Int          @id @default(autoincrement())
->>>>>>> b8da047 (backend issue solved)
   name            String
   profileImageUrl String?
   designation     String?
   linkedinUrl     String?
-<<<<<<< HEAD
-
-  createdAt DateTime @default(now())
-
-  coverStories CoverStory[]
-  magazines    Magazine[]
-}
-
-model CoverStory {
-  id               Int     @id @default(autoincrement())
-  title            String
-  slug             String  @unique
-  shortDescription String?
-  keyCategories    Json?
-  imageBrief       String?
-  fullDescription  String  @db.LongText
-  badge            String?
-  coverImageUrl    String?
-  slugImageUrls    Json?
-
-  createdAt DateTime @default(now())
-
-  authorId Int?
-  author   MagazineAuthor? @relation(fields: [authorId], references: [id])
-
-  magazines Magazine[]
-}
-
-model Magazine {
-  id          Int     @id @default(autoincrement())
-  title       String
-  slug        String  @unique
-  description String? @db.LongText
-
-  coverImageUrl String?
-  pdfUrl        String
-  flipbookPages Json?
-
-  coverStoryId Int?
-  coverStory   CoverStory? @relation(fields: [coverStoryId], references: [id])
-
-  authorId Int?
-  author   MagazineAuthor? @relation(fields: [authorId], references: [id])
-
-  status MagazineStatus @default(DRAFT)
-
-  createdById Int
-  createdBy   User @relation(fields: [createdById], references: [id])
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-
-  // ✅ ADD THIS LINE (VERY IMPORTANT)
-  registrations MagazineRegistration[]
-}
-
-model MagazineRegistration {
-  id Int @id @default(autoincrement())
-
-  magazineId Int
-  magazine   Magazine @relation(fields: [magazineId], references: [id])
-
-=======
   createdAt       DateTime     @default(now())
   CoverStory      CoverStory[]
   Magazine        Magazine[]
@@ -783,20 +342,12 @@ model MagazineRegistration {
 model MagazineRegistration {
   id          Int      @id @default(autoincrement())
   magazineId  Int
->>>>>>> b8da047 (backend issue solved)
   firstName   String
   lastName    String
   email       String
   companyName String?
   jobTitle    String?
   country     String?
-<<<<<<< HEAD
-
-  createdAt DateTime @default(now())
-
-  @@index([magazineId])
-}
-=======
   createdAt   DateTime @default(now())
   Magazine    Magazine @relation(fields: [magazineId], references: [id])
 
@@ -877,4 +428,3 @@ enum Post_status {
   APPROVED
   REJECTED
 }
->>>>>>> b8da047 (backend issue solved)
