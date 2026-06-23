@@ -23,6 +23,7 @@ model Category {
 }
 
 model Post {
+<<<<<<< HEAD
   id       Int     @id @default(autoincrement())
   title    String
   slug     String  @unique
@@ -62,6 +63,45 @@ model Post {
   approvedBy User? @relation("ApprovedPosts", fields: [approvedById], references: [id])
 
   comments Comment[]
+=======
+  id                           Int         @id @default(autoincrement())
+  title                        String
+  slug                         String      @unique
+  badge                        String?
+  excerpt                      String?
+  content                      String      @db.LongText
+  imageUrl                     String?
+  facebookUrl                  String?
+  linkedinUrl                  String?
+  twitterUrl                   String?
+  youtubeUrl                   String?
+  email                        String?
+  whatsappNumber               String?
+  authorId                     Int?
+  companyId                    Int?
+  categoryId                   Int
+  status                       Post_status @default(PENDING)
+  createdById                  Int?
+  approvedById                 Int?
+  approvedAt                   DateTime?
+  publishedAt                  DateTime?
+  views                        Int         @default(0)
+  shares                       Int         @default(0)
+  createdAt                    DateTime    @default(now())
+  updatedAt                    DateTime    @updatedAt
+  comments                     Comment[]
+  User_Post_approvedByIdToUser User?       @relation("Post_approvedByIdToUser", fields: [approvedById], references: [id])
+  author                       Author?     @relation(fields: [authorId], references: [id])
+  category                     Category    @relation(fields: [categoryId], references: [id])
+  Company                      Company?    @relation(fields: [companyId], references: [id])
+  User_Post_createdByIdToUser  User?       @relation("Post_createdByIdToUser", fields: [createdById], references: [id])
+
+  @@index([approvedById], map: "Post_approvedById_fkey")
+  @@index([authorId], map: "Post_authorId_fkey")
+  @@index([categoryId], map: "Post_categoryId_fkey")
+  @@index([companyId], map: "Post_companyId_fkey")
+  @@index([createdById], map: "Post_createdById_fkey")
+>>>>>>> b8da047 (backend issue solved)
 }
 
 model Comment {
@@ -71,10 +111,12 @@ model Comment {
   email     String?
   content   String
   createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id])
 
-  post Post @relation(fields: [postId], references: [id])
+  @@index([postId], map: "Comment_postId_fkey")
 }
 
+<<<<<<< HEAD
 model Industry {
   id       Int     @id @default(autoincrement())
   name     String
@@ -228,6 +270,68 @@ model User {
 
 model AuditLog {
   id        Int      @id @default(autoincrement())
+=======
+model User {
+  id                                                      Int                   @id @default(autoincrement())
+  email                                                   String                @unique
+  password                                                String
+  role                                                    String                @default("candidate")
+  emailVerified                                           Boolean               @default(false)
+  otpHash                                                 String?
+  otpExpiry                                               DateTime?
+  resetOtpHash                                            String?
+  resetOtpExpiry                                          DateTime?
+  failedLoginAttempts                                     Int                   @default(0)
+  lockUntil                                               DateTime?
+  createdAt                                               DateTime              @default(now())
+  username                                                String                @unique
+  fullName                                                String?
+  headline                                                String?
+  about                                                   String?               @db.LongText
+  location                                                String?
+  avatarUrl                                               String?
+  websiteUrl                                              String?
+  isOnboarded                                             Boolean               @default(false)
+  companyId                                               Int?
+  AdvertisementBanner                                     AdvertisementBanner[]
+  CompanyFollower                                         CompanyFollower[]
+  Event_Event_approvedByIdToUser                          Event[]               @relation("Event_approvedByIdToUser")
+  Event_Event_createdByIdToUser                           Event[]               @relation("Event_createdByIdToUser")
+  Job                                                     Job[]
+  JobApplication                                          JobApplication[]
+  Magazine                                                Magazine[]
+  Post_Post_approvedByIdToUser                            Post[]                @relation("Post_approvedByIdToUser")
+  Post_Post_createdByIdToUser                             Post[]                @relation("Post_createdByIdToUser")
+  SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]   @relation("SupplierDirectory_approvedByIdToUser")
+  SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[]   @relation("SupplierDirectory_submittedByIdToUser")
+  Company                                                 Company?              @relation(fields: [companyId], references: [id])
+
+  @@index([companyId], map: "User_companyId_fkey")
+}
+
+model AdvertisementBanner {
+  id          Int                           @id @default(autoincrement())
+  title       String
+  imageUrl    String
+  targetUrl   String?
+  placement   AdvertisementBanner_placement
+  status      AdvertisementBanner_status    @default(INACTIVE)
+  position    Int                           @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  impressions Int                           @default(0)
+  clicks      Int                           @default(0)
+  createdById Int
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime
+  User        User                          @relation(fields: [createdById], references: [id])
+
+  @@index([createdById], map: "AdvertisementBanner_createdById_fkey")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+>>>>>>> b8da047 (backend issue solved)
   action    String
   entity    String
   entityId  Int?
@@ -235,6 +339,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
+<<<<<<< HEAD
 enum DirectoryStatus {
   PENDING
   APPROVED
@@ -400,10 +505,116 @@ model EventRegistration {
   status String @default("REGISTERED")
 
   createdAt DateTime @default(now())
+=======
+model Company {
+  id                Int                 @id @default(autoincrement())
+  name              String
+  slug              String              @unique
+  tagline           String?
+  description       String?
+  location          String?
+  companySize       String?
+  website           String?
+  logoUrl           String?
+  coverImageUrl     String?
+  isVerified        Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  industryId        Int?
+  address           String?
+  Industry          Industry?           @relation(fields: [industryId], references: [id])
+  CompanyFollower   CompanyFollower[]
+  Job               Job[]
+  Post              Post[]
+  SupplierDirectory SupplierDirectory[]
+  User              User[]
+
+  @@index([industryId], map: "Company_industryId_fkey")
+}
+
+model CompanyFollower {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  createdAt DateTime @default(now())
+  Company   Company  @relation(fields: [companyId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+  @@index([userId], map: "CompanyFollower_userId_fkey")
+}
+
+model CoverStory {
+  id               Int             @id @default(autoincrement())
+  title            String
+  slug             String          @unique
+  shortDescription String?
+  keyCategories    Json?
+  imageBrief       String?
+  fullDescription  String          @db.LongText
+  badge            String?
+  coverImageUrl    String?
+  slugImageUrls    Json?
+  createdAt        DateTime        @default(now())
+  authorId         Int?
+  MagazineAuthor   MagazineAuthor? @relation(fields: [authorId], references: [id])
+  Magazine         Magazine[]
+
+  @@index([authorId], map: "CoverStory_authorId_fkey")
+}
+
+model Event {
+  id                            Int                 @id @default(autoincrement())
+  title                         String
+  slug                          String              @unique
+  logoUrl                       String?
+  bannerUrl                     String?
+  startDate                     DateTime
+  endDate                       DateTime
+  description                   String              @db.LongText
+  websiteUrl                    String?
+  registerUrl                   String?
+  location                      String?
+  calendarUrl                   String?
+  status                        Event_status        @default(DRAFT)
+  views                         Int                 @default(0)
+  createdById                   Int
+  approvedById                  Int?
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime
+  publishedAt                   DateTime?
+  User_Event_approvedByIdToUser User?               @relation("Event_approvedByIdToUser", fields: [approvedById], references: [id])
+  User_Event_createdByIdToUser  User                @relation("Event_createdByIdToUser", fields: [createdById], references: [id])
+  EventRegistration             EventRegistration[]
+
+  @@index([approvedById], map: "Event_approvedById_fkey")
+  @@index([createdById], map: "Event_createdById_fkey")
+}
+
+model EventRegistration {
+  id                  Int      @id @default(autoincrement())
+  eventId             Int
+  fullName            String
+  email               String
+  phone               String
+  companyName         String?
+  jobTitle            String?
+  country             String?
+  city                String?
+  industry            String?
+  experience          String?
+  attendeeType        String?
+  ticketType          String?
+  interests           Json?
+  specialRequirements String?  @db.LongText
+  status              String   @default("REGISTERED")
+  createdAt           DateTime @default(now())
+  Event               Event    @relation(fields: [eventId], references: [id])
+>>>>>>> b8da047 (backend issue solved)
 
   @@index([eventId])
 }
 
+<<<<<<< HEAD
 enum MagazineStatus {
   DRAFT
   PUBLISHED
@@ -412,10 +623,95 @@ enum MagazineStatus {
 
 model MagazineAuthor {
   id              Int     @id @default(autoincrement())
+=======
+model Industry {
+  id             Int        @id @default(autoincrement())
+  name           String
+  slug           String     @unique
+  parentId       Int?
+  createdAt      DateTime   @default(now())
+  Company        Company[]
+  Industry       Industry?  @relation("IndustryToIndustry", fields: [parentId], references: [id])
+  other_Industry Industry[] @relation("IndustryToIndustry")
+
+  @@index([parentId])
+}
+
+model Job {
+  id             Int              @id @default(autoincrement())
+  title          String
+  slug           String           @unique
+  description    String           @db.LongText
+  employmentType String
+  experience     String?
+  salaryRange    String?
+  location       String
+  isRemote       Boolean          @default(false)
+  isActive       Boolean          @default(true)
+  views          Int              @default(0)
+  companyId      Int?
+  postedById     Int
+  createdAt      DateTime         @default(now())
+  applyUrl       String?
+  isExternal     Boolean          @default(false)
+  linkedinUrl    String?
+  companyName    String?
+  Company        Company?         @relation(fields: [companyId], references: [id])
+  User           User             @relation(fields: [postedById], references: [id])
+  JobApplication JobApplication[]
+
+  @@index([companyId], map: "Job_companyId_fkey")
+  @@index([postedById], map: "Job_postedById_fkey")
+}
+
+model JobApplication {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  userId    Int
+  resumeUrl String?
+  coverNote String?
+  status    String   @default("applied")
+  createdAt DateTime @default(now())
+  Job       Job      @relation(fields: [jobId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@unique([jobId, userId])
+  @@index([userId], map: "JobApplication_userId_fkey")
+}
+
+model Magazine {
+  id                   Int                    @id @default(autoincrement())
+  title                String
+  slug                 String                 @unique
+  description          String?                @db.LongText
+  coverImageUrl        String?
+  pdfUrl               String
+  flipbookPages        Json?
+  status               Magazine_status        @default(DRAFT)
+  createdById          Int
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  publishedAt          DateTime?
+  authorId             Int?
+  coverStoryId         Int?
+  MagazineAuthor       MagazineAuthor?        @relation(fields: [authorId], references: [id])
+  CoverStory           CoverStory?            @relation(fields: [coverStoryId], references: [id])
+  User                 User                   @relation(fields: [createdById], references: [id])
+  MagazineRegistration MagazineRegistration[]
+
+  @@index([authorId], map: "Magazine_authorId_fkey")
+  @@index([coverStoryId], map: "Magazine_coverStoryId_fkey")
+  @@index([createdById], map: "Magazine_createdById_fkey")
+}
+
+model MagazineAuthor {
+  id              Int          @id @default(autoincrement())
+>>>>>>> b8da047 (backend issue solved)
   name            String
   profileImageUrl String?
   designation     String?
   linkedinUrl     String?
+<<<<<<< HEAD
 
   createdAt DateTime @default(now())
 
@@ -478,14 +774,107 @@ model MagazineRegistration {
   magazineId Int
   magazine   Magazine @relation(fields: [magazineId], references: [id])
 
+=======
+  createdAt       DateTime     @default(now())
+  CoverStory      CoverStory[]
+  Magazine        Magazine[]
+}
+
+model MagazineRegistration {
+  id          Int      @id @default(autoincrement())
+  magazineId  Int
+>>>>>>> b8da047 (backend issue solved)
   firstName   String
   lastName    String
   email       String
   companyName String?
   jobTitle    String?
   country     String?
+<<<<<<< HEAD
 
   createdAt DateTime @default(now())
 
   @@index([magazineId])
 }
+=======
+  createdAt   DateTime @default(now())
+  Magazine    Magazine @relation(fields: [magazineId], references: [id])
+
+  @@index([magazineId])
+}
+
+model SupplierDirectory {
+  id                                         Int                      @id @default(autoincrement())
+  name                                       String
+  slug                                       String                   @unique
+  companyId                                  Int?
+  phoneNumber                                String?
+  email                                      String?
+  tradeNames                                 Json?
+  videoGallery                               Json?
+  description                                String                   @db.LongText
+  website                                    String?
+  logoUrl                                    String?
+  coverImageUrl                              String?
+  socialLinks                                Json?
+  productSupplies                            Json?
+  status                                     SupplierDirectory_status @default(PENDING)
+  isLiveEditable                             Boolean                  @default(false)
+  views                                      Int                      @default(0)
+  connections                                Int                      @default(0)
+  submittedById                              Int
+  approvedById                               Int?
+  createdAt                                  DateTime                 @default(now())
+  approvedAt                                 DateTime?
+  isFeatured                                 Boolean                  @default(false)
+  User_SupplierDirectory_approvedByIdToUser  User?                    @relation("SupplierDirectory_approvedByIdToUser", fields: [approvedById], references: [id])
+  Company                                    Company?                 @relation(fields: [companyId], references: [id])
+  User_SupplierDirectory_submittedByIdToUser User                     @relation("SupplierDirectory_submittedByIdToUser", fields: [submittedById], references: [id])
+
+  @@index([approvedById], map: "SupplierDirectory_approvedById_fkey")
+  @@index([companyId], map: "SupplierDirectory_companyId_fkey")
+  @@index([submittedById], map: "SupplierDirectory_submittedById_fkey")
+}
+
+enum AdvertisementBanner_placement {
+  HOME_TOP
+  HOME_MIDDLE
+  HOME_BOTTOM
+  ARTICLE_TOP
+  ARTICLE_MIDDLE
+  ARTICLE_BOTTOM
+  SUPPLIER_TOP
+  SUPPLIER_AFTER_VIDEO
+  SIDEBAR
+  FOOTER
+}
+
+enum AdvertisementBanner_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum Magazine_status {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Event_status {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SupplierDirectory_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Post_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+>>>>>>> b8da047 (backend issue solved)
