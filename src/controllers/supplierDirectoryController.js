@@ -85,8 +85,8 @@ export const createDirectory = async (req, res) => {
     /* ==============================
        3️⃣ Update Company Info
     ============================== */
-    await prisma.company.update({
-      where: { id: user.companyId },
+    await prisma.Company.update({
+      where: { id: user.CompanyId },
       data: {
         location,
         address,
@@ -112,7 +112,7 @@ export const createDirectory = async (req, res) => {
         socialLinks,
         productSupplies,
 
-        companyId: user.companyId,
+        CompanyId: user.CompanyId,
         status: "PENDING",
         isLiveEditable: false,
         submittedById: user.id,
@@ -300,7 +300,7 @@ export const getSuppliers = async (req, res) => {
 
       // Filter by company location
       ...(location && {
-        company: {
+        Company: {
           location: { contains: location },
         },
       }),
@@ -316,7 +316,7 @@ export const getSuppliers = async (req, res) => {
       // ✅ Industry filter — matches company's industryId
       // Uses the full descendant tree so parent selection works
       ...(industryIds && {
-        company: {
+        Company: {
           industryId: { in: industryIds },
         },
       }),
@@ -342,13 +342,13 @@ export const getSuppliers = async (req, res) => {
         skip,
         take: limitNum,
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
               location: true,
               industryId: true,
-              industry: {
+              Industry: {
                 select: { id: true, name: true },
               },
             },
@@ -380,8 +380,8 @@ export const getSupplierBySlug = async (req, res) => {
     const supplier = await prisma.supplierDirectory.findUnique({
       where: { slug },
       include: {
-        company: {
-          select: { id: true, name: true, location: true, industry: true, website: true },
+        Company: {
+          select: { id: true, name: true, location: true, Industry: true, website: true },
         },
       },
     })
@@ -410,7 +410,7 @@ export const getAllDirectoriesForAdmin = async (req, res) => {
     const directories = await prisma.supplierDirectory.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        company: { select: { id: true, name: true, slug: true } },
+        Company: { select: { id: true, name: true, slug: true } },
         submittedBy: { select: { id: true, email: true, username: true } },
         approvedBy: { select: { id: true, email: true } },
       },

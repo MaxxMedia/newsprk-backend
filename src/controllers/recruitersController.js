@@ -20,7 +20,7 @@ export async function getRecruiterProfile(req, res) {
   websiteUrl: true,
   role: true,
   createdAt: true,
-  company: {
+  Company: {
     select: {
       id: true,
       name: true,
@@ -65,7 +65,7 @@ export async function getMyRecruiterProfile(req, res) {
         websiteUrl: true,
         role: true,
         createdAt: true,
-        company: {
+        Company: {
   select: {
     id: true,
     name: true,
@@ -118,7 +118,7 @@ export async function getRecruiterDashboard(req, res) {
 
     const applicationsCount = await prisma.jobApplication.count({
       where: {
-        job: {
+        Job: {
           postedById: recruiterId,
         },
       },
@@ -127,45 +127,70 @@ export async function getRecruiterDashboard(req, res) {
     const shortlistedCount = await prisma.jobApplication.count({
       where: {
         status: "shortlisted",
-        job: {
+        Job: {
           postedById: recruiterId,
         },
       },
     })
 
-    const recentJobsRaw = await prisma.job.findMany({
-      where: {
-        postedById: recruiterId,
-        isActive: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5,
+   const recentJobsRaw = await prisma.job.findMany({
+  where: {
+    postedById: recruiterId,
+    isActive: true,
+  },
+  orderBy: { createdAt: "desc" },
+  take: 5,
+  select: {
+    id: true,
+    title: true,
+    _count: {
       select: {
-        id: true,
-        title: true,
-        _count: {
-          select: { applications: true },
-        },
+        JobApplication: true,
       },
-    })
+    },
+  },
+})
 
-    const recentJobs = recentJobsRaw.map(job => ({
-      id: job.id,
-      title: job.title,
-      applications: job._count.applications,
-    }))
+const recentJobs = recentJobsRaw.map(job => ({
+  id: job.id,
+  title: job.title,
+  applications: job._count.JobApplication,
+}))
+
+const articles = await prisma.post.findMany({
+  where: {
+    category: {
+      slug: "articles",
+    },
+    createdById: recruiterId,
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+  take: 5,
+  select: {
+    id: true,
+    title: true,
+    status: true,
+    createdAt: true,
+  },
+})
+
+console.log("ARTICLES FOUND:", articles.length)
 
     res.json({
       jobsCount,
       applicationsCount,
       shortlistedCount,
       recentJobs,
+      articles,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
     res.status(500).json({ error: "Failed to load dashboard" })
   }
 }
+
 
 // ================= UPDATE RECRUITER PROFILE =================
 export async function updateRecruiterProfile(req, res) {
@@ -194,7 +219,7 @@ export async function updateRecruiterProfile(req, res) {
 
     const recruiter = await prisma.user.findUnique({
       where: { id: userId },
-      include: { company: true },
+      include: { Company: true },
     })
 
     if (!recruiter) {
@@ -275,7 +300,7 @@ export async function updateRecruiterProfile(req, res) {
         avatarUrl: true,
         websiteUrl: true,
         role: true,
-        company: {
+        Company: {
           select: {
             id: true,
             name: true,
@@ -342,7 +367,7 @@ export async function getAllRecruiters(req, res) {
         role: "recruiter",
       },
       include: {
-        company: {
+        Company: {
           select: {
             name: true,
           },

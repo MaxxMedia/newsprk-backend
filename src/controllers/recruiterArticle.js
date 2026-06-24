@@ -13,11 +13,18 @@ export const createRecruiterArticle = async (req, res) => {
       return res.status(403).json({ error: "Only recruiters can create articles" })
     }
 
-    if (!user.companyId) {
-      return res
-        .status(400)
-        .json({ error: "Recruiter must be linked to a company" })
-    }
+   const recruiter = await prisma.user.findUnique({
+  where: { id: user.id },
+  select: {
+    companyId: true,
+  },
+})
+
+if (!recruiter?.companyId) {
+  return res.status(400).json({
+    error: "Recruiter must be linked to a company",
+  })
+}
 
     const { title, content, excerpt, imageUrl, badge } = req.body
 
@@ -38,34 +45,29 @@ export const createRecruiterArticle = async (req, res) => {
       })
     }
 
-    const slug = slugify(title, {
-      lower: true,
-      strict: true,
-      trim: true,
-    })
+    const slug = `${slugify(title, {
+  lower: true,
+  strict: true,
+  trim: true,
+})}-${Date.now()}`
 
     const post = await prisma.post.create({
-      data: {
+  data: {
     title,
     slug,
     content,
     excerpt,
     imageUrl,
     badge,
-    companyId: user.companyId,
+    companyId: recruiter.companyId,
     categoryId: category.id,
 
     status: "PENDING",
-    createdById: user.userId,
+    createdById: user.id,
 
-    // ❌ do NOT publish yet
     publishedAt: null,
   },
-      include: {
-        company: true,
-        category: true,
-      },
-    })
+})
 
     return res.status(201).json(post)
   } catch (error) {
@@ -87,16 +89,30 @@ export const getMyRecruiterArticles = async (req, res) => {
       return res.status(403).json({ error: "Only recruiters allowed" })
     }
 
+    const recruiter = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        companyId: true,
+      },
+    })
+
+    if (!recruiter?.companyId) {
+      return res.json([])
+    }
+
     const posts = await prisma.post.findMany({
       where: {
-        category: { slug: "articles" },
-        OR: [
-          { companyId: user.companyId }, // recruiter-owned
-          { companyId: null },           // legacy/admin articles
-        ],
+        category: {
+          slug: "articles",
+        },
+        companyId: recruiter.companyId,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     })
+
+    console.log("ARTICLES FOUND:", posts.length)
 
     res.json(posts)
   } catch (error) {
@@ -104,7 +120,6 @@ export const getMyRecruiterArticles = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch articles" })
   }
 }
-
 
 
 /**
@@ -147,7 +162,7 @@ export const updateRecruiterArticle = async (req, res) => {
         updatedAt: new Date(),
       },
       include: {
-        company: true,
+        Company: true,
         category: true,
       },
     })

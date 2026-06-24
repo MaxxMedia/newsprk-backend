@@ -46,12 +46,34 @@ export async function getRecruiterDashboard(req, res) {
       },
     })
 
+    // Articles
+const articles = await prisma.post.findMany({
+  where: {
+    category: {
+      slug: "articles",
+    },
+    createdById: recruiterId,
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+  take: 5,
+  select: {
+    id: true,
+    title: true,
+    status: true,
+    createdAt: true,
+  },
+})
+console.log("Recruiter ID:", recruiterId)
+console.log("Dashboard Articles:", articles)
     res.json({
       jobsCount: jobs.length,
       applicationsCount,
       directoriesCount: directories.length,
       recentJobs: jobs.slice(0, 5),
       directories,
+      articles,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
