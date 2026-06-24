@@ -291,47 +291,56 @@ export async function deactivateJob(req, res) {
  * Admin: company-wise jobs with count
  */
 export const getAdminCompanyJobs = async (req, res) => {
-  // console.log("🔥 getAdminCompanyJobs HIT")
-
-  const companies = await prisma.company.findMany({
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      jobs: {
-        where: { isActive: true },
-        select: {
-          id: true,
-          title: true,
-          location: true,
-          employmentType: true,
-          createdAt: true,
-          views: true,
-          _count: {
-            select: { applications: true }, // ✅ THIS
+  try {
+    const companies = await prisma.company.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        Job: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            employmentType: true,
+            createdAt: true,
+            views: true,
+            _count: {
+              select: {
+                JobApplication: true,
+              },
+            },
           },
         },
       },
-    },
-  })
+    })
 
-  const formatted = companies.map(company => ({
-    id: company.id,
-    name: company.name,
-    slug: company.slug,
-    jobsCount: company.jobs.length,
-    jobs: company.jobs.map(job => ({
-      id: job.id,
-      title: job.title,
-      location: job.location,
-      employmentType: job.employmentType,
-      createdAt: job.createdAt,
-      views: job.views,
-      appliedCount: job._count.applications, // ✅ FIX
-    })),
-  }))
+    const formatted = companies.map(company => ({
+      id: company.id,
+      name: company.name,
+      slug: company.slug,
+      jobsCount: company.Job.length,
+      jobs: company.Job.map(job => ({
+        id: job.id,
+        title: job.title,
+        location: job.location,
+        employmentType: job.employmentType,
+        createdAt: job.createdAt,
+        views: job.views,
+        appliedCount: job._count.JobApplication,
+      })),
+    }))
 
-  res.json(formatted)
+    res.json(formatted)
+  } catch (err) {
+    console.error("Admin company jobs error:", err)
+    res.status(500).json({
+      error: err.message,
+    })
+  }
 }
 
 

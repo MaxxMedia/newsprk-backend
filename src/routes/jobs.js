@@ -8,36 +8,23 @@ import {
   getJobsByRecruiter,
   getMyRecruiterJobs,
   getAdminCompanyJobs,
-  incrementJobView
+  incrementJobView,
 } from "../controllers/jobsController.js"
 
 const router = express.Router()
 
 /* ================= PUBLIC ================= */
 
-// Job feed
+// All jobs
 router.get("/", getAllJobs)
-
-// 👁️ Increment job view
-router.post("/:slug/view", incrementJobView)
-
-// Job detail
-router.get("/:slug", getJobBySlug)
 
 /* ================= RECRUITER ================= */
 
-// ✅ MUST COME FIRST
+// Recruiter's own jobs
 router.get(
   "/recruiter/me",
   requireAuth,
   getMyRecruiterJobs
-)
-
-router.get(
-  "/admin/company-jobs",
-  requireAuth,
-  requireAdmin,
-  getAdminCompanyJobs
 )
 
 // Public recruiter profile jobs
@@ -47,11 +34,42 @@ router.get(
 )
 
 // Create job
-router.post("/", requireAuth, createJob)
+router.post(
+  "/",
+  requireAuth,
+  createJob
+)
 
 /* ================= ADMIN ================= */
 
-router.put("/:id/deactivate", requireAuth, requireAdmin, deactivateJob)
+// Company-wise jobs
+router.get(
+  "/admin/company-jobs",
+  requireAuth,
+  requireAdmin,
+  getAdminCompanyJobs
+)
 
+// Deactivate job
+router.put(
+  "/:id/deactivate",
+  requireAuth,
+  requireAdmin,
+  deactivateJob
+)
+
+/* ================= JOB ACTIONS ================= */
+
+// Increment job view
+router.post(
+  "/:slug/view",
+  incrementJobView
+)
+
+// ⚠️ KEEP THIS LAST
+router.get(
+  "/:slug",
+  getJobBySlug
+)
 
 export default router
