@@ -80,26 +80,30 @@ export async function createJob(req, res) {
  */
 export async function getAllJobs(req, res) {
   try {
-    const jobs = await prisma.job.findMany({
-      where: { isActive: true },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,       // ✅ REQUIRED
-            logoUrl: true,    // (optional for later)
-          },
-        },
-        postedBy: {
-          select: {
-            id: true,
-            email: true,
-          },
-        },
+   const jobs = await prisma.job.findMany({
+  where: {
+    isActive: true,
+  },
+  include: {
+    Company: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
       },
-      orderBy: { createdAt: "desc" },
-    })
+    },
+    User: {
+      select: {
+        id: true,
+        email: true,
+      },
+    },
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+})
 
     res.json(jobs)
   } catch (err) {
