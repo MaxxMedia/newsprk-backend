@@ -15,23 +15,20 @@ export const getApprovedArticles = async (req, res) => {
       orderBy: {
         publishedAt: "desc",
       },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            logoUrl: true,
-          },
-        },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
+     include: {
+  Company: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  User_Post_createdByIdToUser: {
+    select: {
+      id: true,
+      email: true,
+    },
+  },
+},
     })
 
     res.json(articles)
