@@ -228,7 +228,7 @@ export async function getRecruiterDashboard(req, res) {
 // 2️⃣ Applications count
 const applicationsCount = await prisma.jobApplication.count({
   where: {
-    job: {
+    Job: {
       postedById: recruiterId,
     },
   },
@@ -238,7 +238,7 @@ const applicationsCount = await prisma.jobApplication.count({
 const shortlistedCount = await prisma.jobApplication.count({
   where: {
     status: "shortlisted",
-    job: {
+    Job: {
       postedById: recruiterId,
     },
   },
@@ -257,7 +257,7 @@ const shortlistedCount = await prisma.jobApplication.count({
         title: true,
         _count: {
           select: {
-            applications: true,
+            JobApplication: true,
           },
         },
       },
@@ -266,7 +266,7 @@ const shortlistedCount = await prisma.jobApplication.count({
     const recentJobs = recentJobsRaw.map(job => ({
       id: job.id,
       title: job.title,
-      applications: job._count.applications,
+      applications: job._count.JobApplication,
     }))
 
     res.json({

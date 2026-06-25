@@ -65,8 +65,8 @@ export async function getMyApplications(req, res) {
         createdAt: "desc",
       },
       include: {
-        job: {
-          include: { company: true },
+        Job: {
+          include: { Company: true },
         },
       },
     })
@@ -104,7 +104,7 @@ export async function getApplicantsByJob(req, res) {
     const applications = await prisma.jobApplication.findMany({
       where: { jobId },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             fullName: true,
@@ -114,7 +114,7 @@ export async function getApplicantsByJob(req, res) {
         },
       },
       orderBy: { createdAt: "desc" },
-    })
+    });
 
     res.json(applications)
   } catch (err) {
@@ -142,11 +142,11 @@ export async function updateApplicationStatus(req, res) {
     const application = await prisma.jobApplication.findUnique({
       where: { id: Number(applicationId) },
       include: {
-        job: true,
+        Job: true,
       },
     })
 
-    if (!application || application.job.postedById !== req.user.id) {
+    if (!application || application.Job.postedById !== req.user.id) {
       return res.status(403).json({ error: "Not authorized" })
     }
 
