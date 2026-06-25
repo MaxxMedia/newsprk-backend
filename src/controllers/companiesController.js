@@ -81,29 +81,43 @@ export async function getCompanyBySlug(req, res) {
   try {
     const { slug } = req.params;
 
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      include: {
-        jobs: {
-          where: { isActive: true },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            location: true,
-            employmentType: true,
-            isRemote: true,
-            createdAt: true,
-          },
-        },
-        _count: {
-          select: {
-            followers: true, // ✅ Correct way
-          },
-        },
+  const company = await prisma.company.findUnique({
+  where: { slug },
+  include: {
+    Job: {
+      where: {
+        isActive: true,
       },
-    });
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        location: true,
+        employmentType: true,
+        isRemote: true,
+        createdAt: true,
+      },
+    },
+    _count: {
+      select: {
+        CompanyFollower: true,
+      },
+    },
+  },
+})
+
+if (!company) {
+  return res.status(404).json({ error: "Company not found" })
+}
+
+res.json({
+  ...company,
+  jobs: company.Job,
+  followers: company._count.CompanyFollower,
+})
 
     if (!company) {
       return res.status(404).json({ error: "Company not found" });
@@ -126,25 +140,43 @@ export async function getCompanyPeople(req, res) {
   try {
     const { slug } = req.params;
 
-    const company = await prisma.company.findUnique({
-      where: { slug },
-      include: {
-        jobs: {
-          include: {
-            postedBy: {
-              select: {
-                id: true,
-                username: true,
-                fullName: true,
-                headline: true,
-                avatarUrl: true,
-                location: true,
-              },
-            },
-          },
-        },
+   const company = await prisma.company.findUnique({
+  where: { slug },
+  include: {
+    Job: {
+      where: {
+        isActive: true,
       },
-    });
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        location: true,
+        employmentType: true,
+        isRemote: true,
+        createdAt: true,
+      },
+    },
+    _count: {
+      select: {
+        CompanyFollower: true,
+      },
+    },
+  },
+})
+
+if (!company) {
+  return res.status(404).json({ error: "Company not found" })
+}
+
+res.json({
+  ...company,
+  jobs: company.Job,
+  followers: company._count.CompanyFollower,
+})
 
     if (!company) {
       return res.status(404).json({ error: "Company not found" });
