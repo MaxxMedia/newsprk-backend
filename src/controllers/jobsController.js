@@ -107,9 +107,11 @@ export async function getAllJobs(req, res) {
 
     res.json(jobs)
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Failed to fetch jobs" })
-  }
+  console.error("GET JOB ERROR:", err)
+  res.status(500).json({
+    error: err.message
+  })
+}
 }
 
 
@@ -118,23 +120,26 @@ export async function getAllJobs(req, res) {
  */
 export async function getJobBySlug(req, res) {
   try {
-    const job = await prisma.job.findUnique({
-      where: { slug: req.params.slug },
-    include: {
-  company: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      logoUrl: true,
-      description: true,
+   const job = await prisma.job.findUnique({
+  where: { slug: req.params.slug },
+  include: {
+    Company: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        description: true,
+      },
+    },
+    User: {
+      select: {
+        id: true,
+        email: true,
+      },
     },
   },
-  postedBy: {
-    select: { id: true, email: true },
-  },
-}
-    });
+});
 
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
@@ -142,8 +147,11 @@ export async function getJobBySlug(req, res) {
 
     res.json(job);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch job" });
-  }
+  console.error("GET JOB ERROR:", err)
+  res.status(500).json({
+    error: err.message
+  })
+}
 }
 
 export async function getJobsByRecruiter(req, res) {
