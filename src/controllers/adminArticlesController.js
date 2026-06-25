@@ -8,15 +8,25 @@ export const getPendingArticles = async (req, res) => {
     const articles = await prisma.post.findMany({
       where: {
         status: "PENDING",
-        category: { slug: "articles" },
-      },
-      orderBy: { createdAt: "desc" },
-      include: {
-        company: {
-          select: { id: true, name: true },
+        category: {
+          slug: "articles",
         },
-        createdBy: {
-          select: { id: true, email: true },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        Company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        User_Post_createdByIdToUser: {
+          select: {
+            id: true,
+            email: true,
+          },
         },
       },
     })
@@ -24,25 +34,39 @@ export const getPendingArticles = async (req, res) => {
     res.json(articles)
   } catch (err) {
     console.error("Admin fetch pending articles error:", err)
-    res.status(500).json({ error: "Failed to fetch pending articles" })
+    res.status(500).json({
+      error: "Failed to fetch pending articles",
+    })
   }
 }
 
 /**
  * GET all approved recruiter articles
  */
-
 export const getAdminApprovedArticles = async (req, res) => {
   try {
     const articles = await prisma.post.findMany({
       where: {
         status: "APPROVED",
-        category: { slug: "articles" },
+        category: {
+          slug: "articles",
+        },
       },
-      orderBy: { publishedAt: "desc" },
+      orderBy: {
+        publishedAt: "desc",
+      },
       include: {
-        company: {
-          select: { id: true, name: true },
+        Company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        User_Post_createdByIdToUser: {
+          select: {
+            id: true,
+            email: true,
+          },
         },
       },
     })
@@ -50,7 +74,9 @@ export const getAdminApprovedArticles = async (req, res) => {
     res.json(articles)
   } catch (err) {
     console.error("Admin fetch approved articles error:", err)
-    res.status(500).json({ error: "Failed to fetch approved articles" })
+    res.status(500).json({
+      error: "Failed to fetch approved articles",
+    })
   }
 }
 
@@ -59,16 +85,17 @@ export const getAdminApprovedArticles = async (req, res) => {
  */
 export const approveArticle = async (req, res) => {
   try {
-    const adminId = req.user.userId
+    const adminId = req.user.id || req.user.userId
     const postId = Number(req.params.id)
 
-    // 1️⃣ Check if post exists and is pending
     const existingPost = await prisma.post.findUnique({
       where: { id: postId },
     })
 
     if (!existingPost) {
-      return res.status(404).json({ error: "Article not found" })
+      return res.status(404).json({
+        error: "Article not found",
+      })
     }
 
     if (existingPost.status !== "PENDING") {
@@ -77,9 +104,10 @@ export const approveArticle = async (req, res) => {
       })
     }
 
-    // 2️⃣ Approve
     const post = await prisma.post.update({
-      where: { id: postId },
+      where: {
+        id: postId,
+      },
       data: {
         status: "APPROVED",
         approvedById: adminId,
@@ -91,7 +119,9 @@ export const approveArticle = async (req, res) => {
     res.json(post)
   } catch (err) {
     console.error("Approve article error:", err)
-    res.status(500).json({ error: "Failed to approve article" })
+    res.status(500).json({
+      error: "Failed to approve article",
+    })
   }
 }
 
@@ -103,11 +133,15 @@ export const rejectArticle = async (req, res) => {
     const postId = Number(req.params.id)
 
     const existingPost = await prisma.post.findUnique({
-      where: { id: postId },
+      where: {
+        id: postId,
+      },
     })
 
     if (!existingPost) {
-      return res.status(404).json({ error: "Article not found" })
+      return res.status(404).json({
+        error: "Article not found",
+      })
     }
 
     if (existingPost.status !== "PENDING") {
@@ -117,15 +151,21 @@ export const rejectArticle = async (req, res) => {
     }
 
     await prisma.post.update({
-      where: { id: postId },
+      where: {
+        id: postId,
+      },
       data: {
         status: "REJECTED",
       },
     })
 
-    res.json({ success: true })
+    res.json({
+      success: true,
+    })
   } catch (err) {
     console.error("Reject article error:", err)
-    res.status(500).json({ error: "Failed to reject article" })
+    res.status(500).json({
+      error: "Failed to reject article",
+    })
   }
 }
