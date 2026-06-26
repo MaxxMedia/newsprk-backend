@@ -85,8 +85,8 @@ export const createDirectory = async (req, res) => {
     /* ==============================
        3️⃣ Update Company Info
     ============================== */
-    await prisma.Company.update({
-      where: { id: user.CompanyId },
+    await prisma.company.update({
+      where: { id: user.companyId },
       data: {
         location,
         address,
@@ -112,7 +112,7 @@ export const createDirectory = async (req, res) => {
         socialLinks,
         productSupplies,
 
-        CompanyId: user.CompanyId,
+        companyId: user.companyId,
         status: "PENDING",
         isLiveEditable: false,
         submittedById: user.id,
