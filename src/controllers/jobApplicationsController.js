@@ -116,7 +116,15 @@ export async function getApplicantsByJob(req, res) {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(applications)
+    res.json(
+  applications.map(app => ({
+    ...app,
+    job: {
+      ...app.Job,
+      company: app.Job?.Company,
+    },
+  }))
+)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Failed to fetch applicants" })
