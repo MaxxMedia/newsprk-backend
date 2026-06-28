@@ -8,18 +8,20 @@ import {
   getCompanyPeople,
   followCompany,
   unfollowCompany,
-  adminCreateCompany
+  adminCreateCompany, // ✅ ADD COMMA HERE
+  getFollowStatus
 } from "../controllers/companiesController.js";
 
 const router = express.Router();
 
 // Public
 router.get("/", getAllCompanies);
-router.get("/:slug", getCompanyBySlug); // 👈 MUST be before admin routes
-router.get("/:slug/people", getCompanyPeople)
+router.get("/:slug", getCompanyBySlug);
+router.get("/:slug/people", getCompanyPeople);
+router.get("/:companyId/follow-status", requireAuth, getFollowStatus);
 
-router.post("/:companyId/follow", requireAuth, followCompany)
-router.delete("/:companyId/follow", requireAuth, unfollowCompany)
+router.post("/:companyId/follow", requireAuth, followCompany);
+router.delete("/:companyId/follow", requireAuth, unfollowCompany);
 
 // Recruiter
 router.post("/", requireAuth, createCompany);
