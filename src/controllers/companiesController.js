@@ -118,15 +118,6 @@ res.json({
   jobs: company.Job,
   followers: company._count.CompanyFollower,
 })
-
-    if (!company) {
-      return res.status(404).json({ error: "Company not found" });
-    }
-
-    res.json({
-      ...company,
-      followers: company._count.followers,
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch company profile" });
@@ -136,47 +127,26 @@ res.json({
 /**
  * Public: get company people (recruiters)
  */
+/**
+ * Public: get company people (recruiters)
+ */
 export async function getCompanyPeople(req, res) {
   try {
     const { slug } = req.params;
 
-   const company = await prisma.company.findUnique({
-  where: { slug },
-  include: {
-    Job: {
-      where: {
-        isActive: true,
+    const company = await prisma.company.findUnique({
+      where: { slug },
+      include: {
+        Job: {
+          where: {
+            isActive: true,
+          },
+          include: {
+            User: true, // Include the user who posted the job
+          },
+        },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        location: true,
-        employmentType: true,
-        isRemote: true,
-        createdAt: true,
-      },
-    },
-    _count: {
-      select: {
-        CompanyFollower: true,
-      },
-    },
-  },
-})
-
-if (!company) {
-  return res.status(404).json({ error: "Company not found" })
-}
-
-res.json({
-  ...company,
-  jobs: company.Job,
-  followers: company._count.CompanyFollower,
-})
+    });
 
     if (!company) {
       return res.status(404).json({ error: "Company not found" });
@@ -185,9 +155,9 @@ res.json({
     // ✅ Deduplicate recruiters
     const peopleMap = new Map();
 
-    company.jobs.forEach((job) => {
-      if (job.postedBy) {
-        peopleMap.set(job.postedBy.id, job.postedBy);
+    company.Job.forEach((job) => {
+      if (job.User) {
+        peopleMap.set(job.User.id, job.User);
       }
     });
 
@@ -201,15 +171,22 @@ res.json({
 /**
  * Follow company
  */
+/**
+ * Follow company
+ */
 export async function followCompany(req, res) {
   try {
     const { companyId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id; // Use 'id' from your JWT token
+
+    // Convert to numbers
+    const companyIdNum = parseInt(companyId);
+    const userIdNum = parseInt(userId);
 
     await prisma.companyFollower.create({
       data: {
-        companyId: Number(companyId),
-        userId,
+        companyId: companyIdNum,
+        userId: userIdNum,
       },
     });
 
@@ -226,16 +203,23 @@ export async function followCompany(req, res) {
 /**
  * Unfollow company
  */
+/**
+ * Unfollow company
+ */
 export async function unfollowCompany(req, res) {
   try {
     const { companyId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id; // Use 'id' from your JWT token
+
+    // Convert to numbers
+    const companyIdNum = parseInt(companyId);
+    const userIdNum = parseInt(userId);
 
     await prisma.companyFollower.delete({
       where: {
         companyId_userId: {
-          companyId: Number(companyId),
-          userId,
+          companyId: companyIdNum,
+          userId: userIdNum,
         },
       },
     });
@@ -247,6 +231,29 @@ export async function unfollowCompany(req, res) {
   }
 }
 
+/**
+ * Check if user is following a company
+ */
+export async function getFollowStatus(req, res) {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.id;
+
+    const follow = await prisma.companyFollower.findUnique({
+      where: {
+        companyId_userId: {
+          companyId: parseInt(companyId),
+          userId: parseInt(userId),
+        },
+      },
+    });
+
+    res.json({ isFollowing: !!follow });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to check follow status" });
+  }
+}
 
 /**
  * ADMIN: Create company
