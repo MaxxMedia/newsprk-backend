@@ -9,6 +9,9 @@ const MAIL_FROM = process.env.MAIL_FROM;
    CREATE MAGAZINE (ADMIN)
 ====================================================== */
 export const createMagazine = async (req, res) => {
+  console.log("🔥 CREATE MAGAZINE ROUTE HIT");
+console.log(req.body);
+console.log(req.user);
   try {
     const {
       title,
@@ -31,33 +34,43 @@ export const createMagazine = async (req, res) => {
     let slug = baseSlug;
 
     const existing = await prisma.magazine.findUnique({
+      
       where: { slug },
+      
     });
+
+    
 
     if (existing) {
       slug = `${baseSlug}-${Date.now()}`;
     }
+    
 
     const magazine = await prisma.magazine.create({
-      data: {
-        title,
-        slug,
-        description,
-        coverImageUrl,
-        pdfUrl,
-        flipbookPages,
-        coverStoryId: coverStoryId ? Number(coverStoryId) : null,
-        authorId: authorId ? Number(authorId) : null,
-        status: status || "DRAFT",
-        createdById: req.user.id,
-        publishedAt:
-          status === "PUBLISHED" ? new Date() : null,
-      },
-      include: {
-        coverStory: true,
-        author: true,
-      },
-    });
+  data: {
+    title,
+    slug,
+    description,
+    coverImageUrl,
+    pdfUrl,
+    flipbookPages,
+    coverStoryId: coverStoryId ? Number(coverStoryId) : null,
+    authorId: authorId ? Number(authorId) : null,
+    status: status || "DRAFT",
+    createdById: req.user.id,
+    publishedAt: status === "PUBLISHED" ? new Date() : null,
+
+    // REQUIRED
+    updatedAt: new Date(),
+  },
+  include: {
+    CoverStory: true,
+    MagazineAuthor: true,
+  },
+});
+
+console.log("✅ MAGAZINE CREATED:", magazine);
+
 
     res.status(201).json(magazine);
   } catch (error) {
@@ -73,14 +86,20 @@ export const updateMagazine = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const magazine = await prisma.magazine.update({
-      where: { id: Number(id) },
-      data: req.body,
-      include: {
-        coverStory: true,
-        author: true,
-      },
-    });
+    await prisma.magazine.update({
+  where: { id },
+  data: {
+    title,
+    description,
+    coverImageUrl,
+    pdfUrl,
+    flipbookPages,
+    coverStoryId,
+    authorId,
+    status,
+    updatedAt: new Date(),
+  }
+})
 
     res.json(magazine);
   } catch (error) {
@@ -111,10 +130,11 @@ export const deleteMagazine = async (req, res) => {
 export const getAllMagazines = async (req, res) => {
   try {
     const magazines = await prisma.magazine.findMany({
+      
       where: { status: "PUBLISHED" },
       include: {
-        coverStory: true,
-        author: true,
+        CoverStory: true,
+        MagazineAuthor: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -135,8 +155,8 @@ export const getSingleMagazine = async (req, res) => {
     const magazine = await prisma.magazine.findUnique({
       where: { slug },
       include: {
-        coverStory: true,
-        author: true,
+        CoverStory: true,
+        MagazineAuthor: true,
       },
     });
 
@@ -351,7 +371,7 @@ export const createCoverStory = async (req, res) => {
         authorId: authorId ? Number(authorId) : null,
       },
       include: {
-        author: true,
+        MagazineAuthor: true,
       },
     });
 
@@ -369,15 +389,18 @@ export const getAllCoverStories = async (req, res) => {
   try {
     const stories = await prisma.coverStory.findMany({
       include: {
-        author: true,
+        MagazineAuthor: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
     res.json(stories);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch cover stories" });
-  }
+  console.error("GET COVER STORIES ERROR:", error);
+  res.status(500).json({
+    error: error.message,
+  });
+}
 };
 
 /* ======================================================
@@ -405,13 +428,18 @@ export const getSingleCoverStory = async (req, res) => {
 };
 
 export const getAllMagazinesAdmin = async (req, res) => {
-  const magazines = await prisma.magazine.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      author: true,
-      coverStory: true,
-    },
-  })
+  try {
+    const magazines = await prisma.magazine.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        MagazineAuthor: true,
+        CoverStory: true,
+      },
+    })
 
-  res.json(magazines)
+    res.json(magazines)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
 }
