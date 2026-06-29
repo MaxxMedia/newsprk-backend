@@ -24,23 +24,26 @@ export const createEvent = async (req, res) => {
 
     const userId = req.user.id // from auth middleware
 
-    const event = await prisma.event.create({
-      data: {
-        title,
-        slug: slugify(title, { lower: true }),
-        logoUrl,
-        bannerUrl,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        description,
-        websiteUrl,
-        registerUrl,
-        location,
-        calendarUrl,
-        status: status || "DRAFT",
-        createdById: userId
-      }
-    })
+  const event = await prisma.event.create({
+  data: {
+    title,
+    slug: slugify(title, { lower: true }),
+    logoUrl,
+    bannerUrl,
+    startDate: new Date(startDate),
+    endDate: new Date(endDate),
+    description,
+    websiteUrl,
+    registerUrl,
+    location,
+    calendarUrl,
+    status: status || "DRAFT",
+    createdById: userId,
+
+    // REQUIRED
+    updatedAt: new Date(),
+  },
+})
 
     res.status(201).json({ success: true, event })
   } catch (error) {
@@ -141,7 +144,9 @@ export const getAllEventsAdmin = async (req, res) => {
   },
   include: {
     _count: {
-      select: { registrations: true },
+      select: {
+        EventRegistration: true,
+      },
     },
   },
 })
