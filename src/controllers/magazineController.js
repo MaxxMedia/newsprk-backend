@@ -427,19 +427,30 @@ export const getSingleCoverStory = async (req, res) => {
     const { slug } = req.params;
 
     const story = await prisma.coverStory.findUnique({
-      where: { slug },
+      where: {
+        slug,
+      },
       include: {
-        author: true,
+        MagazineAuthor: true,
       },
     });
 
     if (!story) {
-      return res.status(404).json({ error: "Cover story not found" });
+      return res.status(404).json({
+        error: "Cover story not found",
+      });
     }
 
-    res.json(story);
+    res.json({
+      ...story,
+      author: story.MagazineAuthor,
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch cover story" });
+    console.error("GET SINGLE COVER STORY ERROR:", error);
+
+    res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
