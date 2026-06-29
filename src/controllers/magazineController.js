@@ -130,18 +130,28 @@ export const deleteMagazine = async (req, res) => {
 export const getAllMagazines = async (req, res) => {
   try {
     const magazines = await prisma.magazine.findMany({
-      
       where: { status: "PUBLISHED" },
       include: {
         CoverStory: true,
         MagazineAuthor: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
-    res.json(magazines);
+    const formatted = magazines.map((m) => ({
+      ...m,
+      coverStory: m.CoverStory,
+      author: m.MagazineAuthor,
+    }));
+
+    res.json(formatted);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch magazines" });
+    console.error(error);
+    res.status(500).json({
+      error: "Failed to fetch magazines",
+    });
   }
 };
 
@@ -152,13 +162,19 @@ export const getSingleMagazine = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const magazine = await prisma.magazine.findUnique({
-      where: { slug },
-      include: {
-        CoverStory: true,
-        MagazineAuthor: true,
-      },
-    });
+   const magazine = await prisma.magazine.findUnique({
+  where: { slug },
+  include: {
+    CoverStory: true,
+    MagazineAuthor: true,
+  },
+});
+
+res.json({
+  ...magazine,
+  coverStory: magazine.CoverStory,
+  author: magazine.MagazineAuthor,
+});
 
     if (!magazine || magazine.status !== "PUBLISHED") {
       return res.status(404).json({ error: "Magazine not found" });
