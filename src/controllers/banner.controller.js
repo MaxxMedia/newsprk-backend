@@ -29,18 +29,19 @@ export const createBanner = async (req, res) => {
     const nextPosition = lastBanner ? lastBanner.position + 1 : 0;
 
     const banner = await prisma.advertisementBanner.create({
-      data: {
-        title,
-        imageUrl,
-        targetUrl,
-        placement,
-        status: status || "INACTIVE",
-        startDate,
-        endDate,
-        position: nextPosition, // ✅ IMPORTANT
-        createdById: req.user.id,
-      },
-    });
+    data: {
+    title,
+    imageUrl,
+    targetUrl,
+    placement,
+    status,
+    startDate,
+    endDate,
+    position: nextPosition,
+    createdById: req.user.id,
+    updatedAt: new Date(),
+  },
+});
 
     res.status(201).json(banner);
   } catch (error) {
@@ -91,7 +92,7 @@ export const getAllBanners = async (req, res) => {
   try {
     const banners = await prisma.advertisementBanner.findMany({
       include: {
-        createdBy: {
+        User: {
           select: {
             id: true,
             email: true,
@@ -99,12 +100,18 @@ export const getAllBanners = async (req, res) => {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
     res.json(banners);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch banners" });
+    console.error("GET ALL BANNERS ERROR:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
@@ -220,7 +227,7 @@ export const getBannerById = async (req, res) => {
     const banner = await prisma.advertisementBanner.findUnique({
       where: { id: Number(id) },
       include: {
-        createdBy: {
+        User: {
           select: {
             id: true,
             email: true,
