@@ -204,6 +204,69 @@ export async function getMyRecruiterJobs(req, res) {
   }
 }
 
+export async function getJobById(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+
+    const job = await prisma.job.findFirst({
+      where: {
+        id: Number(req.params.id),
+        postedById: req.user.id,
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    res.json(job);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch job" });
+  }
+}
+
+export async function updateJob(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+
+    const job = await prisma.job.findFirst({
+      where: {
+        id: Number(req.params.id),
+        postedById: req.user.id,
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const updatedJob = await prisma.job.update({
+      where: {
+        id: Number(req.params.id),
+      },
+      data: {
+        title: req.body.title,
+        description: req.body.description,
+        employmentType: req.body.employmentType,
+        experience: req.body.experience,
+        salaryRange: req.body.salaryRange,
+        location: req.body.location,
+        isRemote: req.body.isRemote,
+      },
+    });
+
+    res.json(updatedJob);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+}
+
 
 /**
  * Recruiter: dashboard stats + recent jobs

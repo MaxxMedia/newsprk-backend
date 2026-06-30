@@ -1,21 +1,29 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
+import { upload } from "../controllers/uploadController.js";
 import {
   applyJob,
   getMyApplications,
   getApplicantsByJob,
-  updateApplicationStatus
+  getApplicationById,
+  updateApplicationStatus,
 } from "../controllers/jobApplicationsController.js";
 
 const router = express.Router();
 
-// Candidate
-router.post("/", requireAuth, applyJob);
+router.post(
+  "/",
+  requireAuth,
+  upload.single("resume"),
+  applyJob
+);
+
 router.get("/me", requireAuth, getMyApplications);
 
-// Recruiter
-router.get("/job/:jobId", requireAuth, getApplicantsByJob)
-router.put("/:applicationId/status", requireAuth, updateApplicationStatus)
+router.get("/job/:jobId", requireAuth, getApplicantsByJob);
 
+router.get("/:applicationId", requireAuth, getApplicationById);
+
+router.put("/:applicationId/status", requireAuth, updateApplicationStatus);
 
 export default router;

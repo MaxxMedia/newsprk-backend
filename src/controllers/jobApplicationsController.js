@@ -1,4 +1,6 @@
-import { prisma } from "../lib/prisma.js"
+import { prisma } from "../lib/prisma.js";
+import { uploadResumeToCloudinary } from "./uploadController.js";
+
 
 /**
  * Candidate applies for job
@@ -6,45 +8,72 @@ import { prisma } from "../lib/prisma.js"
 export async function applyJob(req, res) {
   try {
     if (req.user.role !== "candidate") {
-      return res.status(403).json({ error: "Only candidates can apply" })
+      return res.status(403).json({
+        error: "Only candidates can apply",
+      });
     }
 
     const job = await prisma.job.findUnique({
-      where: { id: req.body.jobId },
-      select: { id: true, isExternal: true, isActive: true },
-    })
+      where: {
+        id: Number(req.body.jobId),
+      },
+      select: {
+        id: true,
+        isExternal: true,
+        isActive: true,
+      },
+    });
 
     if (!job) {
-      return res.status(404).json({ error: "Job not found" })
+      return res.status(404).json({
+        error: "Job not found",
+      });
     }
 
     if (!job.isActive) {
-      return res.status(400).json({ error: "Job is not active" })
+      return res.status(400).json({
+        error: "Job is not active",
+      });
     }
 
-    // 🔥 BLOCK EXTERNAL JOBS
     if (job.isExternal) {
       return res.status(400).json({
         error: "Please apply through the external website",
-      })
+      });
     }
+
+    let resumeUrl = null;
+
+   if (req.file) {
+  const uploaded = await uploadResumeToCloudinary(req.file);
+  resumeUrl = uploaded.secure_url;
+}
+
+console.log("Resume URL:", resumeUrl);
+
 
     const application = await prisma.jobApplication.create({
       data: {
-        jobId: req.body.jobId,
+        jobId: Number(req.body.jobId),
         userId: req.user.id,
-        resumeUrl: req.body.resumeUrl,
+        resumeUrl,
         coverNote: req.body.coverNote,
       },
-    })
+    });
 
-    res.json(application)
+    res.json(application);
   } catch (err) {
     if (err.code === "P2002") {
-      return res.status(400).json({ error: "Already applied for this job" })
+      return res.status(400).json({
+        error: "Already applied for this job",
+      });
     }
-    console.error(err)
-    res.status(500).json({ error: "Job application failed" })
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "Job application failed",
+    });
   }
 }
 
@@ -59,7 +88,7 @@ export async function getMyApplications(req, res) {
 
     const applications = await prisma.jobApplication.findMany({
       where: {
-        userId: req.user.id,          // ✅ FIX (MOST IMPORTANT)
+        userId: req.user.id,
       },
       orderBy: {
         createdAt: "desc",
@@ -93,7 +122,7 @@ export async function getApplicantsByJob(req, res) {
     const job = await prisma.job.findFirst({
       where: {
         id: jobId,
-        postedById: req.user.id,      // ✅ FIX
+        postedById: req.user.id,
       },
     })
 
@@ -112,22 +141,100 @@ export async function getApplicantsByJob(req, res) {
             headline: true,
           },
         },
+        Job: {
+          include: {
+            Company: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
+    // ✅ FIX: Explicitly return resumeUrl and clean structure
     res.json(
-  applications.map(app => ({
-    ...app,
-    job: {
-      ...app.Job,
-      company: app.Job?.Company,
-    },
-  }))
-)
+      applications.map(app => ({
+        id: app.id,
+        jobId: app.jobId,
+        userId: app.userId,
+        resumeUrl: app.resumeUrl,  // ✅ CRITICAL - ADD THIS
+        coverNote: app.coverNote,
+        status: app.status,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        User: {
+          id: app.User.id,
+          fullName: app.User.fullName,
+          email: app.User.email,
+          headline: app.User.headline,
+        },
+        Job: app.Job ? {
+          id: app.Job.id,
+          title: app.Job.title,
+          location: app.Job.location,
+          employmentType: app.Job.employmentType,
+          Company: app.Job.Company ? {
+            id: app.Job.Company.id,
+            name: app.Job.Company.name,
+          } : null,
+        } : null,
+      }))
+    )
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Failed to fetch applicants" })
+  }
+}
+
+export async function getApplicationById(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({
+        error: "Not allowed",
+      });
+    }
+
+    const applicationId = Number(req.params.applicationId);
+
+    const application = await prisma.jobApplication.findUnique({
+      where: {
+        id: applicationId,
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            headline: true,
+          },
+        },
+        Job: {
+          include: {
+            Company: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        error: "Application not found",
+      });
+    }
+
+    // Recruiter can view only applications for their own jobs
+    if (application.Job.postedById !== req.user.id) {
+      return res.status(403).json({
+        error: "Not authorized",
+      });
+    }
+
+    res.json(application);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Failed to fetch application",
+    });
   }
 }
 
@@ -169,48 +276,3 @@ export async function updateApplicationStatus(req, res) {
     res.status(500).json({ error: "Failed to update status" })
   }
 }
-
-
-// export const getAdminCompanyJobs = async (req, res) => {
-//   console.log("🔥 getAdminCompanyJobs HIT")
-
-//   const companies = await prisma.company.findMany({
-//     select: {
-//       id: true,
-//       name: true,
-//       slug: true,
-//       jobs: {
-//         where: { isActive: true },
-//         select: {
-//           id: true,
-//           title: true,
-//           location: true,
-//           employmentType: true,
-//           createdAt: true,
-//           views: true,
-//           _count: {
-//             select: { applications: true }, // ✅ THIS
-//           },
-//         },
-//       },
-//     },
-//   })
-
-//   const formatted = companies.map(company => ({
-//     id: company.id,
-//     name: company.name,
-//     slug: company.slug,
-//     jobsCount: company.jobs.length,
-//     jobs: company.jobs.map(job => ({
-//       id: job.id,
-//       title: job.title,
-//       location: job.location,
-//       employmentType: job.employmentType,
-//       createdAt: job.createdAt,
-//       views: job.views,
-//       appliedCount: job._count.applications, // ✅ FIX
-//     })),
-//   }))
-
-//   res.json(formatted)
-// }
