@@ -165,14 +165,14 @@ export async function adminCreateFullSetup(req, res) {
   const { company, recruiter, directory } = req.body;
 
   try {
-    // ✅ Generate unique username BEFORE the transaction
-    const uniqueUsername = await generateUniqueUsername(recruiter.email)
+    // Generate unique username
+    const uniqueUsername = await generateUniqueUsername(recruiter.email);
 
     const result = await prisma.$transaction(async (tx) => {
 
       /* ==============================
          1️⃣ VALIDATE INDUSTRY
-      =============================== */
+      ============================== */
       const industry = await tx.industry.findUnique({
         where: { id: Number(company.industryId) },
       });
@@ -183,7 +183,7 @@ export async function adminCreateFullSetup(req, res) {
 
       /* ==============================
          2️⃣ CREATE COMPANY
-      =============================== */
+      ============================== */
       let companySlug = slugify(company.name, {
         lower: true,
         strict: true,
@@ -212,14 +212,27 @@ export async function adminCreateFullSetup(req, res) {
       });
 
       /* ==============================
-         3️⃣ CREATE RECRUITER
-      =============================== */
+         3️⃣ CHECK EMAIL
+      ============================== */
+      const existingUser = await tx.user.findUnique({
+        where: {
+          email: recruiter.email,
+        },
+      });
+
+      if (existingUser) {
+        throw new Error("A user with this email already exists.");
+      }
+
+      /* ==============================
+         4️⃣ CREATE RECRUITER
+      ============================== */
       const hashedPassword = await bcrypt.hash(recruiter.password, 10);
 
       const newRecruiter = await tx.user.create({
         data: {
           email: recruiter.email,
-          username: uniqueUsername,   // ✅ guaranteed unique
+          username: uniqueUsername,
           password: hashedPassword,
           role: "recruiter",
           fullName: recruiter.fullName,
@@ -229,8 +242,8 @@ export async function adminCreateFullSetup(req, res) {
       });
 
       /* ==============================
-         4️⃣ CREATE DIRECTORY
-      =============================== */
+         5️⃣ CREATE DIRECTORY
+      ============================== */
       let directorySlug = slugify(directory.name, {
         lower: true,
         strict: true,
@@ -253,13 +266,10 @@ export async function adminCreateFullSetup(req, res) {
           phoneNumber: directory.phoneNumber,
           email: directory.email,
           logoUrl: directory.logoUrl,
-
           videoGallery: directory.videoGallery || [],
           socialLinks: directory.socialLinks || {},
-
           companyId: newCompany.id,
           submittedById: newRecruiter.id,
-
           status: "APPROVED",
           isLiveEditable: true,
           approvedById: req.user.userId ?? req.user.id,
@@ -268,8 +278,8 @@ export async function adminCreateFullSetup(req, res) {
       });
 
       /* ==============================
-         5️⃣ AUDIT LOG
-      =============================== */
+         6️⃣ AUDIT LOG
+      ============================== */
       await tx.auditLog.create({
         data: {
           action: "FULL_DIRECTORY_CREATED",
@@ -290,6 +300,15 @@ export async function adminCreateFullSetup(req, res) {
 
   } catch (error) {
     console.error("FULL SETUP ERROR:", error);
-    res.status(400).json({ error: error.message || "Failed to create full setup" });
+
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        error: "Email already exists.",
+      });
+    }
+
+    return res.status(400).json({
+      error: error.message || "Failed to create full setup",
+    });
   }
 }

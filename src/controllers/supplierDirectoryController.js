@@ -410,11 +410,30 @@ export const getAllDirectoriesForAdmin = async (req, res) => {
     const directories = await prisma.supplierDirectory.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        Company: { select: { id: true, name: true, slug: true } },
-        submittedBy: { select: { id: true, email: true, username: true } },
-        approvedBy: { select: { id: true, email: true } },
+      Company: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
       },
-    })
+
+      User_SupplierDirectory_submittedByIdToUser: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+        },
+      },
+
+      User_SupplierDirectory_approvedByIdToUser: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+  });
 
     res.json(directories)
   } catch (err) {
