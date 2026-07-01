@@ -189,18 +189,100 @@ export async function getMyRecruiterJobs(req, res) {
       return res.status(403).json({ error: "Not allowed" })
     }
 
-    const jobs = await prisma.job.findMany({
-      where: {
-        postedById: req.user.id,
-        isActive: true,
-      },
-      orderBy: { createdAt: "desc" },
-    })
+  const jobs = await prisma.job.findMany({
+  where: {
+    postedById: req.user.id,
+    isActive: true,
+  },
+  select: {
+  id: true,
+  title: true,
+  slug: true,
+  location: true,
+  employmentType: true,
+  createdAt: true,
+  views: true,
+  _count: {
+    select: {
+      JobApplication: true,
+    },
+  },
+},
+  orderBy: {
+    createdAt: "desc",
+  },
+});
 
-    res.json(jobs)
+console.log("===== Recruiter Jobs =====");
+console.dir(jobs, { depth: null });
+
+res.json(jobs);
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Failed to fetch recruiter jobs" })
+  }
+}
+
+export async function getJobById(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+
+    const job = await prisma.job.findFirst({
+      where: {
+        id: Number(req.params.id),
+        postedById: req.user.id,
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    res.json(job);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch job" });
+  }
+}
+
+export async function updateJob(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+
+    const job = await prisma.job.findFirst({
+      where: {
+        id: Number(req.params.id),
+        postedById: req.user.id,
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const updatedJob = await prisma.job.update({
+      where: {
+        id: Number(req.params.id),
+      },
+      data: {
+        title: req.body.title,
+        description: req.body.description,
+        employmentType: req.body.employmentType,
+        experience: req.body.experience,
+        salaryRange: req.body.salaryRange,
+        location: req.body.location,
+        isRemote: req.body.isRemote,
+      },
+    });
+
+    res.json(updatedJob);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update job" });
   }
 }
 
@@ -362,20 +444,26 @@ export const getAdminCompanyJobs = async (req, res) => {
  */
 export async function incrementJobView(req, res) {
   try {
-    const { slug } = req.params
+    const { slug } = req.params;
 
-    await prisma.job.update({
+    console.log("Incrementing views for:", slug);
+
+    const job = await prisma.job.update({
       where: { slug },
       data: {
-        views: { increment: 1 },
+        views: {
+          increment: 1,
+        },
       },
-    })
+    });
 
-    res.json({ success: true })
+    console.log("New view count:", job.views);
+
+    res.json(job);
   } catch (err) {
-    console.error("Increment job view error:", err)
-    res.status(500).json({ error: "Failed to increment job view" })
+    console.error("Increment job view error:", err);
+    res.status(500).json({
+      error: "Failed to increment job view",
+    });
   }
 }
-
-

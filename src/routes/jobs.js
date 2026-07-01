@@ -9,6 +9,8 @@ import {
   getMyRecruiterJobs,
   getAdminCompanyJobs,
   incrementJobView,
+  getJobById,
+updateJob,
 } from "../controllers/jobsController.js"
 
 const router = express.Router()
@@ -26,6 +28,20 @@ router.get(
   requireAuth,
   getMyRecruiterJobs
 )
+
+// Get single recruiter job
+router.get(
+  "/recruiter/me/:id",
+  requireAuth,
+  getJobById
+);
+
+// Update recruiter job
+router.put(
+  "/:id",
+  requireAuth,
+  updateJob
+);
 
 // Public recruiter profile jobs
 router.get(

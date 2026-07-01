@@ -1,5 +1,4 @@
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -8,31 +7,102 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    const isPdf = file.mimetype === "application/pdf"
+// ----------------------------
+// Memory storage
+// ----------------------------
+const storage = multer.memoryStorage();
 
-    return {
-      folder: "mould-tech",
-      resource_type: isPdf ? "raw" : "image", // 🔥 dynamic
-      allowed_formats: ["jpg", "jpeg", "png", "webp", "pdf"],
+// ----------------------------
+// Resume Upload (PDF)
+// ----------------------------
+export const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed."));
     }
   },
-})
+});
 
-
-const upload = multer({ storage });
-
+// ----------------------------
+// Banner / Image Upload
+// ----------------------------
 export const uploadImage = [
-  upload.single("image"),
-  (req, res) => {
-    if (!req.file?.path) {
-      return res.status(400).json({ error: "Upload failed" });
-    }
+  multer({
+    storage,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith("image/")) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only image files are allowed."));
+      }
+    },
+  }).single("image"),
 
-    res.json({
-      imageUrl: req.file.path,
-    });
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: "No image uploaded",
+        });
+      }
+
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: "mould-tech/images",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+      });
+
+      res.json({
+        imageUrl: result.secure_url,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        error: "Image upload failed",
+      });
+    }
   },
 ];
+
+// ----------------------------
+// Resume Upload Helper
+// ----------------------------
+export async function uploadResumeToCloudinary(file) {
+  return new Promise((resolve, reject) => {
+    const originalName = file.originalname.split(".")[0];
+    const extension = file.originalname.split(".").pop();
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "mould-tech/resumes",
+        resource_type: "raw",
+        public_id: `${originalName}-${Date.now()}`,
+        format: extension,
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+
+    stream.end(file.buffer);
+  });
+}
