@@ -102,6 +102,8 @@ model User {
   Event_Event_createdByIdToUser                           Event[]               @relation("Event_createdByIdToUser")
   Job                                                     Job[]
   JobApplication                                          JobApplication[]
+  SavedJob                                                SavedJob[]
+  JobAlert                                                JobAlert[]
   Magazine                                                Magazine[]
   Post_Post_approvedByIdToUser                            Post[]                @relation("Post_approvedByIdToUser")
   Post_Post_createdByIdToUser                             Post[]                @relation("Post_createdByIdToUser")
@@ -283,9 +285,38 @@ model Job {
   Company        Company?         @relation(fields: [companyId], references: [id])
   User           User             @relation(fields: [postedById], references: [id])
   JobApplication JobApplication[]
+  SavedJob       SavedJob[]
 
   @@index([companyId], map: "Job_companyId_fkey")
   @@index([postedById], map: "Job_postedById_fkey")
+}
+
+model SavedJob {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  userId    Int
+  createdAt DateTime @default(now())
+  Job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+  @@index([userId], map: "SavedJob_userId_fkey")
+}
+
+model JobAlert {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  name           String?
+  keywords       String?
+  location       String?
+  employmentType String?
+  isRemote       Boolean?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  User           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "JobAlert_userId_fkey")
 }
 
 model JobApplication {

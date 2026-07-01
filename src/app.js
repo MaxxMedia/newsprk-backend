@@ -109,6 +109,7 @@ import publicRoutes from "./routes/public.js";
 import magazineRoutes from "./routes/magazineRoutes.js";
 import adminUsersRoutes from "./routes/adminUsers.js";
 import adminIndustriesRoutes from "./routes/adminIndustryRoutes.js";
+import jobAlertsRoutes from "./routes/jobAlerts.js";
 
 
 
@@ -193,6 +194,7 @@ app.use("/api/calendar", calendarRoutes);
 app.use("/api", publicRoutes);
 app.use("/api/magazines", magazineRoutes);
 app.use("/api/admin", adminUsersRoutes);
+app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api", adminIndustriesRoutes);  //admin industry routes don't have /admin prefix since some are public and some are admin-only. The controller handles the auth logic.
 
 

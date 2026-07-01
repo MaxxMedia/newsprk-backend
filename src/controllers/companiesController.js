@@ -136,28 +136,61 @@ export async function getCompanyPeople(req, res) {
 
     const company = await prisma.company.findUnique({
       where: { slug },
-      include: {
-        Job: {
-          where: {
-            isActive: true,
-          },
-          include: {
-            User: true, // Include the user who posted the job
-          },
-        },
-      },
+      select: { id: true },
     });
 
     if (!company) {
       return res.status(404).json({ error: "Company not found" });
     }
 
-    // ✅ Deduplicate recruiters
     const peopleMap = new Map();
+    const profileSelect = {
+      id: true,
+      username: true,
+      fullName: true,
+      headline: true,
+      location: true,
+      avatarUrl: true,
+      role: true,
+    };
 
-    company.Job.forEach((job) => {
-      if (job.User) {
-        peopleMap.set(job.User.id, job.User);
+    const companyRecruiters = await prisma.user.findMany({
+      where: {
+        companyId: company.id,
+        role: "recruiter",
+      },
+      select: profileSelect,
+    });
+
+    companyRecruiters.forEach((user) => {
+      peopleMap.set(user.id, { ...user, relation: "team" });
+    });
+
+    const jobPosters = await prisma.job.findMany({
+      where: {
+        companyId: company.id,
+        isActive: true,
+      },
+      select: {
+        User: { select: profileSelect },
+      },
+    });
+
+    jobPosters.forEach(({ User }) => {
+      if (User) peopleMap.set(User.id, { ...User, relation: "team" });
+    });
+
+    const followers = await prisma.companyFollower.findMany({
+      where: { companyId: company.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        User: { select: profileSelect },
+      },
+    });
+
+    followers.forEach(({ User }) => {
+      if (User && !peopleMap.has(User.id)) {
+        peopleMap.set(User.id, { ...User, relation: "follower" });
       }
     });
 

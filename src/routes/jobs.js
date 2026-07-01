@@ -12,6 +12,12 @@ import {
   getJobById,
 updateJob,
 } from "../controllers/jobsController.js"
+import {
+  getMySavedJobs,
+  saveJob,
+  unsaveJob,
+  getSaveStatus,
+} from "../controllers/savedJobsController.js"
 
 const router = express.Router()
 
@@ -73,6 +79,13 @@ router.put(
   requireAdmin,
   deactivateJob
 )
+
+/* ================= CANDIDATE ================= */
+
+router.get("/saved/me", requireAuth, getMySavedJobs)
+router.get("/:jobId/save-status", requireAuth, getSaveStatus)
+router.post("/:jobId/save", requireAuth, saveJob)
+router.delete("/:jobId/save", requireAuth, unsaveJob)
 
 /* ================= JOB ACTIONS ================= */
 

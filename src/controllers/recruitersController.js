@@ -101,6 +101,143 @@ export async function getMyRecruiterProfile(req, res) {
 }
 
 // ================= RECRUITER DASHBOARD =================
+
+const JOB_LISTING_DAYS = 30
+const EXPIRY_WARN_DAYS = 7
+
+async function buildRecentActivity(recruiterId, applicationsCount) {
+  const activities = []
+
+  if (applicationsCount > 0) {
+    activities.push({
+      id: "view-applicants",
+      type: "action",
+      message: `Review ${applicationsCount} applicant${applicationsCount !== 1 ? "s" : ""}`,
+      href: "/recruiter/jobs",
+      color: "blue",
+      createdAt: new Date().toISOString(),
+    })
+  }
+
+  const recentApps = await prisma.jobApplication.findMany({
+    where: {
+      Job: { postedById: recruiterId },
+      status: "applied",
+      createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: {
+      User: { select: { fullName: true, username: true } },
+      Job: { select: { id: true, title: true } },
+    },
+  })
+
+  for (const app of recentApps) {
+    const name = app.User.fullName || app.User.username || "A candidate"
+    activities.push({
+      id: `app-${app.id}`,
+      type: "new_application",
+      message: `${name} applied to ${app.Job.title}`,
+      href: `/recruiter/jobs/${app.Job.id}/applications`,
+      color: "blue",
+      createdAt: app.createdAt.toISOString(),
+    })
+  }
+
+  const recentShortlisted = await prisma.jobApplication.findMany({
+    where: {
+      status: "shortlisted",
+      Job: { postedById: recruiterId },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: {
+      User: { select: { fullName: true, username: true } },
+      Job: { select: { id: true, title: true } },
+    },
+  })
+
+  for (const app of recentShortlisted) {
+    const name = app.User.fullName || app.User.username || "A candidate"
+    activities.push({
+      id: `shortlist-${app.id}`,
+      type: "shortlisted",
+      message: `${name} shortlisted for ${app.Job.title}`,
+      href: `/recruiter/jobs/${app.Job.id}/applications`,
+      color: "green",
+      createdAt: app.createdAt.toISOString(),
+    })
+  }
+
+  const now = Date.now()
+  const expiringJobs = await prisma.job.findMany({
+    where: { postedById: recruiterId, isActive: true },
+    select: { id: true, title: true, createdAt: true },
+  })
+
+  for (const job of expiringJobs) {
+    const ageDays = Math.floor(
+      (now - new Date(job.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    )
+    const daysLeft = JOB_LISTING_DAYS - ageDays
+    if (daysLeft > 0 && daysLeft <= EXPIRY_WARN_DAYS) {
+      activities.push({
+        id: `expiry-${job.id}`,
+        type: "job_expiring",
+        message: `"${job.title}" expires in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`,
+        href: `/recruiter/jobs/${job.id}/edit`,
+        color: "orange",
+        createdAt: job.createdAt.toISOString(),
+      })
+    }
+  }
+
+  const pendingDirs = await prisma.supplierDirectory.findMany({
+    where: { submittedById: recruiterId, status: "PENDING" },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+    select: { id: true, name: true, createdAt: true },
+  })
+
+  for (const dir of pendingDirs) {
+    activities.push({
+      id: `dir-${dir.id}`,
+      type: "directory_pending",
+      message: `"${dir.name}" directory pending approval`,
+      href: "/recruiter/directories",
+      color: "yellow",
+      createdAt: dir.createdAt.toISOString(),
+    })
+  }
+
+  const pendingArticles = await prisma.post.findMany({
+    where: {
+      createdById: recruiterId,
+      status: "PENDING",
+      category: { slug: "articles" },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+    select: { id: true, title: true, createdAt: true },
+  })
+
+  for (const article of pendingArticles) {
+    activities.push({
+      id: `article-${article.id}`,
+      type: "article_pending",
+      message: `Article "${article.title}" awaiting approval`,
+      href: `/recruiter/articles/${article.id}/edit`,
+      color: "yellow",
+      createdAt: article.createdAt.toISOString(),
+    })
+  }
+
+  return activities
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 10)
+}
+
 export async function getRecruiterDashboard(req, res) {
   try {
     if (req.user.role !== "recruiter") {
@@ -178,12 +315,32 @@ const articles = await prisma.post.findMany({
 
 console.log("ARTICLES FOUND:", articles.length)
 
+    const directories = await prisma.supplierDirectory.findMany({
+      where: { submittedById: recruiterId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        isLiveEditable: true,
+        createdAt: true,
+      },
+    })
+
+    const recentActivity = await buildRecentActivity(
+      recruiterId,
+      applicationsCount
+    )
+
     res.json({
       jobsCount,
       applicationsCount,
       shortlistedCount,
       recentJobs,
       articles,
+      directories,
+      recentActivity,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
