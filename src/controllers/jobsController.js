@@ -297,6 +297,18 @@ export async function getRecruiterDashboard(req, res) {
     }
 
     const recruiterId = req.user.id
+    const recruiter = await prisma.user.findUnique({
+  where: {
+    id: recruiterId,
+  },
+  include: {
+    Company: {
+      select: {
+        name: true,
+      },
+    },
+  },
+})
 
 
     // 1️⃣ Jobs count
@@ -351,12 +363,16 @@ const shortlistedCount = await prisma.jobApplication.count({
       applications: job._count.JobApplication,
     }))
 
-    res.json({
-      jobsCount,
-      applicationsCount,
-      shortlistedCount,
-      recentJobs,
-    })
+   res.json({
+  jobsCount,
+  applicationsCount,
+  shortlistedCount,
+  recentJobs,
+
+  recruiter: {
+    companyName: recruiter?.Company?.name,
+  },
+})
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
     res.status(500).json({ error: "Failed to load dashboard" })
