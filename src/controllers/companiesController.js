@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import slugify from "slugify";
+import { filterJobsForPackageVisibility, enforceCompanyJobVisibility } from "../lib/jobVisibility.js";
 
 /**
  * Recruiter creates company
@@ -113,9 +114,33 @@ if (!company) {
   return res.status(404).json({ error: "Company not found" })
 }
 
+await enforceCompanyJobVisibility(company.id)
+
+const activeJobs = await prisma.job.findMany({
+  where: {
+    companyId: company.id,
+    isActive: true,
+    isExternal: false,
+  },
+  orderBy: { createdAt: "desc" },
+  select: {
+    id: true,
+    title: true,
+    slug: true,
+    location: true,
+    employmentType: true,
+    isRemote: true,
+    createdAt: true,
+    companyId: true,
+    isExternal: true,
+  },
+})
+
+const visibleJobs = await filterJobsForPackageVisibility(activeJobs)
+
 res.json({
   ...company,
-  jobs: company.Job,
+  jobs: visibleJobs,
   followers: company._count.CompanyFollower,
 })
   } catch (err) {

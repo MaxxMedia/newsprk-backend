@@ -10,7 +10,8 @@ import {
   getAdminCompanyJobs,
   incrementJobView,
   getJobById,
-updateJob,
+  updateJob,
+  getPostingEligibility,
 } from "../controllers/jobsController.js"
 import {
   getMySavedJobs,
@@ -33,6 +34,12 @@ router.get(
   "/recruiter/me",
   requireAuth,
   getMyRecruiterJobs
+)
+
+router.get(
+  "/recruiter/posting-eligibility",
+  requireAuth,
+  getPostingEligibility
 )
 
 // Get single recruiter job

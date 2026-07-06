@@ -168,7 +168,7 @@ model Company {
   PackagePurchase     PackagePurchase[]
   subscriptionPlan    String              @default("free")
   subscriptionExpiresAt DateTime?
-  jobPostingCredits   Int                 @default(2)
+  jobPostingCredits   Int                 @default(0)
 
   @@index([industryId], map: "Company_industryId_fkey")
 }

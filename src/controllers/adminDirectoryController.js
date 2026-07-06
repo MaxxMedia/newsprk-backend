@@ -2,6 +2,21 @@ import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt";
 import slugify from "slugify";
 
+const submittedByInclude = {
+  User_SupplierDirectory_submittedByIdToUser: {
+    select: { id: true, email: true, fullName: true },
+  },
+}
+
+function mapDirectory(directory) {
+  if (!directory) return directory
+  const { User_SupplierDirectory_submittedByIdToUser, ...rest } = directory
+  return {
+    ...rest,
+    submittedBy: User_SupplierDirectory_submittedByIdToUser ?? null,
+  }
+}
+
 export async function getPendingDirectories(req, res) {
   if (req.user.role?.toLowerCase() !== "admin") {
     return res.status(403).json({ error: "Admin only" })
@@ -12,14 +27,10 @@ export async function getPendingDirectories(req, res) {
       status: "PENDING",
     },
     orderBy: { createdAt: "asc" },
-    include: {
-      submittedBy: {
-        select: { id: true, email: true, fullName: true },
-      },
-    },
+    include: submittedByInclude,
   })
 
-  res.json(directories)
+  res.json(directories.map(mapDirectory))
 }
 
 export async function getDirectoryForReview(req, res) {
@@ -31,18 +42,14 @@ export async function getDirectoryForReview(req, res) {
 
   const directory = await prisma.supplierDirectory.findUnique({
     where: { id: directoryId },
-    include: {
-      submittedBy: {
-        select: { id: true, email: true, fullName: true },
-      },
-    },
+    include: submittedByInclude,
   })
 
   if (!directory) {
     return res.status(404).json({ error: "Directory not found" })
   }
 
-  res.json(directory)
+  res.json(mapDirectory(directory))
 }
 
 export async function approveDirectory(req, res) {
