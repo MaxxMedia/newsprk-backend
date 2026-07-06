@@ -110,6 +110,7 @@ model User {
   SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]   @relation("SupplierDirectory_approvedByIdToUser")
   SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[]   @relation("SupplierDirectory_submittedByIdToUser")
   Company                                                 Company?              @relation(fields: [companyId], references: [id])
+  PackagePurchase                                         PackagePurchase[]
 
   @@index([companyId], map: "User_companyId_fkey")
 }
@@ -162,10 +163,40 @@ model Company {
   CompanyFollower   CompanyFollower[]
   Job               Job[]
   Post              Post[]
-  SupplierDirectory SupplierDirectory[]
-  User              User[]
+  SupplierDirectory   SupplierDirectory[]
+  User                User[]
+  PackagePurchase     PackagePurchase[]
+  subscriptionPlan    String              @default("free")
+  subscriptionExpiresAt DateTime?
+  jobPostingCredits   Int                 @default(2)
 
   @@index([industryId], map: "Company_industryId_fkey")
+}
+
+model PackagePurchase {
+  id                Int                    @id @default(autoincrement())
+  userId            Int
+  companyId         Int?
+  packageType       PackagePurchase_type
+  packageId         String
+  packageName       String
+  amount            Int
+  currency          String                 @default("INR")
+  status            PackagePurchase_status @default(PENDING)
+  razorpayOrderId   String?                @unique
+  razorpayPaymentId String?
+  metadata          Json?
+  startsAt          DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  User              User                   @relation(fields: [userId], references: [id])
+  Company           Company?               @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([packageType])
 }
 
 model CompanyFollower {
@@ -458,4 +489,17 @@ enum Post_status {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum PackagePurchase_type {
+  SUBSCRIPTION
+  BANNER
+  SPONSORED
+  RECRUITMENT
+}
+
+enum PackagePurchase_status {
+  PENDING
+  PAID
+  FAILED
 }

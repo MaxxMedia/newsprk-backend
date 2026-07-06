@@ -1,6 +1,7 @@
 
 
 import { prisma } from "../lib/prisma.js"
+import { getPlanLabel } from "../lib/packagePricing.js"
 
 // ================= PUBLIC RECRUITER PROFILE =================
 export async function getRecruiterProfile(req, res) {
@@ -328,6 +329,35 @@ console.log("ARTICLES FOUND:", articles.length)
       },
     })
 
+    const recruiter = await prisma.user.findUnique({
+      where: { id: recruiterId },
+      select: {
+        companyId: true,
+        Company: {
+          select: {
+            subscriptionPlan: true,
+            subscriptionExpiresAt: true,
+            jobPostingCredits: true,
+          },
+        },
+      },
+    })
+
+    const recentPurchases = await prisma.packagePurchase.findMany({
+      where: { userId: recruiterId, status: "PAID" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        packageType: true,
+        packageName: true,
+        amount: true,
+        status: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    })
+
     const recentActivity = await buildRecentActivity(
       recruiterId,
       applicationsCount
@@ -341,6 +371,13 @@ console.log("ARTICLES FOUND:", articles.length)
       articles,
       directories,
       recentActivity,
+      subscription: {
+        plan: recruiter?.Company?.subscriptionPlan ?? "free",
+        planLabel: getPlanLabel(recruiter?.Company?.subscriptionPlan ?? "free"),
+        expiresAt: recruiter?.Company?.subscriptionExpiresAt ?? null,
+        jobPostingCredits: recruiter?.Company?.jobPostingCredits ?? 0,
+      },
+      recentPurchases,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
