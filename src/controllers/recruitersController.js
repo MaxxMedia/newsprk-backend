@@ -3,7 +3,11 @@
 import { prisma } from "../lib/prisma.js"
 import { getPlanLabel } from "../lib/packagePricing.js"
 import { getJobPostingEligibility } from "../lib/jobPostingLimits.js"
-import { dedupeCompanyPurchases, buildSubscriptionDisplay } from "../lib/packagePurchases.js"
+import {
+  getArticlePostingEligibility,
+  getProductListingEligibility,
+} from "../lib/packageContentLimits.js"
+import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 
 // ================= PUBLIC RECRUITER PROFILE =================
 export async function getRecruiterProfile(req, res) {
@@ -247,7 +251,21 @@ export async function getRecruiterDashboard(req, res) {
       return res.status(403).json({ error: "Not allowed" })
     }
 
-    const recruiterId = req.user.id // ✅ FIXED
+    const recruiterId = req.user.id
+
+    const recruiter = await prisma.user.findUnique({
+      where: { id: recruiterId },
+      select: {
+        companyId: true,
+        Company: {
+          select: {
+            subscriptionPlan: true,
+            subscriptionExpiresAt: true,
+            jobPostingCredits: true,
+          },
+        },
+      },
+    })
 
     const jobsCount = await prisma.job.count({
       where: {
@@ -302,7 +320,9 @@ const articles = await prisma.post.findMany({
     category: {
       slug: "articles",
     },
-    createdById: recruiterId,
+    ...(recruiter?.companyId
+      ? { companyId: recruiter.companyId }
+      : { createdById: recruiterId }),
   },
   orderBy: {
     createdAt: "desc",
@@ -316,10 +336,15 @@ const articles = await prisma.post.findMany({
   },
 })
 
-console.log("ARTICLES FOUND:", articles.length)
-
     const directories = await prisma.supplierDirectory.findMany({
-      where: { submittedById: recruiterId },
+      where: recruiter?.companyId
+        ? {
+            OR: [
+              { companyId: recruiter.companyId },
+              { submittedById: recruiterId },
+            ],
+          }
+        : { submittedById: recruiterId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -328,20 +353,6 @@ console.log("ARTICLES FOUND:", articles.length)
         status: true,
         isLiveEditable: true,
         createdAt: true,
-      },
-    })
-
-    const recruiter = await prisma.user.findUnique({
-      where: { id: recruiterId },
-      select: {
-        companyId: true,
-        Company: {
-          select: {
-            subscriptionPlan: true,
-            subscriptionExpiresAt: true,
-            jobPostingCredits: true,
-          },
-        },
       },
     })
 
@@ -370,7 +381,13 @@ console.log("ARTICLES FOUND:", articles.length)
       applicationsCount
     )
 
+    if (recruiter?.companyId) {
+      await syncCompanySubscription(recruiter.companyId)
+    }
+
     const jobPosting = await getJobPostingEligibility(recruiter?.companyId ?? null)
+    const articlePosting = await getArticlePostingEligibility(recruiter?.companyId ?? null)
+    const productListings = await getProductListingEligibility(recruiter?.companyId ?? null)
 
     const subscription = recruiter?.Company
       ? await buildSubscriptionDisplay(recruiter.Company, recruiter.companyId, prisma)
@@ -396,6 +413,8 @@ console.log("ARTICLES FOUND:", articles.length)
       subscription,
       recentPurchases,
       jobPosting,
+      articlePosting,
+      productListings,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)

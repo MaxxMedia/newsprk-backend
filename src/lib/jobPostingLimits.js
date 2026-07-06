@@ -1,6 +1,6 @@
 import { prisma } from "./prisma.js";
-import { getPlanLabel, getEffectivePlan } from "./packagePricing.js";
-import { getActiveRecruitmentPackage } from "./packagePurchases.js";
+import { getPlanLabel } from "./packagePricing.js";
+import { getActiveRecruitmentPackage, getActiveSubscription } from "./packagePurchases.js";
 
 export const PLAN_JOB_LIMITS = {
   free: 2,
@@ -37,7 +37,8 @@ export async function getJobPostingEligibility(companyId) {
     };
   }
 
-  const plan = getEffectivePlan(company);
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
   const baseLimit = PLAN_JOB_LIMITS[plan] ?? PLAN_JOB_LIMITS.free;
   const isUnlimited = baseLimit === null;
   const activeRecruitment = await getActiveRecruitmentPackage(companyId, prisma);

@@ -2,7 +2,11 @@ import crypto from "crypto";
 import RazorpayPkg from "razorpay";
 import { prisma } from "../lib/prisma.js";
 import { getPlanLabel, resolvePackage } from "../lib/packagePricing.js";
-import { dedupeCompanyPurchases, buildSubscriptionDisplay } from "../lib/packagePurchases.js";
+import {
+  dedupeCompanyPurchases,
+  buildSubscriptionDisplay,
+  syncCompanySubscription,
+} from "../lib/packagePurchases.js";
 const Razorpay = RazorpayPkg.default || RazorpayPkg;
 
 function getRazorpay() {
@@ -164,9 +168,25 @@ export async function verifyPayment(req, res) {
       return res.json({ success: true, purchase });
     }
 
+    let companyId = purchase.companyId;
+    if (!companyId) {
+      const user = await prisma.user.findUnique({
+        where: { id: purchase.userId },
+        select: { companyId: true },
+      });
+      companyId = user?.companyId ?? null;
+      if (companyId) {
+        await prisma.packagePurchase.update({
+          where: { id: purchase.id },
+          data: { companyId },
+        });
+      }
+    }
+
     const resolved = resolvePackage(purchase.packageType, purchase.packageId);
     const { startsAt, expiresAt } = await activatePackage({
       ...purchase,
+      companyId,
       durationDays: resolved?.durationDays ?? null,
     });
 
@@ -177,8 +197,13 @@ export async function verifyPayment(req, res) {
         razorpayPaymentId: razorpay_payment_id,
         startsAt,
         expiresAt,
+        companyId,
       },
     });
+
+    if (companyId) {
+      await syncCompanySubscription(companyId);
+    }
 
     res.json({ success: true, purchase: updated });
   } catch (err) {
@@ -202,6 +227,9 @@ export async function activateFreePlan(req, res) {
       return res.status(400).json({ error: "Link a company profile before choosing a plan" });
     }
 
+    const { getActiveSubscription } = await import("../lib/packagePurchases.js");
+    const active = await getActiveSubscription(user.companyId);
+
     const existingFreePurchase = await prisma.packagePurchase.findFirst({
       where: {
         companyId: user.companyId,
@@ -213,6 +241,15 @@ export async function activateFreePlan(req, res) {
     });
 
     if (existingFreePurchase) {
+      if (active.plan !== "free") {
+        return res.json({
+          success: true,
+          purchase: existingFreePurchase,
+          alreadyActive: true,
+          message: `Your company is on the ${getPlanLabel(active.plan)} plan.`,
+        });
+      }
+
       await prisma.company.update({
         where: { id: user.companyId },
         data: {
@@ -229,6 +266,14 @@ export async function activateFreePlan(req, res) {
         purchase: existingFreePurchase,
         alreadyActive: true,
         message: "Free plan is already active for your company.",
+      });
+    }
+
+    if (active.plan !== "free") {
+      return res.json({
+        success: true,
+        alreadyActive: true,
+        message: `Your company is on the ${getPlanLabel(active.plan)} plan. Free plan cannot replace a paid subscription.`,
       });
     }
 
@@ -283,6 +328,10 @@ export async function getMyPackageInfo(req, res) {
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.companyId) {
+      await syncCompanySubscription(user.companyId);
     }
 
     const purchases = dedupeCompanyPurchases(

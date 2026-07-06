@@ -1,5 +1,9 @@
 import prisma from "../prismaClient.js"
 import slugify from "slugify"
+import {
+  assertCanCreateArticle,
+  getArticlePostingEligibility,
+} from "../lib/packageContentLimits.js"
 
 /**
  * CREATE recruiter article
@@ -32,6 +36,16 @@ if (!recruiter?.companyId) {
       return res
         .status(400)
         .json({ error: "Title and content are required" })
+    }
+
+    try {
+      await assertCanCreateArticle(recruiter.companyId)
+    } catch (err) {
+      return res.status(err.status || 403).json({
+        error: err.message,
+        code: err.code,
+        eligibility: err.eligibility,
+      })
     }
 
     // 🔒 Force category = articles
@@ -78,6 +92,27 @@ if (!recruiter?.companyId) {
     }
 
     return res.status(500).json({ error: "Internal server error" })
+  }
+}
+
+export const getArticlePostingEligibilityHandler = async (req, res) => {
+  try {
+    const user = req.user
+
+    if (!user || user.role !== "recruiter") {
+      return res.status(403).json({ error: "Only recruiters allowed" })
+    }
+
+    const recruiter = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { companyId: true },
+    })
+
+    const eligibility = await getArticlePostingEligibility(recruiter?.companyId ?? null)
+    res.json(eligibility)
+  } catch (error) {
+    console.error("Article eligibility error:", error)
+    res.status(500).json({ error: "Failed to load article eligibility" })
   }
 }
 

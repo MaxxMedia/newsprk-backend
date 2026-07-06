@@ -4,10 +4,13 @@ import {
   createRecruiterArticle,
   updateRecruiterArticle,
   deleteRecruiterArticle,
-  getMyRecruiterArticles, // ✅ ADD THIS
+  getMyRecruiterArticles,
+  getArticlePostingEligibilityHandler,
 } from "../controllers/recruiterArticle.js"
 
 const router = Router()
+
+router.get("/articles/eligibility", requireAuth, getArticlePostingEligibilityHandler)
 
 // ✅ LIST recruiter articles
 router.get("/articles", requireAuth, getMyRecruiterArticles)

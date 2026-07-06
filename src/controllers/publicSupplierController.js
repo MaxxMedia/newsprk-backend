@@ -43,7 +43,7 @@ export async function getSupplierShowroom(req, res) {
         status: "APPROVED",
       },
       include: {
-        submittedBy: {
+        User_SupplierDirectory_submittedByIdToUser: {
           select: {
             fullName: true,
             email: true,
@@ -73,7 +73,7 @@ export async function getSupplierBySlug(req, res) {
         status: "APPROVED",
       },
       include: {
-        submittedBy: {
+        User_SupplierDirectory_submittedByIdToUser: {
           select: {
             fullName: true,
             email: true,

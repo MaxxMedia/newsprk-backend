@@ -8,7 +8,8 @@ import {
   getMyDirectories,
   getMyDirectoryById,
   getAllDirectoriesForAdmin,
-  trackDirectoryConnection
+  trackDirectoryConnection,
+  getProductListingEligibilityHandler,
 } from "../controllers/supplierDirectoryController.js"
 
 import { requireAuth, requireAdmin } from "../middleware/auth.js"
@@ -23,6 +24,12 @@ router.get(
   requireAuth,
   getMyDirectories
 
+)
+
+router.get(
+  "/recruiter/product-listings/eligibility",
+  requireAuth,
+  getProductListingEligibilityHandler
 )
 
 // Admin

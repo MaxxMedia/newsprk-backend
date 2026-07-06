@@ -1,4 +1,9 @@
 import prisma from "../prismaClient.js"
+import {
+  assertProductListingCount,
+  getCompanyDirectoryCount,
+  getProductListingEligibility,
+} from "../lib/packageContentLimits.js"
 
 /**
  * Recruiter submits directory (FIRST TIME)
@@ -80,6 +85,19 @@ export const createDirectory = async (req, res) => {
 
     if (!industry) {
       return res.status(400).json({ error: "Invalid industry selected" })
+    }
+
+    const existingDirectories = await getCompanyDirectoryCount(user.companyId)
+    const requestedDirectories = existingDirectories + 1
+
+    try {
+      await assertProductListingCount(user.companyId, requestedDirectories)
+    } catch (err) {
+      return res.status(err.status || 403).json({
+        error: err.message,
+        code: err.code,
+        eligibility: err.eligibility,
+      })
     }
 
     /* ==============================
@@ -180,6 +198,21 @@ export const getMyDirectoryById = async (req, res) => {
   }
 }
 
+export const getProductListingEligibilityHandler = async (req, res) => {
+  try {
+    const user = req.user
+    if (user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" })
+    }
+
+    const eligibility = await getProductListingEligibility(user.companyId ?? null)
+    res.json(eligibility)
+  } catch (err) {
+    console.error("Product listing eligibility error:", err)
+    res.status(500).json({ error: "Failed to load product listing eligibility" })
+  }
+}
+
 /**
  * Get recruiter directories
  */
@@ -188,10 +221,32 @@ export const getMyDirectories = async (req, res) => {
     const user = req.user
     if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" })
 
+    if (user.companyId) {
+      await prisma.supplierDirectory.updateMany({
+        where: { submittedById: user.id, companyId: null },
+        data: { companyId: user.companyId },
+      })
+    }
+
     const directories = await prisma.supplierDirectory.findMany({
-      where: { submittedById: user.id },
+      where: user.companyId
+        ? {
+            OR: [
+              { companyId: user.companyId },
+              { submittedById: user.id },
+            ],
+          }
+        : { submittedById: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, slug: true, status: true, isLiveEditable: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        isLiveEditable: true,
+        createdAt: true,
+        productSupplies: true,
+      },
     })
 
     res.json(directories)
