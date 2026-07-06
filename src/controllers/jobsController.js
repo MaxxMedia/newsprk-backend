@@ -1,4 +1,13 @@
 import { prisma } from "../lib/prisma.js";
+import {
+  assertCanPostJob,
+  getJobPostingEligibility,
+} from "../lib/jobPostingLimits.js";
+import {
+  enforceCompanyJobVisibility,
+  filterJobsForPackageVisibility,
+  isJobPackageVisible,
+} from "../lib/jobVisibility.js";
 
 /**
  * Recruiter/Admin: create job
@@ -28,6 +37,16 @@ export async function createJob(req, res) {
 
       companyId = recruiter.companyId
       isExternal = false
+
+      try {
+        await assertCanPostJob(companyId)
+      } catch (limitErr) {
+        return res.status(limitErr.status || 403).json({
+          error: limitErr.message,
+          code: limitErr.code,
+          eligibility: limitErr.eligibility,
+        })
+      }
     }
 
     // 🔹 Admin → External Job
@@ -66,10 +85,33 @@ export async function createJob(req, res) {
       },
     })
 
+    if (companyId) {
+      await enforceCompanyJobVisibility(companyId)
+    }
+
     res.json(job)
   } catch (err) {
     console.error("JOB CREATE ERROR:", err)
     res.status(500).json({ error: err.message })
+  }
+}
+
+export async function getPostingEligibility(req, res) {
+  try {
+    if (req.user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" })
+    }
+
+    const recruiter = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { companyId: true },
+    })
+
+    const eligibility = await getJobPostingEligibility(recruiter?.companyId ?? null)
+    res.json(eligibility)
+  } catch (err) {
+    console.error("Posting eligibility error:", err)
+    res.status(500).json({ error: "Failed to check job posting eligibility" })
   }
 }
 
@@ -105,7 +147,9 @@ export async function getAllJobs(req, res) {
   },
 })
 
-    res.json(jobs)
+    const visibleJobs = await filterJobsForPackageVisibility(jobs)
+
+    res.json(visibleJobs)
   } catch (err) {
   console.error("GET JOB ERROR:", err)
   res.status(500).json({
@@ -145,6 +189,15 @@ export async function getJobBySlug(req, res) {
       return res.status(404).json({ error: "Job not found" });
     }
 
+    if (!job.isActive) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const visible = await isJobPackageVisible(job);
+    if (!visible) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
     res.json(job);
   } catch (err) {
   console.error("GET JOB ERROR:", err)
@@ -176,7 +229,9 @@ export async function getJobsByRecruiter(req, res) {
       },
     })
 
-    res.json(jobs)
+    const visibleJobs = await filterJobsForPackageVisibility(jobs)
+
+    res.json(visibleJobs)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Failed to fetch recruiter jobs" })
@@ -189,10 +244,19 @@ export async function getMyRecruiterJobs(req, res) {
       return res.status(403).json({ error: "Not allowed" })
     }
 
+    const recruiter = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { companyId: true },
+    })
+
+    if (recruiter?.companyId) {
+      await enforceCompanyJobVisibility(recruiter.companyId)
+    }
+
   const jobs = await prisma.job.findMany({
   where: {
     postedById: req.user.id,
-    isActive: true,
+    isExternal: false,
   },
   select: {
   id: true,
@@ -202,6 +266,7 @@ export async function getMyRecruiterJobs(req, res) {
   employmentType: true,
   createdAt: true,
   views: true,
+  isActive: true,
   _count: {
     select: {
       JobApplication: true,
@@ -212,9 +277,6 @@ export async function getMyRecruiterJobs(req, res) {
     createdAt: "desc",
   },
 });
-
-console.log("===== Recruiter Jobs =====");
-console.dir(jobs, { depth: null });
 
 res.json(jobs);
   } catch (err) {

@@ -51,7 +51,7 @@ const SPONSORED_PACKAGES = {
 };
 
 const RECRUITMENT_PACKAGES = {
-  "single-job": { name: "Single Job (30 Days)", price: 2000 },
+  "single-job": { name: "Single Job (Monthly · 30 Days)", price: 2000, durationDays: 30 },
 };
 
 export function resolvePackage(packageType, packageId) {
@@ -103,7 +103,7 @@ export function resolvePackage(packageType, packageId) {
       packageId,
       packageName: pkg.name,
       amount: pkg.price,
-      durationDays: 30,
+      durationDays: pkg.durationDays ?? 30,
     };
   }
 
@@ -112,4 +112,18 @@ export function resolvePackage(packageType, packageId) {
 
 export function getPlanLabel(planId) {
   return SUBSCRIPTION_PLANS[planId]?.name ?? planId;
+}
+
+export function getEffectivePlan(company) {
+  const plan = company?.subscriptionPlan || "free";
+
+  if (
+    plan !== "free" &&
+    company?.subscriptionExpiresAt &&
+    new Date(company.subscriptionExpiresAt) < new Date()
+  ) {
+    return "free";
+  }
+
+  return plan;
 }

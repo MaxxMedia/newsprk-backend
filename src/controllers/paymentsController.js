@@ -2,7 +2,7 @@ import crypto from "crypto";
 import RazorpayPkg from "razorpay";
 import { prisma } from "../lib/prisma.js";
 import { getPlanLabel, resolvePackage } from "../lib/packagePricing.js";
-
+import { dedupeCompanyPurchases, buildSubscriptionDisplay } from "../lib/packagePurchases.js";
 const Razorpay = RazorpayPkg.default || RazorpayPkg;
 
 function getRazorpay() {
@@ -29,7 +29,7 @@ async function activatePackage(purchase) {
     expiresAt = addDays(now, purchase.durationDays);
   }
 
-  if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
+    if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
     await prisma.company.update({
       where: { id: purchase.companyId },
       data: {
@@ -39,14 +39,13 @@ async function activatePackage(purchase) {
     });
   }
 
-  if (purchase.packageType === "RECRUITMENT" && purchase.companyId) {
-    await prisma.company.update({
-      where: { id: purchase.companyId },
-      data: {
-        jobPostingCredits: { increment: 1 },
-      },
-    });
+  if (purchase.companyId) {
+    const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(purchase.companyId);
   }
+
+  // Recruitment packages are monthly (30 days) and tracked on PackagePurchase.expiresAt.
+  // The base subscription plan (e.g. free) stays unchanged underneath.
 
   return { startsAt, expiresAt };
 }
@@ -203,12 +202,42 @@ export async function activateFreePlan(req, res) {
       return res.status(400).json({ error: "Link a company profile before choosing a plan" });
     }
 
+    const existingFreePurchase = await prisma.packagePurchase.findFirst({
+      where: {
+        companyId: user.companyId,
+        packageType: "SUBSCRIPTION",
+        packageId: "free",
+        status: "PAID",
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (existingFreePurchase) {
+      await prisma.company.update({
+        where: { id: user.companyId },
+        data: {
+          subscriptionPlan: "free",
+          subscriptionExpiresAt: null,
+        },
+      });
+
+      const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+      await enforceCompanyJobVisibility(user.companyId);
+
+      return res.json({
+        success: true,
+        purchase: existingFreePurchase,
+        alreadyActive: true,
+        message: "Free plan is already active for your company.",
+      });
+    }
+
     await prisma.company.update({
       where: { id: user.companyId },
       data: {
         subscriptionPlan: "free",
         subscriptionExpiresAt: null,
-        jobPostingCredits: 2,
+        jobPostingCredits: 0,
       },
     });
 
@@ -225,7 +254,10 @@ export async function activateFreePlan(req, res) {
       },
     });
 
-    res.json({ success: true, purchase });
+    const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
+    res.json({ success: true, purchase, alreadyActive: false });
   } catch (err) {
     console.error("Activate free plan error:", err);
     res.status(500).json({ error: "Failed to activate free plan" });
@@ -253,30 +285,42 @@ export async function getMyPackageInfo(req, res) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const purchases = await prisma.packagePurchase.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        packageType: true,
-        packageId: true,
-        packageName: true,
-        amount: true,
-        status: true,
-        startsAt: true,
-        expiresAt: true,
-        createdAt: true,
-      },
-    });
+    const purchases = dedupeCompanyPurchases(
+      await prisma.packagePurchase.findMany({
+        where: user.companyId
+          ? { companyId: user.companyId }
+          : { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          packageType: true,
+          packageId: true,
+          packageName: true,
+          amount: true,
+          status: true,
+          startsAt: true,
+          expiresAt: true,
+          createdAt: true,
+        },
+      })
+    );
+
+    const subscription = user.Company
+      ? await buildSubscriptionDisplay(user.Company, user.companyId, prisma)
+      : {
+          plan: "free",
+          planLabel: "Free",
+          displayPlan: "free",
+          displayPlanLabel: "Free",
+          recruitmentExpiresAt: null,
+          expiresAt: null,
+          jobPostingCredits: 0,
+          basePlanLabel: "Free",
+        };
 
     res.json({
-      subscription: {
-        plan: user.Company?.subscriptionPlan ?? "free",
-        planLabel: getPlanLabel(user.Company?.subscriptionPlan ?? "free"),
-        expiresAt: user.Company?.subscriptionExpiresAt ?? null,
-        jobPostingCredits: user.Company?.jobPostingCredits ?? 0,
-      },
+      subscription,
       purchases,
     });
   } catch (err) {

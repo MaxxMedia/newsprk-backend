@@ -2,6 +2,8 @@
 
 import { prisma } from "../lib/prisma.js"
 import { getPlanLabel } from "../lib/packagePricing.js"
+import { getJobPostingEligibility } from "../lib/jobPostingLimits.js"
+import { dedupeCompanyPurchases, buildSubscriptionDisplay } from "../lib/packagePurchases.js"
 
 // ================= PUBLIC RECRUITER PROFILE =================
 export async function getRecruiterProfile(req, res) {
@@ -343,25 +345,45 @@ console.log("ARTICLES FOUND:", articles.length)
       },
     })
 
-    const recentPurchases = await prisma.packagePurchase.findMany({
-      where: { userId: recruiterId, status: "PAID" },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        packageType: true,
-        packageName: true,
-        amount: true,
-        status: true,
-        createdAt: true,
-        expiresAt: true,
-      },
-    })
+    const recentPurchases = dedupeCompanyPurchases(
+      await prisma.packagePurchase.findMany({
+        where: recruiter?.companyId
+          ? { companyId: recruiter.companyId, status: "PAID" }
+          : { userId: recruiterId, status: "PAID" },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          packageType: true,
+          packageId: true,
+          packageName: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+      })
+    )
 
     const recentActivity = await buildRecentActivity(
       recruiterId,
       applicationsCount
     )
+
+    const jobPosting = await getJobPostingEligibility(recruiter?.companyId ?? null)
+
+    const subscription = recruiter?.Company
+      ? await buildSubscriptionDisplay(recruiter.Company, recruiter.companyId, prisma)
+      : {
+          plan: "free",
+          planLabel: "Free",
+          displayPlan: "free",
+          displayPlanLabel: "Free",
+          recruitmentExpiresAt: null,
+          expiresAt: null,
+          jobPostingCredits: 0,
+          basePlanLabel: "Free",
+        }
 
     res.json({
       jobsCount,
@@ -371,13 +393,9 @@ console.log("ARTICLES FOUND:", articles.length)
       articles,
       directories,
       recentActivity,
-      subscription: {
-        plan: recruiter?.Company?.subscriptionPlan ?? "free",
-        planLabel: getPlanLabel(recruiter?.Company?.subscriptionPlan ?? "free"),
-        expiresAt: recruiter?.Company?.subscriptionExpiresAt ?? null,
-        jobPostingCredits: recruiter?.Company?.jobPostingCredits ?? 0,
-      },
+      subscription,
       recentPurchases,
+      jobPosting,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
