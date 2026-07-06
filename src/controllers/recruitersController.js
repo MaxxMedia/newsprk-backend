@@ -8,6 +8,7 @@ import {
   getProductListingEligibility,
 } from "../lib/packageContentLimits.js"
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
+import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"
 
 // ================= PUBLIC RECRUITER PROFILE =================
 export async function getRecruiterProfile(req, res) {
@@ -388,6 +389,7 @@ const articles = await prisma.post.findMany({
     const jobPosting = await getJobPostingEligibility(recruiter?.companyId ?? null)
     const articlePosting = await getArticlePostingEligibility(recruiter?.companyId ?? null)
     const productListings = await getProductListingEligibility(recruiter?.companyId ?? null)
+    const analytics = await buildRecruiterAnalytics(recruiterId, recruiter?.companyId ?? null)
 
     const subscription = recruiter?.Company
       ? await buildSubscriptionDisplay(recruiter.Company, recruiter.companyId, prisma)
@@ -415,6 +417,7 @@ const articles = await prisma.post.findMany({
       jobPosting,
       articlePosting,
       productListings,
+      analytics,
     })
   } catch (err) {
     console.error("Recruiter dashboard error:", err)
