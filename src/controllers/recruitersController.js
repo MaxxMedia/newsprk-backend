@@ -1,6 +1,7 @@
 
 
 import { prisma } from "../lib/prisma.js"
+import slugify from "slugify"
 import { getPlanLabel } from "../lib/packagePricing.js"
 import { getJobPostingEligibility } from "../lib/jobPostingLimits.js"
 import {
@@ -438,6 +439,7 @@ export async function updateRecruiterProfile(req, res) {
       location,
       websiteUrl,
       avatarUrl,
+      companyId: bodyCompanyId,
 
       companyName,
       companyTagline,
@@ -479,6 +481,23 @@ export async function updateRecruiterProfile(req, res) {
 
     /* ================= SAFE COMPANY UPDATE ================= */
 
+    if (!companyId && bodyCompanyId) {
+      const linkedCompany = await prisma.company.findUnique({
+        where: { id: Number(bodyCompanyId) },
+      })
+
+      if (!linkedCompany) {
+        return res.status(400).json({ error: "Company not found" })
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { companyId: linkedCompany.id },
+      })
+
+      companyId = linkedCompany.id
+    }
+
     if (companyId) {
       await prisma.company.update({
         where: { id: companyId },
@@ -495,22 +514,35 @@ export async function updateRecruiterProfile(req, res) {
           ...(companyCoverImageUrl && { coverImageUrl: companyCoverImageUrl }),
         },
       })
-    } else {
+    } else if (companyName?.trim()) {
+      const baseSlug = slugify(companyName, {
+        lower: true,
+        strict: true,
+        trim: true,
+      })
+
+      let slug = baseSlug
+      let count = 1
+
+      while (await prisma.company.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${count++}`
+      }
+
       const newCompany = await prisma.company.create({
         data: {
-          name: companyName,
-          slug: companyName?.toLowerCase().replace(/\s+/g, "-"),
-          tagline: companyTagline,
-          description: companyDescription,
+          name: companyName.trim(),
+          slug,
+          tagline: companyTagline || null,
+          description: companyDescription || null,
           industryId: companyIndustryId
             ? Number(companyIndustryId)
             : null,
-          location: companyLocation,
-          address: companyAddress,
-          companySize,
-          website: companyWebsite,
-          logoUrl: companyLogoUrl,
-          coverImageUrl: companyCoverImageUrl,
+          location: companyLocation || null,
+          address: companyAddress || null,
+          companySize: companySize || null,
+          website: companyWebsite || null,
+          logoUrl: companyLogoUrl || null,
+          coverImageUrl: companyCoverImageUrl || null,
         },
       })
 
@@ -518,6 +550,8 @@ export async function updateRecruiterProfile(req, res) {
         where: { id: userId },
         data: { companyId: newCompany.id },
       })
+
+      companyId = newCompany.id
     }
 
     /* ================= RETURN UPDATED DATA ================= */

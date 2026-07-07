@@ -38,6 +38,16 @@ export async function createCompany(req, res) {
       },
     });
 
+    if (req.user?.role === "recruiter" && !req.user.companyId) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: {
+          companyId: company.id,
+          isOnboarded: true,
+        },
+      });
+    }
+
     res.json(company);
   } catch (err) {
     console.error(err);
