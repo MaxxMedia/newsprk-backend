@@ -152,9 +152,6 @@ res.json({
 /**
  * Public: get company people (recruiters)
  */
-/**
- * Public: get company people (recruiters)
- */
 export async function getCompanyPeople(req, res) {
   try {
     const { slug } = req.params;
@@ -213,9 +210,13 @@ export async function getCompanyPeople(req, res) {
       },
     });
 
-    followers.forEach(({ User }) => {
+    followers.forEach(({ User, createdAt }) => {
       if (User && !peopleMap.has(User.id)) {
-        peopleMap.set(User.id, { ...User, relation: "follower" });
+        peopleMap.set(User.id, {
+          ...User,
+          relation: "follower",
+          followingSince: createdAt,
+        });
       }
     });
 
@@ -226,9 +227,6 @@ export async function getCompanyPeople(req, res) {
   }
 }
 
-/**
- * Follow company
- */
 /**
  * Follow company
  */
@@ -258,9 +256,6 @@ export async function followCompany(req, res) {
   }
 }
 
-/**
- * Unfollow company
- */
 /**
  * Unfollow company
  */
