@@ -115,49 +115,76 @@ export async function getPostingEligibility(req, res) {
   }
 }
 
-
-
 /**
- * Public: list jobs (for feed)
+ * Public: list jobs (for feed) - WITH PAGINATION
  */
 export async function getAllJobs(req, res) {
   try {
-   const jobs = await prisma.job.findMany({
-  where: {
-    isActive: true,
-  },
-  include: {
-    Company: {
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoUrl: true,
-      },
-    },
-    User: {
-      select: {
-        id: true,
-        email: true,
-      },
-    },
-  },
-  orderBy: {
-    createdAt: "desc",
-  },
-})
+    // 🔥 Get pagination params from query
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
+    const skip = (page - 1) * limit
 
+    // 🔥 Get total count of active jobs (before pagination)
+    const totalJobs = await prisma.job.count({
+      where: {
+        isActive: true,
+      },
+    })
+
+    // 🔥 Get paginated jobs
+    const jobs = await prisma.job.findMany({
+      where: {
+        isActive: true,
+      },
+      include: {
+        Company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+          },
+        },
+        User: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: limit,
+      skip: skip,
+    })
+
+    // 🔥 Apply visibility filtering
     const visibleJobs = await filterJobsForPackageVisibility(jobs)
 
-    res.json(visibleJobs)
-  } catch (err) {
-  console.error("GET JOB ERROR:", err)
-  res.status(500).json({
-    error: err.message
-  })
-}
-}
+    // 🔥 Calculate pagination metadata
+    const totalPages = Math.ceil(totalJobs / limit)
 
+    // 🔥 Return paginated response
+    res.json({
+      jobs: visibleJobs,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalJobs: totalJobs,
+        limit: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    })
+  } catch (err) {
+    console.error("GET JOBS ERROR:", err)
+    res.status(500).json({
+      error: err.message
+    })
+  }
+}
 
 /**
  * Public: job detail by slug
@@ -348,7 +375,6 @@ export async function updateJob(req, res) {
   }
 }
 
-
 /**
  * Recruiter: dashboard stats + recent jobs
  */
@@ -371,7 +397,6 @@ export async function getRecruiterDashboard(req, res) {
     },
   },
 })
-
 
     // 1️⃣ Jobs count
     const jobsCount = await prisma.job.count({
@@ -441,7 +466,6 @@ const shortlistedCount = await prisma.jobApplication.count({
   }
 }
 
-
 /**
  * Admin: deactivate job (soft delete)
  */
@@ -457,7 +481,6 @@ export async function deactivateJob(req, res) {
     res.status(500).json({ error: "Failed to deactivate job" });
   }
 }
-
 
 /**
  * Admin: company-wise jobs with count
@@ -514,8 +537,6 @@ export const getAdminCompanyJobs = async (req, res) => {
     })
   }
 }
-
-
 
 /**
  * 👁️ PUBLIC: Increment job view

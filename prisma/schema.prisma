@@ -503,3 +503,14 @@ enum PackagePurchase_status {
   PAID
   FAILED
 }
+
+model ContactMessage {
+  id          Int      @id @default(autoincrement())
+  fullName    String
+  email       String
+  phoneNumber String?
+  website     String?
+  message     String   @db.LongText
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+}
