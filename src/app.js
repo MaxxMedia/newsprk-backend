@@ -112,6 +112,7 @@ import adminIndustriesRoutes from "./routes/adminIndustryRoutes.js";
 import jobAlertsRoutes from "./routes/jobAlerts.js";
 import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
+import contactRoutes from "./routes/contact.js";
 
 
 
@@ -141,6 +142,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/contact", contactRoutes);
 
 /* ==========================
    🏠 Default Route
