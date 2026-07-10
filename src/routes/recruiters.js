@@ -6,7 +6,8 @@ import {
   getMyRecruiterProfile,
   getRecruiterDashboard,
   getRecruitersByCompany,
-  getAllRecruiters
+  getAllRecruiters,
+  getCompanyProfileEligibilityController,
 } from "../controllers/recruitersController.js"
 
 const router = express.Router()
@@ -20,8 +21,15 @@ router.get("/dashboard", requireAuth, getRecruiterDashboard)
 // ✅ Admin get all recruiters (MOVE THIS UP)
 router.get("/admin", requireAuth, getAllRecruiters)
 
+router.get(
+  "/company-profile-eligibility",
+  requireAuth,
+  getCompanyProfileEligibilityController
+)
+
 // Company filter
 router.get("/", requireAuth, getRecruitersByCompany)
+
 
 // 🌍 Public recruiter profile (MUST BE LAST)
 router.get("/:username", getRecruiterProfile)

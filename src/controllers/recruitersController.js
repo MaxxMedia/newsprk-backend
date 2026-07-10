@@ -7,9 +7,11 @@ import { getJobPostingEligibility } from "../lib/jobPostingLimits.js"
 import {
   getArticlePostingEligibility,
   getProductListingEligibility,
-} from "../lib/packageContentLimits.js"
+  getCompanyProfileEligibility,
+} from "../lib/packageContentLimits.js";
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"
+
 
 // ================= PUBLIC RECRUITER PROFILE =================
 export async function getRecruiterProfile(req, res) {
@@ -106,6 +108,30 @@ export async function getMyRecruiterProfile(req, res) {
   } catch (err) {
     console.error("My recruiter profile error:", err)
     res.status(500).json({ error: "Failed to fetch recruiter profile" })
+  }
+}
+
+export async function getCompanyProfileEligibilityController(req, res) {
+  try {
+    const recruiter = await prisma.user.findUnique({
+      where: {
+        id: req.user.id,
+      },
+      select: {
+        companyId: true,
+      },
+    });
+
+    const eligibility = await getCompanyProfileEligibility(
+      recruiter?.companyId ?? null
+    );
+
+    res.json(eligibility);
+  } catch (err) {
+    console.error("Company profile eligibility error:", err);
+    res.status(500).json({
+      error: "Failed to load company profile eligibility",
+    });
   }
 }
 
@@ -499,22 +525,28 @@ export async function updateRecruiterProfile(req, res) {
     }
 
     if (companyId) {
-      await prisma.company.update({
-        where: { id: companyId },
-        data: {
-          ...(companyName && { name: companyName }),
-          ...(companyTagline && { tagline: companyTagline }),
-          ...(companyDescription && { description: companyDescription }),
-          ...(companyIndustryId && { industryId: Number(companyIndustryId) }),
-          ...(companyLocation && { location: companyLocation }),
-          ...(companyAddress && { address: companyAddress }),
-          ...(companySize && { companySize }),
-          ...(companyWebsite && { website: companyWebsite }),
-          ...(companyLogoUrl && { logoUrl: companyLogoUrl }),
-          ...(companyCoverImageUrl && { coverImageUrl: companyCoverImageUrl }),
-        },
-      })
-    } else if (companyName?.trim()) {
+
+  await assertCompanyProfileLimits(companyId, {
+    companyDescription,
+    companyCoverImageUrl,
+  });
+
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      ...(companyName && { name: companyName }),
+      ...(companyTagline && { tagline: companyTagline }),
+      ...(companyDescription && { description: companyDescription }),
+      ...(companyIndustryId && { industryId: Number(companyIndustryId) }),
+      ...(companyLocation && { location: companyLocation }),
+      ...(companyAddress && { address: companyAddress }),
+      ...(companySize && { companySize }),
+      ...(companyWebsite && { website: companyWebsite }),
+      ...(companyLogoUrl && { logoUrl: companyLogoUrl }),
+      ...(companyCoverImageUrl && { coverImageUrl: companyCoverImageUrl }),
+    },
+  });
+} else if (companyName?.trim()) {
       const baseSlug = slugify(companyName, {
         lower: true,
         strict: true,
@@ -590,9 +622,19 @@ export async function updateRecruiterProfile(req, res) {
     res.json(updatedRecruiter)
 
   } catch (err) {
-    console.error("Update recruiter profile error:", err)
-    res.status(500).json({ error: "Failed to update profile" })
+  console.error("Update recruiter profile error:", err);
+
+  if (err.status) {
+    return res.status(err.status).json({
+      error: err.message,
+      code: err.code,
+    });
   }
+
+  res.status(500).json({
+    error: "Failed to update profile",
+  });
+}
 }
 
 export async function getRecruitersByCompany(req, res) {

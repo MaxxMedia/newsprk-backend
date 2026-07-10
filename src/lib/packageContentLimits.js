@@ -16,6 +16,72 @@ export const PLAN_PRODUCT_LISTING_LIMITS = {
   enterprise: null,
 };
 
+export const PLAN_COMPANY_PROFILE_LIMITS = {
+  free: {
+    descriptionLimit: 150,
+    coverBanner: false,
+    website: true,
+    googleMap: true,
+    whatsapp: false,
+    galleryImages: 0,
+    factoryImages: 0,
+    productCategories: 3,
+    productListings: 5,
+    productImages: 10,
+    productVideos: 0,
+    brochures: false,
+    certifications: false,
+  },
+
+  basic: {
+    descriptionLimit: 1000,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
+    galleryImages: 10,
+    factoryImages: 10,
+    productCategories: 10,
+    productListings: 25,
+    productImages: 50,
+    productVideos: 5,
+    brochures: true,
+    certifications: true,
+  },
+
+  professional: {
+    descriptionLimit: 2500,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
+    galleryImages: 15,
+    factoryImages: 30,
+    productCategories: 30,
+    productListings: 100,
+    productImages: 100,
+    productVideos: 20,
+    brochures: true,
+    certifications: true,
+  },
+
+  enterprise: {
+    descriptionLimit: null,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
+    galleryImages: null,
+    factoryImages: null,
+    productCategories: null,
+    productListings: null,
+    productImages: null,
+    productVideos: null,
+    brochures: true,
+    certifications: true,
+  },
+};
+
 function getYearStart() {
   const now = new Date();
   return new Date(now.getFullYear(), 0, 1);
@@ -159,6 +225,30 @@ export async function getProductListingEligibility(companyId) {
   };
 }
 
+export async function getCompanyProfileEligibility(companyId) {
+  if (!companyId) {
+    return {
+      canEdit: false,
+      reason: "NO_COMPANY",
+      message: "Link a company profile before editing it.",
+      upgradeRequired: false,
+    };
+  }
+
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
+
+  const limits =
+    PLAN_COMPANY_PROFILE_LIMITS[plan] ??
+    PLAN_COMPANY_PROFILE_LIMITS.free;
+
+  return {
+    canEdit: true,
+    plan,
+    planLabel: getPlanLabel(plan),
+    ...limits,
+  };
+}
 export async function assertCanCreateArticle(companyId) {
   const eligibility = await getArticlePostingEligibility(companyId);
 
@@ -191,6 +281,50 @@ export async function assertProductListingCount(companyId, requestedCount) {
   return eligibility;
 }
 
+export async function assertCompanyProfileLimits(companyId, data) {
+  const eligibility = await getCompanyProfileEligibility(companyId);
+
+  if (!eligibility.canEdit) {
+    const error = new Error(eligibility.message);
+    error.status = 403;
+    error.code = "COMPANY_PROFILE_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  if (
+    eligibility.descriptionLimit !== null &&
+    data.companyDescription &&
+    data.companyDescription.length > eligibility.descriptionLimit
+  ) {
+    const error = new Error(
+      `Company description cannot exceed ${eligibility.descriptionLimit} characters.`
+    );
+    error.status = 403;
+    error.code = "DESCRIPTION_LIMIT_REACHED";
+    throw error;
+  }
+
+  if (!eligibility.coverBanner && data.companyCoverImageUrl) {
+    const error = new Error(
+      "Company cover banner is available only on Basic plan and above."
+    );
+    error.status = 403;
+    error.code = "COVER_BANNER_NOT_ALLOWED";
+    throw error;
+  }
+
+  if (!eligibility.whatsapp && data.companyWhatsapp) {
+    const error = new Error(
+      "WhatsApp button is available only on Basic plan and above."
+    );
+    error.status = 403;
+    error.code = "WHATSAPP_NOT_ALLOWED";
+    throw error;
+  }
+
+  return eligibility;
+}
 export function applyProductListingLimit(productSupplies, limit) {
   const items = normalizeProductSupplies(productSupplies);
   if (limit === null) {
@@ -207,3 +341,6 @@ export function applyProductListingLimit(productSupplies, limit) {
 
   return filled.slice(0, limit);
 }
+
+
+
