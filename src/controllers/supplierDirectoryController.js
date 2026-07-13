@@ -47,25 +47,43 @@ export const createDirectory = async (req, res) => {
       return res.status(403).json({ error: "Only recruiters can submit directories" })
     }
 
-    const {
-      name,
-      slug,
-      description,
-      website,
-      logoUrl,
-      coverImageUrl,
-      phoneNumber,
-      email,
-      tradeNames,
-      videoGallery,
-      socialLinks,
-      productSupplies,
+   const {
+  name,
+  slug,
+  description,
+  website,
+  logoUrl,
+  coverImageUrl,
+  phoneNumber,
+  email,
 
-      // ✅ NEW FIELDS
-      location,
-      address,
-      industryId,
-    } = req.body
+  tradeNames,
+  socialLinks,
+
+  videoGallery,
+  productGallery,
+  companyGallery,
+  factoryGallery,
+
+  companyBrochure,
+  certifications,
+
+  brandsRepresented,
+  industriesServed,
+  exportMarkets,
+
+  manufacturingCapabilities,
+  machineryList,
+  qualityStandards,
+
+  enableInquiryForm,
+
+  productSupplies,
+
+  location,
+  address,
+  industryId,
+} = req.body
 
     /* ==============================
        1️⃣ Validate required fields
@@ -127,9 +145,25 @@ export const createDirectory = async (req, res) => {
         email,
         tradeNames,
         videoGallery,
-        socialLinks,
-        productSupplies,
+productGallery,
+companyGallery,
+factoryGallery,
 
+companyBrochure,
+certifications,
+
+brandsRepresented,
+industriesServed,
+exportMarkets,
+
+manufacturingCapabilities,
+machineryList,
+qualityStandards,
+
+enableInquiryForm,
+
+socialLinks,
+productSupplies,
         companyId: user.companyId,
         status: "PENDING",
         isLiveEditable: false,
@@ -185,9 +219,12 @@ export const getMyDirectoryById = async (req, res) => {
 
     if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" })
 
-    const directory = await prisma.supplierDirectory.findFirst({
-      where: { id: directoryId, submittedById: user.id },
-    })
+   const directory = await prisma.supplierDirectory.findFirst({
+    where:{
+        id:directoryId,
+        submittedById:user.id,
+    }
+})
 
     if (!directory) return res.status(404).json({ error: "Directory not found" })
 
@@ -238,15 +275,37 @@ export const getMyDirectories = async (req, res) => {
           }
         : { submittedById: user.id },
       orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        status: true,
-        isLiveEditable: true,
-        createdAt: true,
-        productSupplies: true,
-      },
+      select:{
+   id:true,
+   name:true,
+   slug:true,
+   status:true,
+   isLiveEditable:true,
+   createdAt:true,
+
+   logoUrl:true,
+   coverImageUrl:true,
+
+   productSupplies:true,
+
+   videoGallery:true,
+   productGallery:true,
+   companyGallery:true,
+   factoryGallery:true,
+
+   companyBrochure:true,
+   certifications:true,
+
+   brandsRepresented:true,
+   industriesServed:true,
+   exportMarkets:true,
+
+   manufacturingCapabilities:true,
+   machineryList:true,
+   qualityStandards:true,
+
+   enableInquiryForm:true,
+},
     })
 
     res.json(directories)
@@ -270,15 +329,77 @@ export const updateDirectory = async (req, res) => {
     if (directory.submittedById !== user.id) return res.status(403).json({ error: "Not allowed" })
     if (!directory.isLiveEditable) return res.status(400).json({ error: "Directory not approved yet" })
 
-    const { name, description, website, logoUrl, coverImageUrl, phoneNumber, email,
-      tradeNames, videoGallery, socialLinks, productSupplies, slug } = req.body
+    const {
+    name,
+    description,
+    website,
+    logoUrl,
+    coverImageUrl,
+    phoneNumber,
+    email,
+
+    tradeNames,
+    socialLinks,
+
+    videoGallery,
+    productGallery,
+    companyGallery,
+    factoryGallery,
+
+    companyBrochure,
+    certifications,
+
+    brandsRepresented,
+    industriesServed,
+    exportMarkets,
+
+    manufacturingCapabilities,
+    machineryList,
+    qualityStandards,
+
+    enableInquiryForm,
+
+    productSupplies,
+
+    slug,
+} = req.body
 
     if (slug && slug !== directory.slug) return res.status(400).json({ error: "Slug cannot be changed" })
 
     const updated = await prisma.supplierDirectory.update({
       where: { id: directoryId },
-      data: { name, description, website, logoUrl, coverImageUrl, phoneNumber, email,
-        tradeNames, videoGallery, socialLinks, productSupplies },
+      data:{
+    name,
+    description,
+    website,
+    logoUrl,
+    coverImageUrl,
+    phoneNumber,
+    email,
+
+    tradeNames,
+    socialLinks,
+
+    videoGallery,
+    productGallery,
+    companyGallery,
+    factoryGallery,
+
+    companyBrochure,
+    certifications,
+
+    brandsRepresented,
+    industriesServed,
+    exportMarkets,
+
+    manufacturingCapabilities,
+    machineryList,
+    qualityStandards,
+
+    enableInquiryForm,
+
+    productSupplies,
+},
     })
 
     await prisma.auditLog.create({

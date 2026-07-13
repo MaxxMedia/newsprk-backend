@@ -420,33 +420,68 @@ model SupplierDirectory {
   id                                         Int                      @id @default(autoincrement())
   name                                       String
   slug                                       String                   @unique
+
   companyId                                  Int?
+
   phoneNumber                                String?
   email                                      String?
-  tradeNames                                 Json?
-  videoGallery                               Json?
-  description                                String                   @db.LongText
   website                                    String?
+
   logoUrl                                    String?
   coverImageUrl                              String?
+
+  description                                String                   @db.LongText
+
+  tradeNames                                 Json?
   socialLinks                                Json?
+
+  // EXISTING
+  videoGallery                               Json?
   productSupplies                            Json?
+
+  // NEW GALLERIES
+  productGallery                             Json?
+  companyGallery                             Json?
+  factoryGallery                             Json?
+
+  // DOCUMENTS
+  companyBrochure                            Json?
+  certifications                             Json?
+
+  // LISTS
+  brandsRepresented                          Json?
+  industriesServed                           Json?
+  exportMarkets                              Json?
+
+  // TEXT SECTIONS
+  manufacturingCapabilities                  String?                  @db.LongText
+  machineryList                              String?                  @db.LongText
+  qualityStandards                           String?                  @db.LongText
+
+  // INQUIRY SETTINGS
+  enableInquiryForm                          Boolean                  @default(true)
+
   status                                     SupplierDirectory_status @default(PENDING)
   isLiveEditable                             Boolean                  @default(false)
+
   views                                      Int                      @default(0)
   connections                                Int                      @default(0)
+
   submittedById                              Int
   approvedById                               Int?
+
   createdAt                                  DateTime                 @default(now())
   approvedAt                                 DateTime?
+
   isFeatured                                 Boolean                  @default(false)
+
   User_SupplierDirectory_approvedByIdToUser  User?                    @relation("SupplierDirectory_approvedByIdToUser", fields: [approvedById], references: [id])
   Company                                    Company?                 @relation(fields: [companyId], references: [id])
   User_SupplierDirectory_submittedByIdToUser User                     @relation("SupplierDirectory_submittedByIdToUser", fields: [submittedById], references: [id])
 
-  @@index([approvedById], map: "SupplierDirectory_approvedById_fkey")
-  @@index([companyId], map: "SupplierDirectory_companyId_fkey")
-  @@index([submittedById], map: "SupplierDirectory_submittedById_fkey")
+  @@index([approvedById])
+  @@index([companyId])
+  @@index([submittedById])
 }
 
 enum AdvertisementBanner_placement {
