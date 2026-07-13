@@ -18,68 +18,120 @@ export const PLAN_PRODUCT_LISTING_LIMITS = {
 
 export const PLAN_COMPANY_PROFILE_LIMITS = {
   free: {
-    descriptionLimit: 150,
-    coverBanner: false,
-    website: true,
-    googleMap: true,
-    whatsapp: false,
-    galleryImages: 0,
-    factoryImages: 0,
-    productCategories: 3,
-    productListings: 5,
-    productImages: 10,
-    productVideos: 0,
-    brochures: false,
-    certifications: false,
-  },
+  descriptionLimit: 150,
+  coverBanner: false,
+  website: true,
+  googleMap: true,
+  whatsapp: false,
 
-  basic: {
-    descriptionLimit: 1000,
-    coverBanner: true,
-    website: true,
-    googleMap: true,
-    whatsapp: true,
-    galleryImages: 10,
-    factoryImages: 10,
-    productCategories: 10,
-    productListings: 25,
-    productImages: 50,
-    productVideos: 5,
-    brochures: true,
-    certifications: true,
-  },
+  galleryImages: 0,
+  factoryImages: 0,
+  productCategories: 3,
+  productListings: 5,
+  productImages: 10,
+  productVideos: 0,
+  productCatalogues: 0,
+
+  brochures: false,
+  certifications: false,
+
+  brandsRepresented: 0,
+  industriesServed: 5,
+  exportMarkets: false,
+
+  manufacturingCapabilities: false,
+  machineryList: false,
+  qualityStandards: false,
+
+  inquiryForm: "Basic",
+},
+
+basic: {
+  descriptionLimit: 1000,
+  coverBanner: true,
+  website: true,
+  googleMap: true,
+  whatsapp: true,
+
+  galleryImages: 10,
+  factoryImages: 10,
+  productCategories: 10,
+  productListings: 25,
+  productImages: 50,
+  productVideos: 5,
+  productCatalogues: 2,
+
+  brochures: true,
+  certifications: true,
+
+  brandsRepresented: 10,
+  industriesServed: 20,
+  exportMarkets: true,
+
+  manufacturingCapabilities: "Basic",
+  machineryList: "Basic",
+  qualityStandards: true,
+
+  inquiryForm: "Standard",
+},
 
   professional: {
-    descriptionLimit: 2500,
-    coverBanner: true,
-    website: true,
-    googleMap: true,
-    whatsapp: true,
-    galleryImages: 15,
-    factoryImages: 30,
-    productCategories: 30,
-    productListings: 100,
-    productImages: 100,
-    productVideos: 20,
-    brochures: true,
-    certifications: true,
-  },
+  descriptionLimit: 2500,
+  coverBanner: true,
+  website: true,
+  googleMap: true,
+  whatsapp: true,
+
+  galleryImages: 15,
+  factoryImages: 30,
+  productCategories: 30,
+  productListings: 100,
+  productImages: 100,
+  productVideos: 20,
+  productCatalogues: 10,
+
+  brochures: true,
+  certifications: true,
+
+  brandsRepresented: null,
+  industriesServed: null,
+  exportMarkets: true,
+
+  manufacturingCapabilities: "Complete",
+  machineryList: "Detailed",
+  qualityStandards: true,
+
+  inquiryForm: "Advanced",
+},
 
   enterprise: {
-    descriptionLimit: null,
-    coverBanner: true,
-    website: true,
-    googleMap: true,
-    whatsapp: true,
-    galleryImages: null,
-    factoryImages: null,
-    productCategories: null,
-    productListings: null,
-    productImages: null,
-    productVideos: null,
-    brochures: true,
-    certifications: true,
-  },
+  descriptionLimit: null,
+  coverBanner: true,
+  website: true,
+  googleMap: true,
+  whatsapp: true,
+
+  galleryImages: null,
+  factoryImages: null,
+  productCategories: null,
+  productListings: null,
+  productImages: null,
+  productVideos: null,
+  productCatalogues: null,
+
+  brochures: true,
+  certifications: true,
+
+  brandsRepresented: null,
+  industriesServed: null,
+  exportMarkets: true,
+
+  manufacturingCapabilities: "Complete + Photos + Video",
+  machineryList: "Detailed with Images",
+  qualityStandards: true,
+
+  inquiryForm: "Custom",
+},
 };
 
 function getYearStart() {
@@ -322,6 +374,120 @@ export async function assertCompanyProfileLimits(companyId, data) {
     error.code = "WHATSAPP_NOT_ALLOWED";
     throw error;
   }
+
+  if (
+  eligibility.galleryImages !== null &&
+  Array.isArray(data.companyGallery) &&
+  data.companyGallery.filter(Boolean).length >
+    eligibility.galleryImages
+) {
+  throw new Error(
+    `Only ${eligibility.galleryImages} company gallery images are allowed.`
+  );
+}
+
+if (
+  eligibility.factoryImages !== null &&
+  Array.isArray(data.factoryGallery) &&
+  data.factoryGallery.filter(Boolean).length >
+    eligibility.factoryImages
+) {
+  throw new Error(
+    `Only ${eligibility.factoryImages} factory images are allowed.`
+  );
+}
+
+if (
+  eligibility.productVideos !== null &&
+  Array.isArray(data.videoGallery) &&
+  data.videoGallery.filter(Boolean).length >
+    eligibility.productVideos
+) {
+  throw new Error(
+    `Only ${eligibility.productVideos} product videos are allowed.`
+  );
+}
+
+if (
+  eligibility.productCatalogues !== null &&
+  Array.isArray(data.productCatalogues) &&
+  data.productCatalogues.filter(Boolean).length >
+    eligibility.productCatalogues
+) {
+  throw new Error(
+    `Only ${eligibility.productCatalogues} product catalogues are allowed.`
+  );
+}
+
+if (
+  eligibility.brandsRepresented !== null &&
+  Array.isArray(data.brandsRepresented) &&
+  data.brandsRepresented.filter(Boolean).length >
+    eligibility.brandsRepresented
+) {
+  throw new Error(
+    `Only ${eligibility.brandsRepresented} brands are allowed.`
+  );
+}
+
+if (
+  eligibility.industriesServed !== null &&
+  Array.isArray(data.industriesServed) &&
+  data.industriesServed.filter(Boolean).length >
+    eligibility.industriesServed
+) {
+  throw new Error(
+    `Only ${eligibility.industriesServed} industries are allowed.`
+  );
+}
+
+if (
+  !eligibility.exportMarkets &&
+  Array.isArray(data.exportMarkets) &&
+  data.exportMarkets.filter(Boolean).length
+) {
+  throw new Error(
+    "Export Markets are available only on Basic plan and above."
+  );
+}
+
+if (
+  !eligibility.brochures &&
+  Array.isArray(data.companyBrochure) &&
+  data.companyBrochure.filter(Boolean).length
+) {
+  throw new Error(
+    "Company Brochure is available only on Basic plan and above."
+  );
+}
+
+if (
+  !eligibility.manufacturingCapabilities &&
+  data.manufacturingCapabilities
+) {
+  throw new Error(
+    "Manufacturing Capabilities are available only on Basic plan."
+  );
+}
+
+if (
+  !eligibility.machineryList &&
+  data.machineryList
+) {
+  throw new Error(
+    "Machinery List is available only on Basic plan."
+  );
+}
+
+if (
+  !eligibility.qualityStandards &&
+  data.qualityStandards
+) {
+  throw new Error(
+    "Quality Standards are available only on Basic plan."
+  );
+}
+
 
   return eligibility;
 }
