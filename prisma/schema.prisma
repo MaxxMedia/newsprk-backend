@@ -428,8 +428,8 @@ model SupplierDirectory {
   website                                    String?
 
   logoUrl                                    String?
-  coverImageUrl                              String?
-
+  coverImageUrl                              Json?
+  
   description                                String                   @db.LongText
 
   tradeNames                                 Json?
