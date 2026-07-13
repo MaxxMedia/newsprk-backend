@@ -16,6 +16,23 @@ export const PLAN_PRODUCT_LISTING_LIMITS = {
   enterprise: null,
 };
 
+/* ==========================================================
+   NEW: Supplier Directory media permissions (cover images + WhatsApp)
+   ========================================================== */
+export const PLAN_COVER_IMAGE_LIMITS = {
+  free: 0,
+  basic: 1,
+  professional: 3,
+  enterprise: 5,
+};
+
+export const PLAN_WHATSAPP_ALLOWED = {
+  free: false,
+  basic: true,
+  professional: true,
+  enterprise: true,
+};
+
 export const PLAN_COMPANY_PROFILE_LIMITS = {
   free: {
   descriptionLimit: 150,
@@ -235,6 +252,12 @@ export async function getArticlePostingEligibility(companyId) {
   };
 }
 
+/**
+ * ✅ EXTENDED: now also returns maxCoverImages + allowWhatsapp, computed from
+ * the same `plan` this function already resolves via getActiveSubscription().
+ * This lets the frontend reuse the ContentLimitEligibility object it already
+ * fetches (fetchProductListingEligibility) instead of adding a new API call.
+ */
 export async function getProductListingEligibility(companyId) {
   if (!companyId) {
     return {
@@ -246,6 +269,8 @@ export async function getProductListingEligibility(companyId) {
       effectiveLimit: 0,
       activeListings: 0,
       isUnlimited: false,
+      maxCoverImages: PLAN_COVER_IMAGE_LIMITS.free,
+      allowWhatsapp: PLAN_WHATSAPP_ALLOWED.free,
     };
   }
 
@@ -269,6 +294,9 @@ export async function getProductListingEligibility(companyId) {
     remaining,
     isUnlimited,
     upgradeRequired: !canAdd,
+    // ---- NEW: supplier directory media permissions ----
+    maxCoverImages: PLAN_COVER_IMAGE_LIMITS[plan] ?? PLAN_COVER_IMAGE_LIMITS.free,
+    allowWhatsapp: PLAN_WHATSAPP_ALLOWED[plan] ?? false,
     message: canAdd
       ? isUnlimited
         ? `You can add unlimited supplier directories on the ${planLabel} plan.`
@@ -301,6 +329,7 @@ export async function getCompanyProfileEligibility(companyId) {
     ...limits,
   };
 }
+
 export async function assertCanCreateArticle(companyId) {
   const eligibility = await getArticlePostingEligibility(companyId);
 
@@ -491,6 +520,7 @@ if (
 
   return eligibility;
 }
+
 export function applyProductListingLimit(productSupplies, limit) {
   const items = normalizeProductSupplies(productSupplies);
   if (limit === null) {
@@ -508,5 +538,76 @@ export function applyProductListingLimit(productSupplies, limit) {
   return filled.slice(0, limit);
 }
 
+/* ==========================================================
+   NEW: Supplier Directory media validation + sanitization.
+   Single source of truth used by createDirectory and
+   updateDirectory in suppliersController.js — never trust the
+   frontend, always re-derive the plan server-side.
+   ========================================================== */
 
+/**
+ * Pure function: given a resolved plan + raw coverImages/socialLinks,
+ * returns sanitized values or throws a validation error.
+ * - FREE + non-empty coverImages -> throws (rejected, not silently dropped)
+ * - paid plan exceeding its max -> throws with a clear message
+ * - whatsapp is silently stripped from socialLinks when not allowed,
+ *   per spec ("Remove WhatsApp from socialLinks before saving")
+ * 
+ * ✅ UPDATED: Handles both string (single URL) and array inputs
+ */
+export function sanitizeSupplierDirectoryMedia({ plan, coverImages, socialLinks }) {
+  const maxCoverImages = PLAN_COVER_IMAGE_LIMITS[plan] ?? PLAN_COVER_IMAGE_LIMITS.free;
+  const allowWhatsapp = PLAN_WHATSAPP_ALLOWED[plan] ?? false;
+  const planLabel = getPlanLabel(plan);
 
+  // ✅ Handle both string and array inputs
+  let incomingCoverImages = [];
+  if (Array.isArray(coverImages)) {
+    incomingCoverImages = coverImages.filter((url) => typeof url === "string" && url.trim().length > 0);
+  } else if (typeof coverImages === "string" && coverImages.trim().length > 0) {
+    incomingCoverImages = [coverImages];
+  }
+
+  if (maxCoverImages === 0 && incomingCoverImages.length > 0) {
+    const error = new Error(
+      "Cover images are not available on the Free plan. Upgrade to Basic or higher to upload a cover image."
+    );
+    error.status = 403;
+    error.code = "COVER_IMAGE_NOT_ALLOWED";
+    throw error;
+  }
+
+  if (incomingCoverImages.length > maxCoverImages) {
+    const overBy = incomingCoverImages.length - maxCoverImages;
+    const error = new Error(
+      `Your ${planLabel} plan allows a maximum of ${maxCoverImages} cover image${maxCoverImages === 1 ? "" : "s"}. Please remove ${overBy} image${overBy === 1 ? "" : "s"} or upgrade your plan.`
+    );
+    error.status = 403;
+    error.code = "COVER_IMAGE_LIMIT_EXCEEDED";
+    throw error;
+  }
+
+  const sanitizedSocialLinks = { ...(socialLinks || {}) };
+  if (!allowWhatsapp) {
+    delete sanitizedSocialLinks.whatsapp;
+  }
+
+  return {
+    coverImages: incomingCoverImages, // Always returns an array
+    socialLinks: sanitizedSocialLinks,
+  };
+}
+
+/**
+ * Resolves the company's active plan via getActiveSubscription() and applies
+ * sanitizeSupplierDirectoryMedia(). Use this in the controller instead of
+ * duplicating the plan lookup.
+ */
+export async function assertAndSanitizeSupplierDirectoryMedia(companyId, { coverImages, socialLinks }) {
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  return sanitizeSupplierDirectoryMedia({
+    plan: activeSubscription.plan,
+    coverImages,
+    socialLinks,
+  });
+}

@@ -83,6 +83,76 @@ export const uploadImage = [
 ];
 
 // ----------------------------
+// ✅ NEW: Document Upload (PDF, Word, Excel, etc.)
+// ----------------------------
+export const uploadDocument = [
+  multer({
+    storage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ];
+
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only document files (PDF, Word, Excel, PowerPoint) are allowed."));
+      }
+    },
+  }).single("document"), // ✅ Changed field name to "document"
+
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: "No document uploaded",
+        });
+      }
+
+      // Get original file extension
+      const originalName = req.file.originalname.split(".")[0];
+      const extension = req.file.originalname.split(".").pop();
+
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: "mould-tech/documents",
+            resource_type: "auto", // ✅ Auto-detect file type
+            public_id: `${originalName}-${Date.now()}`,
+            format: extension,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+      });
+
+      res.json({
+        documentUrl: result.secure_url,
+        publicId: result.public_id,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        error: "Document upload failed",
+      });
+    }
+  },
+];
+
+// ----------------------------
 // Resume Upload Helper
 // ----------------------------
 export async function uploadResumeToCloudinary(file) {
@@ -106,3 +176,104 @@ export async function uploadResumeToCloudinary(file) {
     stream.end(file.buffer);
   });
 }
+
+// ----------------------------
+// ✅ NEW: Delete file from Cloudinary
+// ----------------------------
+export const deleteFile = async (req, res) => {
+  try {
+    const { publicId } = req.body;
+
+    if (!publicId) {
+      return res.status(400).json({ error: "Public ID is required" });
+    }
+
+    const result = await cloudinary.uploader.destroy(publicId);
+
+    if (result.result === "ok") {
+      return res.json({ message: "File deleted successfully" });
+    } else {
+      return res.status(400).json({ error: "Failed to delete file" });
+    }
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ error: "Failed to delete file" });
+  }
+};
+
+// ----------------------------
+// ✅ NEW: Upload multiple documents
+// ----------------------------
+export const uploadMultipleDocuments = [
+  multer({
+    storage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB per file
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ];
+
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only document files are allowed."));
+      }
+    },
+  }).array("documents", 5), // Max 5 documents
+
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          error: "No documents uploaded",
+        });
+      }
+
+      const uploadPromises = req.files.map((file) => {
+        return new Promise((resolve, reject) => {
+          const originalName = file.originalname.split(".")[0];
+          const extension = file.originalname.split(".").pop();
+
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "mould-tech/documents",
+              resource_type: "auto",
+              public_id: `${originalName}-${Date.now()}`,
+              format: extension,
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+
+          stream.end(file.buffer);
+        });
+      });
+
+      const results = await Promise.all(uploadPromises);
+
+      const documentUrls = results.map((result) => ({
+        documentUrl: result.secure_url,
+        publicId: result.public_id,
+      }));
+
+      res.json({
+        documents: documentUrls,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        error: "Document upload failed",
+      });
+    }
+  },
+];
