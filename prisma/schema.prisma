@@ -443,6 +443,7 @@ model SupplierDirectory {
   productGallery                             Json?
   companyGallery                             Json?
   factoryGallery                             Json?
+  productCatalogues                          Json? 
 
   // DOCUMENTS
   companyBrochure                            Json?
@@ -495,6 +496,11 @@ enum AdvertisementBanner_placement {
   SUPPLIER_AFTER_VIDEO
   SIDEBAR
   FOOTER
+  EVENT_RIGHT
+  SUPPLIER_RIGHT
+  JOB_RIGHT
+  INDUSTRY_TALKS_RIGHT
+  MAGAZINE_RIGHT
 }
 
 enum AdvertisementBanner_status {

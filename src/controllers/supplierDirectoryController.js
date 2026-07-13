@@ -148,6 +148,7 @@ export const createDirectory = async (req, res) => {
 productGallery,
 companyGallery,
 factoryGallery,
+productCatalogues,
 
 companyBrochure,
 certifications,
@@ -287,11 +288,13 @@ export const getMyDirectories = async (req, res) => {
    coverImageUrl:true,
 
    productSupplies:true,
+   productCategories:true,
 
    videoGallery:true,
    productGallery:true,
    companyGallery:true,
    factoryGallery:true,
+   productCatalogues:true,
 
    companyBrochure:true,
    certifications:true,
@@ -345,6 +348,8 @@ export const updateDirectory = async (req, res) => {
     productGallery,
     companyGallery,
     factoryGallery,
+    productCatalogues,
+    productCategories,
 
     companyBrochure,
     certifications,
@@ -384,6 +389,8 @@ export const updateDirectory = async (req, res) => {
     productGallery,
     companyGallery,
     factoryGallery,
+    productCatalogues,
+    productCategories,
 
     companyBrochure,
     certifications,
