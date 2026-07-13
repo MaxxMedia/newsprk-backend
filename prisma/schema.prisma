@@ -501,6 +501,7 @@ enum AdvertisementBanner_placement {
   JOB_RIGHT
   INDUSTRY_TALKS_RIGHT
   MAGAZINE_RIGHT
+  Archive
 }
 
 enum AdvertisementBanner_status {
