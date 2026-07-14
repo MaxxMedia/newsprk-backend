@@ -771,10 +771,177 @@ export async function getAnalytics(req, res) {
    TEMPLATES
 =========================== */
 
-export async function getTemplates(req, res) {}
+export async function getTemplates(req, res) {
+  try {
+    const templates = await prisma.newsletterTemplate.findMany({
+      include: {
+        User: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-export async function createTemplate(req, res) {}
+    res.json({
+      success: true,
+      data: templates,
+    });
+  } catch (err) {
+    console.error(err);
 
-export async function updateTemplate(req, res) {}
+    res.status(500).json({
+      success: false,
+      error: "Failed to load templates.",
+    });
+  }
+}
 
-export async function deleteTemplate(req, res) {}
+export async function createTemplate(req, res) {
+  try {
+    const { name, subject, content } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Template name is required.",
+      });
+    }
+
+    if (!subject?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Subject is required.",
+      });
+    }
+
+    if (!content?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Content is required.",
+      });
+    }
+
+    const exists = await prisma.newsletterTemplate.findFirst({
+      where: {
+        name,
+      },
+    });
+
+    if (exists) {
+      return res.status(409).json({
+        success: false,
+        error: "Template name already exists.",
+      });
+    }
+
+    const template = await prisma.newsletterTemplate.create({
+      data: {
+        name,
+        subject,
+        content,
+        createdById: req.user.id,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Template created successfully.",
+      data: template,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to create template.",
+    });
+  }
+}
+
+export async function updateTemplate(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const { name, subject, content } = req.body;
+
+    const exists = await prisma.newsletterTemplate.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!exists) {
+      return res.status(404).json({
+        success: false,
+        error: "Template not found.",
+      });
+    }
+
+    const template = await prisma.newsletterTemplate.update({
+      where: {
+        id,
+      },
+      data: {
+        name,
+        subject,
+        content,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Template updated successfully.",
+      data: template,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to update template.",
+    });
+  }
+}
+
+export async function deleteTemplate(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const exists = await prisma.newsletterTemplate.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!exists) {
+      return res.status(404).json({
+        success: false,
+        error: "Template not found.",
+      });
+    }
+
+    await prisma.newsletterTemplate.delete({
+      where: {
+        id,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Template deleted successfully.",
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to delete template.",
+    });
+  }
+}
