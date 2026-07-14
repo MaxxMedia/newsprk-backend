@@ -710,7 +710,63 @@ await prisma.newsletterCampaign.update({
     });
   }
 }
+/* ===========================
+   ANALYTICS / DASHBOARD
+=========================== */
 
+export async function getAnalytics(req, res) {
+  try {
+    console.log("📊 getAnalytics called by user:", req.user?.id || 'unknown');
+
+    const [
+      totalSubscribers,
+      activeSubscribers,
+      inactiveSubscribers,
+      totalCampaigns,
+      draftCampaigns,
+      scheduledCampaigns,
+      sentCampaigns,
+    ] = await Promise.all([
+      prisma.newsletterSubscriber.count(),
+      prisma.newsletterSubscriber.count({
+        where: { status: "ACTIVE" },
+      }),
+      prisma.newsletterSubscriber.count({
+        where: { status: "UNSUBSCRIBED" },
+      }),
+      prisma.newsletterCampaign.count(),
+      prisma.newsletterCampaign.count({
+        where: { status: "DRAFT" },
+      }),
+      prisma.newsletterCampaign.count({
+        where: { status: "SCHEDULED" },
+      }),
+      prisma.newsletterCampaign.count({
+        where: { status: "SENT" },
+      }),
+    ]);
+
+    const result = {
+      totalSubscribers,
+      activeSubscribers,
+      inactiveSubscribers,
+      totalCampaigns,
+      draftCampaigns,
+      scheduledCampaigns,
+      sentCampaigns,
+    };
+
+    console.log("📊 Analytics result:", result);
+
+    res.json(result);
+  } catch (err) {
+    console.error("❌ Analytics error:", err);
+    res.status(500).json({
+      error: "Failed to load analytics",
+      details: err.message,
+    });
+  }
+}
 /* ===========================
    TEMPLATES
 =========================== */

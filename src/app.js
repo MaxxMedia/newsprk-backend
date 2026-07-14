@@ -1,3 +1,4 @@
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -34,7 +35,6 @@ import jobAlertsRoutes from "./routes/jobAlerts.js";
 import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
-
 import newsletterRoutes from "./routes/newsletter.js";
 
 import leadRoutes from "./routes/leadRoutes.js";
@@ -118,7 +118,6 @@ app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/admin", adminDirectoryRoutes);
 app.use("/api/suppliers", publicSupplierRoutes);
-app.use("/api/suppliers", quoteRoutes);
 app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/banners", bannerRoutes);
@@ -133,7 +132,6 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
 app.use("/api", adminIndustriesRoutes);  //admin industry routes don't have /admin prefix since some are public and some are admin-only. The controller handles the auth logic.
 app.use("/api/newsletter", newsletterRoutes);
-app.use("/api/leads", leadRoutes);
 
 
 

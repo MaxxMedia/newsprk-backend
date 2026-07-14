@@ -24,6 +24,7 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  getAnalytics
 } from "../controllers/newsletterController.js";
 
 const router = express.Router();
@@ -35,6 +36,14 @@ const router = express.Router();
 router.post("/subscribe", subscribeNewsletter);
 
 router.post("/unsubscribe", unsubscribeNewsletter);
+
+
+router.get(
+  "/analytics",
+  requireAuth,
+  requireAdmin,
+  getAnalytics
+);
 
 /* ========================================
    SUBSCRIBERS
