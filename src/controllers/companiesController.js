@@ -364,3 +364,63 @@ export async function adminCreateCompany(req, res) {
     res.status(500).json({ error: "Admin company creation failed" });
   }
 }
+
+export const getCompanyTeam = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const company = await prisma.company.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found.",
+      });
+    }
+
+    const team = await prisma.companyTeamMember.findMany({
+      where: {
+        companyId: company.id,
+        status: "ACTIVE",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            username: true,
+            avatarUrl: true,
+            headline: true,
+            location: true,
+          },
+        },
+      },
+      orderBy: {
+        approvedAt: "desc",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      company: company.name,
+      total: team.length,
+      data: team,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+    });
+  }
+};

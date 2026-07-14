@@ -96,25 +96,38 @@ model User {
   websiteUrl                                              String?
   isOnboarded                                             Boolean               @default(false)
   companyId                                               Int?
+
   AdvertisementBanner                                     AdvertisementBanner[]
   CompanyFollower                                         CompanyFollower[]
+
   Event_Event_approvedByIdToUser                          Event[]               @relation("Event_approvedByIdToUser")
   Event_Event_createdByIdToUser                           Event[]               @relation("Event_createdByIdToUser")
+
   Job                                                     Job[]
   JobApplication                                          JobApplication[]
   SavedJob                                                SavedJob[]
   JobAlert                                                JobAlert[]
+
   Magazine                                                Magazine[]
+
   NewsletterSubscriber                                    NewsletterSubscriber[]
   NewsletterCampaign                                      NewsletterCampaign[]
   NewsletterTemplate                                      NewsletterTemplate[]
+
   Post_Post_approvedByIdToUser                            Post[]                @relation("Post_approvedByIdToUser")
   Post_Post_createdByIdToUser                             Post[]                @relation("Post_createdByIdToUser")
+
   SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]   @relation("SupplierDirectory_approvedByIdToUser")
   SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[]   @relation("SupplierDirectory_submittedByIdToUser")
+
   Company                                                 Company?              @relation(fields: [companyId], references: [id])
+
   PackagePurchase                                         PackagePurchase[]
 
+  // ===== Team =====
+
+ teamMemberships                                         CompanyTeamMember[] @relation("TeamMemberUser")
+approvedTeamMembers                                      CompanyTeamMember[] @relation("TeamMemberApprovedBy")
   @@index([companyId], map: "User_companyId_fkey")
 }
 
@@ -172,9 +185,47 @@ model Company {
   subscriptionPlan    String              @default("free")
   subscriptionExpiresAt DateTime?
   NewsletterSubscriber NewsletterSubscriber[]
+  teamMembers          CompanyTeamMember[]
   jobPostingCredits   Int                 @default(0)
+  
 
   @@index([industryId], map: "Company_industryId_fkey")
+}
+
+model CompanyTeamMember {
+  id               Int      @id @default(autoincrement())
+
+  companyId        Int
+  userId           Int
+
+  designation      String
+  department       String?
+  employmentType   String?
+
+  startDate        DateTime?
+  endDate          DateTime?
+
+  status           TeamMemberStatus @default(PENDING)
+
+  approvedById     Int?
+  approvedAt       DateTime?
+
+  rejectionReason  String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  user User @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  approvedBy User? @relation("TeamMemberApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, userId])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([status])
 }
 
 model PackagePurchase {
@@ -751,6 +802,13 @@ enum LeadStatus {
   IN_PROGRESS
   QUALIFIED
   CLOSED
+}
+
+enum TeamMemberStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  FORMER
 }
 
 model Lead {

@@ -9,7 +9,8 @@ import {
   followCompany,
   unfollowCompany,
   adminCreateCompany, // ✅ ADD COMMA HERE
-  getFollowStatus
+  getFollowStatus,
+  getCompanyTeam,
 } from "../controllers/companiesController.js";
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get("/", getAllCompanies);
 router.get("/:slug", getCompanyBySlug);
 router.get("/:slug/people", getCompanyPeople);
 router.get("/:companyId/follow-status", requireAuth, getFollowStatus);
+router.get("/:slug/team", getCompanyTeam);
 
 router.post("/:companyId/follow", requireAuth, followCompany);
 router.delete("/:companyId/follow", requireAuth, unfollowCompany);
