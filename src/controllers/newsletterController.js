@@ -321,6 +321,36 @@ export async function createSubscriber(req, res) {
   }
 }
 
+export async function importSubscribers(req, res) {
+  return res.status(501).json({
+    success: false,
+    message: "CSV import is not implemented yet.",
+  });
+}
+
+export async function exportSubscribers(req, res) {
+  try {
+    const subscribers = await prisma.newsletterSubscriber.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json({
+      success: true,
+      total: subscribers.length,
+      data: subscribers,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to export subscribers.",
+    });
+  }
+}
+
 export async function updateSubscriber(req, res) {
   try {
     const id = Number(req.params.id);
@@ -508,6 +538,186 @@ export async function updateCampaign(req, res) {
 
     res.status(500).json({
       error: "Unable to update campaign.",
+    });
+  }
+}  
+
+export async function scheduleCampaign(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const { scheduledAt } = req.body;
+
+    if (!scheduledAt) {
+      return res.status(400).json({
+        success: false,
+        error: "scheduledAt is required.",
+      });
+    }
+
+    const campaign = await prisma.newsletterCampaign.update({
+      where: { id },
+      data: {
+        scheduledAt: new Date(scheduledAt),
+        status: "SCHEDULED",
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Campaign scheduled successfully.",
+      data: campaign,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to schedule campaign.",
+    });
+  }
+} 
+
+export async function cancelCampaign(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const campaign = await prisma.newsletterCampaign.update({
+      where: { id },
+      data: {
+        status: "DRAFT",
+        scheduledAt: null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Campaign cancelled.",
+      data: campaign,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to cancel campaign.",
+    });
+  }
+} 
+
+export async function sendTestCampaign(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "Email is required.",
+      });
+    }
+
+    const campaign = await prisma.newsletterCampaign.findUnique({
+      where: { id },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: "Campaign not found.",
+      });
+    }
+
+    await resend.emails.send({
+      from: "Newsprk <newsletter@yourdomain.com>",
+      to: email,
+      subject: campaign.subject,
+      html: newsletterHtml(campaign),
+    });
+
+    res.json({
+      success: true,
+      message: "Test email sent successfully.",
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to send test email.",
+    });
+  }
+}  
+
+export async function getCampaignRecipients(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const recipients = await prisma.newsletterRecipient.findMany({
+      where: {
+        campaignId: id,
+      },
+      include: {
+        NewsletterSubscriber: true,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    res.json({
+      success: true,
+      total: recipients.length,
+      data: recipients,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to load recipients.",
+    });
+  }
+}
+
+export async function getCampaignAnalytics(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const campaign = await prisma.newsletterCampaign.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        subject: true,
+        totalRecipients: true,
+        delivered: true,
+        opened: true,
+        clicked: true,
+        failed: true,
+        status: true,
+        sentAt: true,
+      },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: "Campaign not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: campaign,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to load campaign analytics.",
     });
   }
 }
@@ -802,6 +1012,44 @@ export async function getTemplates(req, res) {
   }
 }
 
+export async function getTemplate(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const template = await prisma.newsletterTemplate.findUnique({
+      where: { id },
+      include: {
+        User: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: "Template not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: template,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to load template.",
+    });
+  }
+}
+
 export async function createTemplate(req, res) {
   try {
     const { name, subject, content } = req.body;
@@ -905,6 +1153,77 @@ export async function updateTemplate(req, res) {
     res.status(500).json({
       success: false,
       error: "Unable to update template.",
+    });
+  }
+}
+
+export async function duplicateTemplate(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const template = await prisma.newsletterTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: "Template not found.",
+      });
+    }
+
+    const copy = await prisma.newsletterTemplate.create({
+      data: {
+        name: `${template.name} Copy`,
+        subject: template.subject,
+        content: template.content,
+        createdById: req.user.id,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Template duplicated successfully.",
+      data: copy,
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to duplicate template.",
+    });
+  }
+}  
+
+export async function previewTemplate(req, res) {
+  try {
+    const id = Number(req.params.id);
+
+    const template = await prisma.newsletterTemplate.findUnique({
+      where: { id },
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: "Template not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      preview: {
+        subject: template.subject,
+        html: template.content,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: "Unable to preview template.",
     });
   }
 }
