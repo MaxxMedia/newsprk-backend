@@ -740,3 +740,48 @@ model ContactMessage {
   status      String   @default("NEW")
   createdAt   DateTime @default(now())
 }
+
+enum Lead_source {
+  CONTACT
+  QUOTE
+}
+
+enum LeadStatus {
+  NEW
+  IN_PROGRESS
+  QUALIFIED
+  CLOSED
+}
+
+model Lead {
+  id          Int         @id @default(autoincrement())
+  source      Lead_source
+
+  // Plain IDs only — intentionally NOT Prisma relations.
+  contactId   Int?
+  supplierId  Int?
+  userId      Int?
+  companyId   Int?
+
+  fullName    String
+  email       String
+  phoneNumber String?
+  website     String?
+  companyName String?
+  message     String      @db.LongText
+
+  hasPackage  Boolean     @default(false)
+  planName    String?
+
+  status      LeadStatus  @default(NEW)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([contactId])
+  @@index([supplierId])
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([source])
+}

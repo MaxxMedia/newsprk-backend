@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { resolveLeadUserInfo } from "../lib/leadHelpers.js";
 
 export const createContact = async (req, res) => {
   try {
@@ -11,6 +12,7 @@ export const createContact = async (req, res) => {
       });
     }
 
+    // Step 1: save into ContactMessage exactly as it works today.
     const contact = await prisma.contactMessage.create({
       data: {
         fullName,
@@ -21,6 +23,34 @@ export const createContact = async (req, res) => {
         status: "NEW"
       }
     });
+
+    // Steps 2-4: resolve the user/company/package info and create a Lead.
+    // This is intentionally isolated in its own try/catch so that a failure
+    // here can never break the existing Contact Us response or behaviour.
+    try {
+      const { userId, companyId, companyName, hasPackage, planName } =
+        await resolveLeadUserInfo(email);
+
+      await prisma.lead.create({
+        data: {
+          source: "CONTACT",
+          contactId: contact.id,
+          fullName,
+          email,
+          phoneNumber: phoneNumber || null,
+          website: website || null,
+          message,
+          userId,
+          companyId,
+          companyName,
+          hasPackage,
+          planName,
+          status: "NEW"
+        }
+      });
+    } catch (leadError) {
+      console.error("Error creating lead from contact message:", leadError);
+    }
 
     res.status(201).json({
       success: true,
@@ -91,11 +121,11 @@ export const updateContactStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     const validStatuses = [
-  'NEW',
-  'IN_PROGRESS',
-  'RESOLVED',
-  'ARCHIVED'
-];
+      'NEW',
+      'IN_PROGRESS',
+      'RESOLVED',
+      'ARCHIVED'
+    ];
 
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
