@@ -35,6 +35,7 @@ import jobAlertsRoutes from "./routes/jobAlerts.js";
 import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
+import newsletterRoutes from "./routes/newsletter.js";
 
 
 
@@ -124,6 +125,7 @@ app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
 app.use("/api", adminIndustriesRoutes);  //admin industry routes don't have /admin prefix since some are public and some are admin-only. The controller handles the auth logic.
+app.use("/api/newsletter", newsletterRoutes);
 
 
 /* ==========================

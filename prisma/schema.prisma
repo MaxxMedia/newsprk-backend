@@ -105,6 +105,9 @@ model User {
   SavedJob                                                SavedJob[]
   JobAlert                                                JobAlert[]
   Magazine                                                Magazine[]
+  NewsletterSubscriber                                    NewsletterSubscriber[]
+  NewsletterCampaign                                      NewsletterCampaign[]
+  NewsletterTemplate                                      NewsletterTemplate[]
   Post_Post_approvedByIdToUser                            Post[]                @relation("Post_approvedByIdToUser")
   Post_Post_createdByIdToUser                             Post[]                @relation("Post_createdByIdToUser")
   SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]   @relation("SupplierDirectory_approvedByIdToUser")
@@ -168,6 +171,7 @@ model Company {
   PackagePurchase     PackagePurchase[]
   subscriptionPlan    String              @default("free")
   subscriptionExpiresAt DateTime?
+  NewsletterSubscriber NewsletterSubscriber[]
   jobPostingCredits   Int                 @default(0)
 
   @@index([industryId], map: "Company_industryId_fkey")
@@ -485,6 +489,143 @@ model SupplierDirectory {
   @@index([submittedById])
 }
 
+model NewsletterSubscriber {
+  id          Int      @id @default(autoincrement())
+
+  fullName    String?
+  email       String?  @unique
+  phoneNumber String?
+
+  companyName String?
+
+  userId      Int?
+  companyId   Int?
+
+  source NewsletterSubscriberSource
+
+  emailSubscribed     Boolean @default(true)
+  whatsappSubscribed  Boolean @default(false)
+  smsSubscribed       Boolean @default(false)
+
+  frequency NewsletterFrequency @default(MONTHLY)
+
+  status NewsletterStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  User User? @relation(fields: [userId], references: [id])
+  Company Company? @relation(fields: [companyId], references: [id])
+
+  NewsletterRecipient NewsletterRecipient[]
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model NewsletterCampaign {
+
+  id Int @id @default(autoincrement())
+
+  title String
+
+  subject String
+
+  content String @db.LongText
+
+  coverImage String?
+
+  emailEnabled Boolean @default(true)
+
+  whatsappEnabled Boolean @default(false)
+
+  smsEnabled Boolean @default(false)
+
+  frequency NewsletterFrequency?
+
+  scheduledAt DateTime?
+
+  sentAt DateTime?
+
+  status CampaignStatus @default(DRAFT)
+
+  totalRecipients Int @default(0)
+
+  delivered Int @default(0)
+
+  opened Int @default(0)
+
+  clicked Int @default(0)
+
+  failed Int @default(0)
+
+  createdById Int
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  User User @relation(fields: [createdById], references: [id])
+
+  NewsletterRecipient NewsletterRecipient[]
+
+  @@index([status])
+}
+
+model NewsletterRecipient {
+
+  id Int @id @default(autoincrement())
+
+  campaignId Int
+
+  subscriberId Int
+
+  emailStatus DeliveryStatus @default(PENDING)
+
+  whatsappStatus DeliveryStatus @default(PENDING)
+
+  smsStatus DeliveryStatus @default(PENDING)
+
+  sentAt DateTime?
+
+  openedAt DateTime?
+
+  clickedAt DateTime?
+
+  NewsletterCampaign NewsletterCampaign @relation(fields:[campaignId], references:[id])
+
+  NewsletterSubscriber NewsletterSubscriber @relation(fields:[subscriberId], references:[id])
+
+  @@unique([campaignId, subscriberId])
+
+  @@index([campaignId])
+
+  @@index([subscriberId])
+}
+
+model NewsletterTemplate {
+
+  id Int @id @default(autoincrement())
+
+  name String
+
+  subject String
+
+  content String @db.LongText
+
+  createdById Int
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  User User @relation(fields:[createdById], references:[id])
+}
+
+
+
 enum AdvertisementBanner_placement {
   HOME_TOP
   HOME_MIDDLE
@@ -544,6 +685,49 @@ enum PackagePurchase_status {
   PENDING
   PAID
   FAILED
+}
+
+enum NewsletterStatus{
+  ACTIVE
+  UNSUBSCRIBED
+  BLOCKED
+}
+
+enum NewsletterSubscriberSource{
+  NEWSLETTER_FORM
+  COMPANY_PROFILE
+  ADMIN
+  IMPORT
+  EVENT
+  MAGAZINE
+}
+
+enum NewsletterFrequency{
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  TEN_TIMES_PER_YEAR
+  CUSTOM
+}
+
+enum CampaignStatus{
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum DeliveryStatus{
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  OPENED
+  CLICKED
 }
 
 model ContactMessage {
