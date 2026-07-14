@@ -40,6 +40,8 @@ import newsletterRoutes from "./routes/newsletter.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
+import companyTeamRoutes from "./routes/companyTeam.js";
+
 
 
 
@@ -132,6 +134,7 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
 app.use("/api", adminIndustriesRoutes);  //admin industry routes don't have /admin prefix since some are public and some are admin-only. The controller handles the auth logic.
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/companies", companyTeamRoutes);
 
 
 
