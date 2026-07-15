@@ -675,3 +675,23 @@ export const trackDirectoryConnection = async (req, res) => {
     res.status(500).json({ error: "Failed to track connection" })
   }
 }
+/**
+ * Resolves the company's active plan via getActiveSubscription() and applies
+ * sanitizeSupplierDirectoryMedia(). Use this in the controller instead of
+ * duplicating the plan lookup.
+ */
+// export const assertAndSanitizeSupplierDirectoryMedia(companyId, { coverImages, socialLinks }) {
+//   if (!companyId) {
+//     const error = new Error("Link a company profile before submitting a supplier directory.");
+//     error.status = 403;
+//     error.code = "NO_COMPANY";
+//     throw error;
+//   }
+
+//   const activeSubscription = await getActiveSubscription(companyId, prisma);
+//   return sanitizeSupplierDirectoryMedia({
+//     plan: activeSubscription.plan,
+//     coverImages,
+//     socialLinks,
+//   });
+// }
