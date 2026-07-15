@@ -8,6 +8,7 @@ import {
   getArticlePostingEligibility,
   getProductListingEligibility,
   getCompanyProfileEligibility,
+  getHomepageFeaturedAdEligibility,
 } from "../lib/packageContentLimits.js";
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"
@@ -416,6 +417,7 @@ const articles = await prisma.post.findMany({
     const jobPosting = await getJobPostingEligibility(recruiter?.companyId ?? null)
     const articlePosting = await getArticlePostingEligibility(recruiter?.companyId ?? null)
     const productListings = await getProductListingEligibility(recruiter?.companyId ?? null)
+    const homepageFeaturedAd = await getHomepageFeaturedAdEligibility(recruiter?.companyId ?? null)
     const analytics = await buildRecruiterAnalytics(recruiterId, recruiter?.companyId ?? null)
 
     const subscription = recruiter?.Company
@@ -444,6 +446,7 @@ const articles = await prisma.post.findMany({
       jobPosting,
       articlePosting,
       productListings,
+      homepageFeaturedAd,
       analytics,
     })
   } catch (err) {

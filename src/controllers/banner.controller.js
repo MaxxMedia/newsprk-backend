@@ -1,4 +1,7 @@
 import prisma from "../prismaClient.js";
+import { getHomepageFeaturedAdEligibility } from "../lib/packageContentLimits.js";
+
+const FEATURED_AD_PLACEMENT = "HOME_TOP";
 
 /**
  * CREATE BANNER (ADMIN)
@@ -17,6 +20,24 @@ export const createBanner = async (req, res) => {
 
     if (!title || !imageUrl || !placement) {
       return res.status(400).json({ message: "Required fields missing" });
+    }
+
+    // Enforce quota only for the Homepage Featured placement
+    if (placement === FEATURED_AD_PLACEMENT) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { companyId: true },
+      });
+
+      const eligibility = await getHomepageFeaturedAdEligibility(user?.companyId ?? null);
+
+      if (!eligibility.canCreate) {
+        return res.status(403).json({
+          message: eligibility.message,
+          reason: eligibility.reason,
+          upgradeRequired: eligibility.upgradeRequired,
+        });
+      }
     }
 
     // 🔥 GET LAST POSITION FOR THIS PLACEMENT

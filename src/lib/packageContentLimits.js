@@ -611,3 +611,109 @@ export async function assertAndSanitizeSupplierDirectoryMedia(companyId, { cover
     socialLinks,
   });
 }
+
+export const PLAN_FEATURED_AD_LIMITS = {
+  free: null,          // null (here) = not available at all
+  basic: null,         // not available
+  professional: { limit: 1, period: "month" },
+  enterprise: { limit: 1, period: "week" },
+};
+
+const FEATURED_AD_PLACEMENT = "HOME_TOP";
+
+function getWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday
+  const diff = d.getDate() - day;
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getWeekEnd(weekStart) {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 7);
+  return end;
+}
+
+function getMonthStart(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getMonthEnd(monthStart) {
+  return new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+}
+
+export async function getHomepageFeaturedAdEligibility(companyId) {
+  if (!companyId) {
+    return {
+      canCreate: false,
+      reason: "NO_COMPANY",
+      message: "Link a company profile before posting a featured ad.",
+      upgradeRequired: false,
+      remaining: 0,
+      effectiveLimit: 0,
+      usedThisPeriod: 0,
+      isUnlimited: false,
+      periodLabel: null,
+      resetsAt: null,
+    };
+  }
+
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
+  const planConfig = PLAN_FEATURED_AD_LIMITS[plan] ?? null;
+  const planLabel = getPlanLabel(plan);
+
+  // Free / Basic — feature not available at all
+  if (!planConfig) {
+    return {
+      canCreate: false,
+      plan,
+      planLabel,
+      reason: "PLAN_NOT_ELIGIBLE",
+      upgradeRequired: true,
+      remaining: 0,
+      effectiveLimit: 0,
+      usedThisPeriod: 0,
+      isUnlimited: false,
+      periodLabel: null,
+      resetsAt: null,
+      message: `Homepage Featured Ads are not included in the ${planLabel} plan. Upgrade to Professional (1/month) or Enterprise (1/week) to unlock.`,
+    };
+  }
+
+  const { limit, period } = planConfig;
+
+  const periodStart = period === "week" ? getWeekStart() : getMonthStart();
+  const periodEnd = period === "week" ? getWeekEnd(periodStart) : getMonthEnd(periodStart);
+
+  const usedThisPeriod = await prisma.advertisementBanner.count({
+    where: {
+      placement: FEATURED_AD_PLACEMENT,
+      User: { companyId },
+      createdAt: { gte: periodStart, lt: periodEnd },
+    },
+  });
+
+  const remaining = Math.max(0, limit - usedThisPeriod);
+  const canCreate = usedThisPeriod < limit;
+  const periodLabel = period === "week" ? "this week" : "this month";
+
+  return {
+    canCreate,
+    plan,
+    planLabel,
+    reason: canCreate ? null : "QUOTA_REACHED",
+    upgradeRequired: !canCreate && plan === "professional", // enterprise has no higher tier to suggest
+    remaining,
+    effectiveLimit: limit,
+    usedThisPeriod,
+    isUnlimited: false,
+    periodLabel,
+    resetsAt: periodEnd,
+    message: canCreate
+      ? `${remaining} of ${limit} Homepage Featured Ad${limit === 1 ? "" : "s"} remaining ${periodLabel} (${planLabel} plan).`
+      : `Your ${planLabel} plan allows ${limit} Homepage Featured Ad${limit === 1 ? "" : "s"} ${periodLabel}. You've used ${usedThisPeriod} of ${limit}. Resets ${periodEnd.toDateString()}.`,
+  };
+}
