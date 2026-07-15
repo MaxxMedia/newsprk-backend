@@ -272,7 +272,7 @@ export const registerForEvent = async (req, res) => {
 
     const verifyData = await verifyResponse.json()
 
-    console.log("🔐 Turnstile full response:", verifyData)
+    // console.log("🔐 Turnstile full response:", verifyData)
 
     if (!verifyData.success) {
       return res.status(400).json({

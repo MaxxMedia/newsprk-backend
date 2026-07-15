@@ -57,8 +57,8 @@ dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
 
-console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
-console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
+// console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
+// console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
 
 /* ======================================================
    🚀 APP INIT
