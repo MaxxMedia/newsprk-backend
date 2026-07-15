@@ -1,9 +1,11 @@
+// routes/quoteRoutes.js
 import express from "express";
-import { createQuoteRequest } from "../controllers/quoteController.js";
+import { getSupplierQuotes } from "../controllers/quoteController.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// POST /api/suppliers/:slug/quote-request
-router.post("/:slug/quote-request", createQuoteRequest);
+// Protected route - get quotes for a specific supplier
+router.get("/supplier/:supplierId", requireAuth, getSupplierQuotes);
 
 export default router;

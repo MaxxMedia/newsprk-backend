@@ -2,15 +2,50 @@ import express from "express";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 import {
+  /* ===========================
+      PUBLIC
+  =========================== */
+
   subscribeNewsletter,
   unsubscribeNewsletter,
 
+  /* ===========================
+      ANALYTICS
+  =========================== */
+
+  getAnalytics,
+  getCampaignAnalytics,
+
+  /* ===========================
+      SUBSCRIBERS
+  =========================== */
+
   getSubscribers,
   getSubscriber,
-
   createSubscriber,
   updateSubscriber,
   deleteSubscriber,
+
+  importSubscribers,
+  exportSubscribers,
+
+  /* ===========================
+      TEMPLATES
+  =========================== */
+
+  getTemplates,
+  getTemplate,
+
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+
+  duplicateTemplate,
+  previewTemplate,
+
+  /* ===========================
+      CAMPAIGNS
+  =========================== */
 
   getCampaigns,
   getCampaign,
@@ -18,25 +53,28 @@ import {
   createCampaign,
   updateCampaign,
   deleteCampaign,
-  sendCampaign,
 
-  getTemplates,
-  createTemplate,
-  updateTemplate,
-  deleteTemplate,
-  getAnalytics
+  sendCampaign,
+  scheduleCampaign,
+  cancelCampaign,
+  sendTestCampaign,
+
+  getCampaignRecipients,
 } from "../controllers/newsletterController.js";
 
 const router = express.Router();
 
-/* ========================================
+/* =======================================================
    PUBLIC
-======================================== */
+======================================================= */
 
 router.post("/subscribe", subscribeNewsletter);
 
 router.post("/unsubscribe", unsubscribeNewsletter);
 
+/* =======================================================
+   ANALYTICS
+======================================================= */
 
 router.get(
   "/analytics",
@@ -45,9 +83,16 @@ router.get(
   getAnalytics
 );
 
-/* ========================================
+router.get(
+  "/analytics/campaign/:id",
+  requireAuth,
+  requireAdmin,
+  getCampaignAnalytics
+);
+
+/* =======================================================
    SUBSCRIBERS
-======================================== */
+======================================================= */
 
 router.get(
   "/subscribers",
@@ -84,9 +129,76 @@ router.delete(
   deleteSubscriber
 );
 
-/* ========================================
+router.post(
+  "/subscribers/import",
+  requireAuth,
+  requireAdmin,
+  importSubscribers
+);
+
+router.get(
+  "/subscribers/export",
+  requireAuth,
+  requireAdmin,
+  exportSubscribers
+);
+
+/* =======================================================
+   TEMPLATES
+======================================================= */
+
+router.get(
+  "/templates",
+  requireAuth,
+  requireAdmin,
+  getTemplates
+);
+
+router.get(
+  "/templates/:id",
+  requireAuth,
+  requireAdmin,
+  getTemplate
+);
+
+router.post(
+  "/templates",
+  requireAuth,
+  requireAdmin,
+  createTemplate
+);
+
+router.put(
+  "/templates/:id",
+  requireAuth,
+  requireAdmin,
+  updateTemplate
+);
+
+router.delete(
+  "/templates/:id",
+  requireAuth,
+  requireAdmin,
+  deleteTemplate
+);
+
+router.post(
+  "/templates/:id/duplicate",
+  requireAuth,
+  requireAdmin,
+  duplicateTemplate
+);
+
+router.get(
+  "/templates/:id/preview",
+  requireAuth,
+  requireAdmin,
+  previewTemplate
+);
+
+/* =======================================================
    CAMPAIGNS
-======================================== */
+======================================================= */
 
 router.get(
   "/campaigns",
@@ -130,36 +242,70 @@ router.post(
   sendCampaign
 );
 
-/* ========================================
-   TEMPLATES
-======================================== */
-
-router.get(
-  "/templates",
+router.post(
+  "/campaigns/:id/schedule",
   requireAuth,
   requireAdmin,
-  getTemplates
+  scheduleCampaign
 );
 
 router.post(
-  "/templates",
+  "/campaigns/:id/cancel",
   requireAuth,
   requireAdmin,
-  createTemplate
+  cancelCampaign
 );
 
-router.put(
-  "/templates/:id",
+router.post(
+  "/campaigns/:id/test",
   requireAuth,
   requireAdmin,
-  updateTemplate
+  sendTestCampaign
 );
 
-router.delete(
-  "/templates/:id",
+router.get(
+  "/campaigns/:id/recipients",
   requireAuth,
   requireAdmin,
-  deleteTemplate
+  getCampaignRecipients
 );
 
 export default router;
+
+
+
+
+// Feature Checklist
+// Public
+// ✅ Subscribe
+// ✅ Unsubscribe
+// Dashboard
+// ✅ Overall Analytics
+// ✅ Campaign Analytics
+// Subscribers
+// ✅ List Subscribers
+// ✅ Get Subscriber
+// ✅ Create
+// ✅ Update
+// ✅ Delete
+// ✅ Import CSV
+// ✅ Export CSV
+// Templates
+// ✅ List Templates
+// ✅ Get Single Template
+// ✅ Create
+// ✅ Update
+// ✅ Delete
+// ✅ Duplicate Template
+// ✅ Preview Template
+// Campaigns
+// ✅ List Campaigns
+// ✅ Get Campaign
+// ✅ Create Campaign
+// ✅ Update Campaign
+// ✅ Delete Campaign
+// ✅ Send Campaign
+// ✅ Schedule Campaign
+// ✅ Cancel Scheduled Campaign
+// ✅ Send Test Campaign
+// ✅ View Campaign Recipients

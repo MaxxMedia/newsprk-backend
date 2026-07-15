@@ -33,122 +33,133 @@ export const PLAN_WHATSAPP_ALLOWED = {
   enterprise: true,
 };
 
+/* ==========================================================
+   NEW: Team Profiles package limits.
+   Free -> 0, Basic -> 5, Professional -> 10, Enterprise -> Unlimited (null)
+   ========================================================== */
+export const PLAN_TEAM_MEMBER_LIMITS = {
+  free: 0,
+  basic: 5,
+  professional: 10,
+  enterprise: null,
+};
+
 export const PLAN_COMPANY_PROFILE_LIMITS = {
   free: {
-  descriptionLimit: 150,
-  coverBanner: false,
-  website: true,
-  googleMap: true,
-  whatsapp: false,
+    descriptionLimit: 150,
+    coverBanner: false,
+    website: true,
+    googleMap: true,
+    whatsapp: false,
 
-  galleryImages: 0,
-  factoryImages: 0,
-  productCategories: 3,
-  productListings: 5,
-  productImages: 10,
-  productVideos: 0,
-  productCatalogues: 0,
+    galleryImages: 0,
+    factoryImages: 0,
+    productCategories: 3,
+    productListings: 5,
+    productImages: 10,
+    productVideos: 0,
+    productCatalogues: 0,
 
-  brochures: false,
-  certifications: false,
+    brochures: false,
+    certifications: false,
 
-  brandsRepresented: 0,
-  industriesServed: 5,
-  exportMarkets: false,
+    brandsRepresented: 0,
+    industriesServed: 5,
+    exportMarkets: false,
 
-  manufacturingCapabilities: false,
-  machineryList: false,
-  qualityStandards: false,
+    manufacturingCapabilities: false,
+    machineryList: false,
+    qualityStandards: false,
 
-  inquiryForm: "Basic",
-},
+    inquiryForm: "Basic",
+  },
 
-basic: {
-  descriptionLimit: 1000,
-  coverBanner: true,
-  website: true,
-  googleMap: true,
-  whatsapp: true,
+  basic: {
+    descriptionLimit: 1000,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
 
-  galleryImages: 10,
-  factoryImages: 10,
-  productCategories: 10,
-  productListings: 25,
-  productImages: 50,
-  productVideos: 5,
-  productCatalogues: 2,
+    galleryImages: 10,
+    factoryImages: 10,
+    productCategories: 10,
+    productListings: 25,
+    productImages: 50,
+    productVideos: 5,
+    productCatalogues: 2,
 
-  brochures: true,
-  certifications: true,
+    brochures: true,
+    certifications: true,
 
-  brandsRepresented: 10,
-  industriesServed: 20,
-  exportMarkets: true,
+    brandsRepresented: 10,
+    industriesServed: 20,
+    exportMarkets: true,
 
-  manufacturingCapabilities: "Basic",
-  machineryList: "Basic",
-  qualityStandards: true,
+    manufacturingCapabilities: "Basic",
+    machineryList: "Basic",
+    qualityStandards: true,
 
-  inquiryForm: "Standard",
-},
+    inquiryForm: "Standard",
+  },
 
   professional: {
-  descriptionLimit: 2500,
-  coverBanner: true,
-  website: true,
-  googleMap: true,
-  whatsapp: true,
+    descriptionLimit: 2500,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
 
-  galleryImages: 15,
-  factoryImages: 30,
-  productCategories: 30,
-  productListings: 100,
-  productImages: 100,
-  productVideos: 20,
-  productCatalogues: 10,
+    galleryImages: 15,
+    factoryImages: 30,
+    productCategories: 30,
+    productListings: 100,
+    productImages: 100,
+    productVideos: 20,
+    productCatalogues: 10,
 
-  brochures: true,
-  certifications: true,
+    brochures: true,
+    certifications: true,
 
-  brandsRepresented: null,
-  industriesServed: null,
-  exportMarkets: true,
+    brandsRepresented: null,
+    industriesServed: null,
+    exportMarkets: true,
 
-  manufacturingCapabilities: "Complete",
-  machineryList: "Detailed",
-  qualityStandards: true,
+    manufacturingCapabilities: "Complete",
+    machineryList: "Detailed",
+    qualityStandards: true,
 
-  inquiryForm: "Advanced",
-},
+    inquiryForm: "Advanced",
+  },
 
   enterprise: {
-  descriptionLimit: null,
-  coverBanner: true,
-  website: true,
-  googleMap: true,
-  whatsapp: true,
+    descriptionLimit: null,
+    coverBanner: true,
+    website: true,
+    googleMap: true,
+    whatsapp: true,
 
-  galleryImages: null,
-  factoryImages: null,
-  productCategories: null,
-  productListings: null,
-  productImages: null,
-  productVideos: null,
-  productCatalogues: null,
+    galleryImages: null,
+    factoryImages: null,
+    productCategories: null,
+    productListings: null,
+    productImages: null,
+    productVideos: null,
+    productCatalogues: null,
 
-  brochures: true,
-  certifications: true,
+    brochures: true,
+    certifications: true,
 
-  brandsRepresented: null,
-  industriesServed: null,
-  exportMarkets: true,
+    brandsRepresented: null,
+    industriesServed: null,
+    exportMarkets: true,
 
-  manufacturingCapabilities: "Complete + Photos + Video",
-  machineryList: "Detailed with Images",
-  qualityStandards: true,
+    manufacturingCapabilities: "Complete + Photos + Video",
+    machineryList: "Detailed with Images",
+    qualityStandards: true,
 
-  inquiryForm: "Custom",
-},
+    inquiryForm: "Custom",
+  },
 };
 
 function getYearStart() {
@@ -197,6 +208,20 @@ export async function getCompanyDirectoryCount(companyId, prismaClient = prisma)
 /** @deprecated Use getCompanyDirectoryCount — package limit is per supplier directory */
 export async function getCompanyProductListingCount(companyId, prismaClient = prisma) {
   return getCompanyDirectoryCount(companyId, prismaClient);
+}
+
+/* ==========================================================
+   NEW: Team member counting.
+   Only ACTIVE memberships count toward the plan limit —
+   PENDING and REJECTED are intentionally excluded.
+   ========================================================== */
+export async function getActiveTeamMemberCount(companyId, prismaClient = prisma) {
+  return prismaClient.companyTeamMember.count({
+    where: {
+      companyId,
+      status: "ACTIVE",
+    },
+  });
 }
 
 export async function getArticlePostingEligibility(companyId) {
@@ -305,6 +330,76 @@ export async function getProductListingEligibility(companyId) {
   };
 }
 
+/**
+ * NEW: Team Profiles eligibility.
+ * Resolves the company's active subscription plan (Company.subscriptionPlan,
+ * via getActiveSubscription — same source of truth used everywhere else in
+ * this file), determines the plan's team member limit, and counts only
+ * ACTIVE CompanyTeamMember rows for that company (PENDING/REJECTED excluded).
+ */
+export async function getTeamMemberEligibility(companyId) {
+  if (!companyId) {
+    return {
+      canAdd: false,
+      reason: "NO_COMPANY",
+      message: "Link a company profile before adding team members.",
+      upgradeRequired: false,
+      remaining: 0,
+      effectiveLimit: 0,
+      activeMembers: 0,
+      isUnlimited: false,
+    };
+  }
+
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
+  const baseLimit = PLAN_TEAM_MEMBER_LIMITS[plan] ?? PLAN_TEAM_MEMBER_LIMITS.free;
+  const isUnlimited = baseLimit === null;
+
+  const activeMembers = await getActiveTeamMemberCount(companyId, prisma);
+  const effectiveLimit = isUnlimited ? null : baseLimit;
+  const remaining = isUnlimited ? null : Math.max(0, effectiveLimit - activeMembers);
+  const canAdd = isUnlimited || activeMembers < effectiveLimit;
+  const planLabel = getPlanLabel(plan);
+
+  return {
+    canAdd,
+    plan,
+    planLabel,
+    activeMembers,
+    effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
+    remaining,
+    isUnlimited,
+    upgradeRequired: !canAdd,
+    message: canAdd
+      ? isUnlimited
+        ? `You can add unlimited team members on the ${planLabel} plan.`
+        : `${remaining} team member slot${remaining === 1 ? "" : "s"} remaining (${activeMembers} of ${effectiveLimit} used on ${planLabel}).`
+      : "Your team profile limit has been reached. Upgrade your subscription to add more members.",
+  };
+}
+
+/**
+ * NEW: Throws a standardized error when the company's team member limit
+ * has been reached. Use this in approveTeamMember before flipping a
+ * membership to ACTIVE.
+ */
+export async function assertCanAddTeamMember(companyId) {
+  const eligibility = await getTeamMemberEligibility(companyId);
+
+  if (!eligibility.canAdd) {
+    const error = new Error(
+      "Your team profile limit has been reached. Upgrade your subscription to add more members."
+    );
+    error.status = 403;
+    error.code = "TEAM_MEMBER_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  return eligibility;
+}
+
 export async function getCompanyProfileEligibility(companyId) {
   if (!companyId) {
     return {
@@ -405,117 +500,117 @@ export async function assertCompanyProfileLimits(companyId, data) {
   }
 
   if (
-  eligibility.galleryImages !== null &&
-  Array.isArray(data.companyGallery) &&
-  data.companyGallery.filter(Boolean).length >
+    eligibility.galleryImages !== null &&
+    Array.isArray(data.companyGallery) &&
+    data.companyGallery.filter(Boolean).length >
     eligibility.galleryImages
-) {
-  throw new Error(
-    `Only ${eligibility.galleryImages} company gallery images are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.galleryImages} company gallery images are allowed.`
+    );
+  }
 
-if (
-  eligibility.factoryImages !== null &&
-  Array.isArray(data.factoryGallery) &&
-  data.factoryGallery.filter(Boolean).length >
+  if (
+    eligibility.factoryImages !== null &&
+    Array.isArray(data.factoryGallery) &&
+    data.factoryGallery.filter(Boolean).length >
     eligibility.factoryImages
-) {
-  throw new Error(
-    `Only ${eligibility.factoryImages} factory images are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.factoryImages} factory images are allowed.`
+    );
+  }
 
-if (
-  eligibility.productVideos !== null &&
-  Array.isArray(data.videoGallery) &&
-  data.videoGallery.filter(Boolean).length >
+  if (
+    eligibility.productVideos !== null &&
+    Array.isArray(data.videoGallery) &&
+    data.videoGallery.filter(Boolean).length >
     eligibility.productVideos
-) {
-  throw new Error(
-    `Only ${eligibility.productVideos} product videos are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.productVideos} product videos are allowed.`
+    );
+  }
 
-if (
-  eligibility.productCatalogues !== null &&
-  Array.isArray(data.productCatalogues) &&
-  data.productCatalogues.filter(Boolean).length >
+  if (
+    eligibility.productCatalogues !== null &&
+    Array.isArray(data.productCatalogues) &&
+    data.productCatalogues.filter(Boolean).length >
     eligibility.productCatalogues
-) {
-  throw new Error(
-    `Only ${eligibility.productCatalogues} product catalogues are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.productCatalogues} product catalogues are allowed.`
+    );
+  }
 
-if (
-  eligibility.brandsRepresented !== null &&
-  Array.isArray(data.brandsRepresented) &&
-  data.brandsRepresented.filter(Boolean).length >
+  if (
+    eligibility.brandsRepresented !== null &&
+    Array.isArray(data.brandsRepresented) &&
+    data.brandsRepresented.filter(Boolean).length >
     eligibility.brandsRepresented
-) {
-  throw new Error(
-    `Only ${eligibility.brandsRepresented} brands are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.brandsRepresented} brands are allowed.`
+    );
+  }
 
-if (
-  eligibility.industriesServed !== null &&
-  Array.isArray(data.industriesServed) &&
-  data.industriesServed.filter(Boolean).length >
+  if (
+    eligibility.industriesServed !== null &&
+    Array.isArray(data.industriesServed) &&
+    data.industriesServed.filter(Boolean).length >
     eligibility.industriesServed
-) {
-  throw new Error(
-    `Only ${eligibility.industriesServed} industries are allowed.`
-  );
-}
+  ) {
+    throw new Error(
+      `Only ${eligibility.industriesServed} industries are allowed.`
+    );
+  }
 
-if (
-  !eligibility.exportMarkets &&
-  Array.isArray(data.exportMarkets) &&
-  data.exportMarkets.filter(Boolean).length
-) {
-  throw new Error(
-    "Export Markets are available only on Basic plan and above."
-  );
-}
+  if (
+    !eligibility.exportMarkets &&
+    Array.isArray(data.exportMarkets) &&
+    data.exportMarkets.filter(Boolean).length
+  ) {
+    throw new Error(
+      "Export Markets are available only on Basic plan and above."
+    );
+  }
 
-if (
-  !eligibility.brochures &&
-  Array.isArray(data.companyBrochure) &&
-  data.companyBrochure.filter(Boolean).length
-) {
-  throw new Error(
-    "Company Brochure is available only on Basic plan and above."
-  );
-}
+  if (
+    !eligibility.brochures &&
+    Array.isArray(data.companyBrochure) &&
+    data.companyBrochure.filter(Boolean).length
+  ) {
+    throw new Error(
+      "Company Brochure is available only on Basic plan and above."
+    );
+  }
 
-if (
-  !eligibility.manufacturingCapabilities &&
-  data.manufacturingCapabilities
-) {
-  throw new Error(
-    "Manufacturing Capabilities are available only on Basic plan."
-  );
-}
+  if (
+    !eligibility.manufacturingCapabilities &&
+    data.manufacturingCapabilities
+  ) {
+    throw new Error(
+      "Manufacturing Capabilities are available only on Basic plan."
+    );
+  }
 
-if (
-  !eligibility.machineryList &&
-  data.machineryList
-) {
-  throw new Error(
-    "Machinery List is available only on Basic plan."
-  );
-}
+  if (
+    !eligibility.machineryList &&
+    data.machineryList
+  ) {
+    throw new Error(
+      "Machinery List is available only on Basic plan."
+    );
+  }
 
-if (
-  !eligibility.qualityStandards &&
-  data.qualityStandards
-) {
-  throw new Error(
-    "Quality Standards are available only on Basic plan."
-  );
-}
+  if (
+    !eligibility.qualityStandards &&
+    data.qualityStandards
+  ) {
+    throw new Error(
+      "Quality Standards are available only on Basic plan."
+    );
+  }
 
 
   return eligibility;

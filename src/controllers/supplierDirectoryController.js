@@ -1,3 +1,4 @@
+// controllers/supplierDirectoryController.js
 import prisma from "../prismaClient.js"
 import {
   assertProductListingCount,
@@ -511,6 +512,7 @@ export const getSuppliers = async (req, res) => {
             select: {
               id: true,
               name: true,
+              slug: true,
               location: true,
               industryId: true,
               Industry: {
@@ -546,7 +548,18 @@ export const getSupplierBySlug = async (req, res) => {
       where: { slug },
       include: {
         Company: {
-          select: { id: true, name: true, location: true, Industry: true, website: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true, // ✅ FIX: was missing — page.tsx needs this to build
+            // the correct /api/companies/:slug/team URL. Without it,
+            // supplier.Company?.slug was always undefined and the
+            // frontend fell back to the *directory's* slug instead,
+            // causing "company not found" 404s from /team.
+            location: true,
+            Industry: true,
+            website: true,
+          },
         },
       },
     })

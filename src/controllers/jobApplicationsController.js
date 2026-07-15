@@ -49,7 +49,7 @@ export async function applyJob(req, res) {
   resumeUrl = uploaded.secure_url;
 }
 
-console.log("Resume URL:", resumeUrl);
+// console.log("Resume URL:", resumeUrl);
 
 
     const application = await prisma.jobApplication.create({

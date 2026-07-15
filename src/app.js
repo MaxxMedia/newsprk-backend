@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -36,16 +35,13 @@ import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
 import newsletterRoutes from "./routes/newsletter.js";
-
 import leadRoutes from "./routes/leadRoutes.js";
 import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
-
-
-
+import companyTeamRoutes from "./routes/companyTeam.js";
 
 /* ======================================================
-   ✅ FIX: Proper .env loading (IMPORTANT FOR TURNSTILE)
+   ✅ FIX: Proper .env loading
 ====================================================== */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,8 +51,8 @@ dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
 
-console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
-console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
+// console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
+// console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
 
 /* ======================================================
    🚀 APP INIT
@@ -98,9 +94,16 @@ app.get("/health", async (req, res) => {
 });
 
 /* ==========================
-   🔗 API Routes
+   🔗 API Routes - ORDER MATTERS!
+   More specific routes MUST be registered first
 ========================== */
 
+// ✅ COMPANY ROUTES - Specific to Generic order
+app.use("/api/companies", companyTeamRoutes);        // /api/companies/:slug/team
+app.use("/api/companies", companyArticlesRoutes);    // /api/companies/:slug/articles
+app.use("/api/companies", companiesRoutes);          // /api/companies/:slug (MUST BE LAST)
+
+// Other routes
 app.use("/api/posts", postsRoutes);
 app.use("/api/authors", authorsRoutes);
 app.use("/api/categories", categoriesRoutes);
@@ -108,8 +111,6 @@ app.use("/api/comments", commentsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/jobs", jobsRoutes);
-app.use("/api/companies", companyArticlesRoutes);
-app.use("/api/companies", companiesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
@@ -130,10 +131,10 @@ app.use("/api/admin", adminUsersRoutes);
 app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
-app.use("/api", adminIndustriesRoutes);  //admin industry routes don't have /admin prefix since some are public and some are admin-only. The controller handles the auth logic.
+app.use("/api", adminIndustriesRoutes);
 app.use("/api/newsletter", newsletterRoutes);
-
-
+app.use("/api/leads", leadRoutes);
+app.use("/api/quotes", quoteRoutes);
 
 /* ==========================
    🚀 Start Server
