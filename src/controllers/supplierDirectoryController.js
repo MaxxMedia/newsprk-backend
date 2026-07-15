@@ -7,6 +7,7 @@ import {
   getProductListingEligibility,
 } from "../lib/packageContentLimits.js"
 import { getActiveSubscription } from "../lib/packagePurchases.js"
+import { getRfqLeadsEligibilityForSupplier } from "../lib/Leadlimits.js"
 
 /**
  * Recruiter submits directory (FIRST TIME)
@@ -595,6 +596,27 @@ export const getSupplierBySlug = async (req, res) => {
   }
 }
 
+
+export const getSupplierRfqEligibility = async (req, res) => {
+  try {
+    const { slug } = req.params
+
+    const supplier = await prisma.supplierDirectory.findUnique({
+      where: { slug },
+      select: { id: true, status: true },
+    })
+
+    if (!supplier || supplier.status !== "APPROVED") {
+      return res.status(404).json({ error: "Supplier not found" })
+    }
+
+    const eligibility = await getRfqLeadsEligibilityForSupplier(supplier.id)
+    return res.json(eligibility)
+  } catch (err) {
+    console.error("Supplier RFQ eligibility error:", err)
+    return res.status(500).json({ error: "Failed to load RFQ eligibility" })
+  }
+}
 /**
  * ADMIN: Get all directories (for review & management)
  */

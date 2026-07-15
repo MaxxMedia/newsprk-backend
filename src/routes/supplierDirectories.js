@@ -10,6 +10,7 @@ import {
   getAllDirectoriesForAdmin,
   trackDirectoryConnection,
   getProductListingEligibilityHandler,
+  getSupplierRfqEligibility,
 } from "../controllers/supplierDirectoryController.js"
 
 import { createQuoteRequest } from "../controllers/quoteController.js" // ✅ NEW
@@ -61,6 +62,8 @@ router.get(
 
 // Public
 router.get("/", getSuppliers)
+router.get("/:slug/rfq-eligibility", getSupplierRfqEligibility)
 router.get("/:slug", getSupplierBySlug)
+
 
 export default router

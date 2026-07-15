@@ -8,6 +8,7 @@ import {
   getArticlePostingEligibility,
   getProductListingEligibility,
   getCompanyProfileEligibility,
+  assertCompanyProfileLimits,
 } from "../lib/packageContentLimits.js";
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"

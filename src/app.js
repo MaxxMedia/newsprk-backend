@@ -12,13 +12,13 @@ import authRoutes from "./routes/auth.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import jobsRoutes from "./routes/jobs.js";
 import companiesRoutes from "./routes/companies.js";
+import adminCompaniesRoutes from "./routes/adminCompanies.js";
 import applicationsRoutes from "./routes/applications.js";
 import recruitersRoutes from "./routes/recruiters.js";
 import candidatesRoutes from "./routes/candidates.js";
 import recruiterDashboardRoutes from "./routes/recruiterDashboard.js";
 import supplierDirectoryRoutes from "./routes/supplierDirectories.js";
 import adminDirectoryRoutes from "./routes/adminDirectories.js";
-import publicSupplierRoutes from "./routes/publicSuppliers.js";
 import recruiterArticlesRoutes from "./routes/recruiterArticles.js";
 import companyArticlesRoutes from "./routes/companyArticles.js";
 import adminArticlesRoutes from "./routes/adminArticles.js";
@@ -111,14 +111,18 @@ app.use("/api/comments", commentsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/jobs", jobsRoutes);
+
+app.use("/api/companies", companyArticlesRoutes);
+app.use("/api/companies", companiesRoutes);
+app.use("/api/admin/companies", adminCompaniesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
 app.use("/api/recruiter", recruiterDashboardRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
+app.use("/api/suppliers", quoteRoutes);
 app.use("/api/admin", adminDirectoryRoutes);
-app.use("/api/suppliers", publicSupplierRoutes);
 app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/banners", bannerRoutes);
@@ -135,6 +139,7 @@ app.use("/api", adminIndustriesRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/quotes", quoteRoutes);
+
 
 /* ==========================
    🚀 Start Server
