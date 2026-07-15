@@ -1,7 +1,8 @@
 import { prisma } from "../lib/prisma.js";
 import {
-  assertCanPostJob,
+  assertCanPostByType,
   getJobPostingEligibility,
+  getInternshipPostingEligibility,
 } from "../lib/jobPostingLimits.js";
 import {
   enforceCompanyJobVisibility,
@@ -39,7 +40,8 @@ export async function createJob(req, res) {
       isExternal = false
 
       try {
-        await assertCanPostJob(companyId)
+        // 🔹 Routes to job quota or internship quota depending on employmentType
+        await assertCanPostByType(companyId, req.body.employmentType)
       } catch (limitErr) {
         return res.status(limitErr.status || 403).json({
           error: limitErr.message,
@@ -107,8 +109,17 @@ export async function getPostingEligibility(req, res) {
       select: { companyId: true },
     })
 
-    const eligibility = await getJobPostingEligibility(recruiter?.companyId ?? null)
-    res.json(eligibility)
+    const jobEligibility = await getJobPostingEligibility(recruiter?.companyId ?? null)
+    const internshipEligibility = await getInternshipPostingEligibility(recruiter?.companyId ?? null)
+
+    // 🔹 Top-level fields stay identical to before (job eligibility) so any
+    // existing frontend code keeps working unchanged. Both are also nested
+    // explicitly under `job` / `internship` for the new Job Type-aware UI.
+    res.json({
+      ...jobEligibility,
+      job: jobEligibility,
+      internship: internshipEligibility,
+    })
   } catch (err) {
     console.error("Posting eligibility error:", err)
     res.status(500).json({ error: "Failed to check job posting eligibility" })
