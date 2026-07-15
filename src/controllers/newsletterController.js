@@ -402,22 +402,31 @@ export async function deleteSubscriber(req, res) {
 
 export async function getCampaigns(req, res) {
   try {
-    const campaigns =
-      await prisma.newsletterCampaign.findMany({
-        include: {
-          User: true,
+    const campaigns = await prisma.newsletterCampaign.findMany({
+      include: {
+        User: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
         },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-    res.json(campaigns);
+    res.json({
+      success: true,
+      total: campaigns.length,
+      campaigns,
+    });
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
+      success: false,
       error: "Unable to load campaigns.",
     });
   }
@@ -427,27 +436,37 @@ export async function getCampaign(req, res) {
   try {
     const id = Number(req.params.id);
 
-    const campaign =
-      await prisma.newsletterCampaign.findUnique({
-        where: {
-          id,
+    const campaign = await prisma.newsletterCampaign.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
         },
+      },
+    });
 
-        include: {
-          NewsletterRecipient: true,
-        },
-      });
-
-    if (!campaign)
+    if (!campaign) {
       return res.status(404).json({
+        success: false,
         error: "Campaign not found.",
       });
+    }
 
-    res.json(campaign);
+    res.json({
+      success: true,
+      campaign,
+    });
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
+      success: false,
       error: "Unable to load campaign.",
     });
   }
@@ -460,60 +479,61 @@ export async function createCampaign(req, res) {
       subject,
       content,
       coverImage,
-
-      emailEnabled,
-      whatsappEnabled,
-      smsEnabled,
-
+      emailEnabled = true,
+      whatsappEnabled = false,
+      smsEnabled = false,
       frequency,
       scheduledAt,
+      status = "DRAFT",
     } = req.body;
 
-    if (!title)
+    if (!title?.trim()) {
       return res.status(400).json({
+        success: false,
         error: "Campaign title is required.",
       });
+    }
 
-    if (!subject)
+    if (!subject?.trim()) {
       return res.status(400).json({
+        success: false,
         error: "Subject is required.",
       });
+    }
 
-    if (!content)
+    if (!content?.trim()) {
       return res.status(400).json({
+        success: false,
         error: "Content is required.",
       });
+    }
 
-    const campaign =
-      await prisma.newsletterCampaign.create({
-        data: {
-          title,
-          subject,
-          content,
-          coverImage,
+    const campaign = await prisma.newsletterCampaign.create({
+      data: {
+        title,
+        subject,
+        content,
+        coverImage,
+        emailEnabled,
+        whatsappEnabled,
+        smsEnabled,
+        frequency,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        status,
+        createdById: req.user.id,
+      },
+    });
 
-          emailEnabled: emailEnabled ?? true,
-          whatsappEnabled: whatsappEnabled ?? false,
-          smsEnabled: smsEnabled ?? false,
-
-          frequency,
-
-          scheduledAt:
-            scheduledAt ? new Date(scheduledAt) : null,
-
-          status: scheduledAt
-            ? "SCHEDULED"
-            : "DRAFT",
-
-          createdById: req.user.id,
-        },
-      });
-
-    res.status(201).json(campaign);
+    res.status(201).json({
+      success: true,
+      message: "Campaign created successfully.",
+      campaign,
+    });
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
+      success: false,
       error: "Unable to create campaign.",
     });
   }
@@ -523,20 +543,60 @@ export async function updateCampaign(req, res) {
   try {
     const id = Number(req.params.id);
 
-    const campaign =
-      await prisma.newsletterCampaign.update({
-        where: {
-          id,
-        },
+    const exists = await prisma.newsletterCampaign.findUnique({
+      where: {
+        id,
+      },
+    });
 
-        data: req.body,
+    if (!exists) {
+      return res.status(404).json({
+        success: false,
+        error: "Campaign not found.",
       });
+    }
 
-    res.json(campaign);
+    const {
+      title,
+      subject,
+      content,
+      coverImage,
+      emailEnabled,
+      whatsappEnabled,
+      smsEnabled,
+      frequency,
+      scheduledAt,
+      status,
+    } = req.body;
+
+    const campaign = await prisma.newsletterCampaign.update({
+      where: {
+        id,
+      },
+      data: {
+        title,
+        subject,
+        content,
+        coverImage,
+        emailEnabled,
+        whatsappEnabled,
+        smsEnabled,
+        frequency,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        status,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Campaign updated successfully.",
+      campaign,
+    });
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
+      success: false,
       error: "Unable to update campaign.",
     });
   }
@@ -726,6 +786,25 @@ export async function deleteCampaign(req, res) {
   try {
     const id = Number(req.params.id);
 
+    const exists = await prisma.newsletterCampaign.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!exists) {
+      return res.status(404).json({
+        success: false,
+        error: "Campaign not found.",
+      });
+    }
+
+    await prisma.newsletterRecipient.deleteMany({
+      where: {
+        campaignId: id,
+      },
+    });
+
     await prisma.newsletterCampaign.delete({
       where: {
         id,
@@ -734,11 +813,13 @@ export async function deleteCampaign(req, res) {
 
     res.json({
       success: true,
+      message: "Campaign deleted successfully.",
     });
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
+      success: false,
       error: "Unable to delete campaign.",
     });
   }
@@ -926,7 +1007,7 @@ await prisma.newsletterCampaign.update({
 
 export async function getAnalytics(req, res) {
   try {
-    console.log("📊 getAnalytics called by user:", req.user?.id || 'unknown');
+    // console.log("📊 getAnalytics called by user:", req.user?.id || 'unknown');
 
     const [
       totalSubscribers,
