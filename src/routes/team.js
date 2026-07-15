@@ -1,3 +1,4 @@
+// routes/team.js
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -8,40 +9,42 @@ import {
   approveTeamMember,
   rejectTeamMember,
   getCompanyTeamMembers,
+  addTeamMember,
+  updateTeamMember,
+  removeTeamMember,
+  searchCandidates,
+  getTeamMemberDetails,
 } from "../controllers/teamController.js";
 
 const router = express.Router();
 
+// Existing routes
 router.post("/request", requireAuth, requestToJoinCompany);
-
 router.get("/me", requireAuth, getMyTeamMembership);
-
 router.get("/pending", requireAuth, getPendingRequests);
+router.get("/members", requireAuth, getCompanyTeamMembers);
+router.patch("/:id/approve", requireAuth, approveTeamMember);
+router.patch("/:id/reject", requireAuth, rejectTeamMember);
 
-router.get(
-  "/members",
-  requireAuth,
-  getCompanyTeamMembers
-);
-router.patch(
-  "/:id/approve",
-  requireAuth,
-  approveTeamMember
-);
+// NEW: Add team member directly
+router.post("/add", requireAuth, addTeamMember);
 
-router.patch(
-  "/:id/reject",
-  requireAuth,
-  rejectTeamMember
-);
-// routes/team.js - Add these debug endpoints
+// NEW: Update team member
+router.patch("/:id", requireAuth, updateTeamMember);
 
-// Debug: Check all pending requests (admin only)
-// routes/team.js - Add this debug endpoint
+// NEW: Remove team member (mark as FORMER)
+router.patch("/:id/remove", requireAuth, removeTeamMember);
 
+// NEW: Get team member details
+router.get("/:id", requireAuth, getTeamMemberDetails);
+
+// NEW: Search candidates
+router.get("/candidates/search", requireAuth, searchCandidates);
+
+// Debug endpoints
 router.get("/debug/all-pending", requireAuth, async (req, res) => {
   try {
-    // Check if user is admin or recruiter
+    const { prisma } = await import("../lib/prisma.js");
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { role: true }
@@ -86,9 +89,9 @@ router.get("/debug/all-pending", requireAuth, async (req, res) => {
   }
 });
 
-// Debug: Check recruiter's company
 router.get("/debug/recruiter-company", requireAuth, async (req, res) => {
   try {
+    const { prisma } = await import("../lib/prisma.js");
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
@@ -116,6 +119,5 @@ router.get("/debug/recruiter-company", requireAuth, async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-
 
 export default router;

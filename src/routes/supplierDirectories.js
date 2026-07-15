@@ -12,6 +12,8 @@ import {
   getProductListingEligibilityHandler,
 } from "../controllers/supplierDirectoryController.js"
 
+import { createQuoteRequest } from "../controllers/quoteController.js" // ✅ NEW
+
 import { requireAuth, requireAdmin } from "../middleware/auth.js"
 
 const router = express.Router()
@@ -23,7 +25,6 @@ router.get(
   "/recruiter/directories",
   requireAuth,
   getMyDirectories
-
 )
 
 router.get(
@@ -47,6 +48,9 @@ router.post(
   trackDirectoryConnection
 )
 
+// ✅ NEW: Public quote request — matches frontend call to
+// POST /api/suppliers/:slug/quote-request
+router.post("/:slug/quote-request", createQuoteRequest)
 
 // Recruiter
 router.get(

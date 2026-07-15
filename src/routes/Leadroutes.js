@@ -1,18 +1,21 @@
+// routes/leadRoutes.js
 import express from "express";
 import {
     getAllLeads,
     getLeadById,
     updateLeadStatus,
-    deleteLead
+    deleteLead,
+    getLeadPackageSummary
 } from "../controllers/leadController.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Admin routes (you might want to add authentication middleware here,
-// same as the existing admin routes in this project)
-router.get("/", getAllLeads);
-router.get("/:id", getLeadById);
-router.patch("/:id/status", updateLeadStatus);
-router.delete("/:id", deleteLead);
+// All lead routes should be protected
+router.get("/", requireAuth, getAllLeads);
+router.get("/package-summary", requireAuth, getLeadPackageSummary);
+router.get("/:id", requireAuth, getLeadById);
+router.patch("/:id/status", requireAuth, updateLeadStatus);
+router.delete("/:id", requireAuth, deleteLead);
 
 export default router;
