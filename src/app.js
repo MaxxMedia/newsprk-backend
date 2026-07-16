@@ -39,6 +39,8 @@ import leadRoutes from "./routes/leadRoutes.js";
 import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
+import adminPackageRoutes from "./routes/adminPackageRoutes.js";
+
 
 /* ======================================================
    ✅ FIX: Proper .env loading
@@ -139,6 +141,8 @@ app.use("/api", adminIndustriesRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/quotes", quoteRoutes);
+app.use("/api/admin/package", adminPackageRoutes);
+
 
 
 /* ==========================
