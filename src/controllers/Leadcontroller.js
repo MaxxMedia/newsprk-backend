@@ -39,6 +39,63 @@ function enrichLead(lead, packageMap) {
     };
 }
 
+/**
+ * Fetches leads scoped to the requesting user's company
+ * (or all leads if admin)
+ */
+async function fetchScopedLeads(req) {
+    const userId = req.user?.id;
+
+    if (!userId) {
+        return [];
+    }
+
+    const user = await getRequestingUser(userId);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    const where = {};
+
+    // Admin sees all leads
+    if (user.role !== "admin") {
+        // Recruiters and company users only see their company's leads
+        if (!user.companyId) {
+            return [];
+        }
+
+        where.companyId = user.companyId;
+    }
+
+    const leads = await prisma.lead.findMany({
+        where,
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+
+    const packageMap = await buildPackageDetailsMap(
+        leads.map((lead) => lead.companyId)
+    );
+
+    return leads.map((lead) => enrichLead(lead, packageMap));
+}
+
+/**
+ * Helper function to escape CSV values
+ */
+function escapeCsvValue(value) {
+    if (value === null || value === undefined) {
+        return '""';
+    }
+    const stringValue = String(value);
+    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return `"${stringValue}"`;
+}
+
 // GET /api/leads
 // Admin: sees all leads (optionally filtered by ?companyId=).
 // Recruiter / any other authenticated company user: auto-scoped to their own company.
@@ -46,6 +103,13 @@ export const getAllLeads = async (req, res) => {
     try {
         const { source, status, packageFilter, plan, companyId } = req.query;
         const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
 
         const requester = await getRequestingUser(userId);
         if (!requester) {
@@ -136,6 +200,15 @@ export const getAllLeads = async (req, res) => {
 export const getLeadById = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
         const lead = await prisma.lead.findUnique({
             where: { id: parseInt(id) }
         });
@@ -148,6 +221,13 @@ export const getLeadById = async (req, res) => {
         }
 
         const user = await getRequestingUser(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
 
         if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
             return res.status(403).json({
@@ -182,13 +262,28 @@ export const updateLeadStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        const userId = req.user?.id;
 
-    if (!VALID_STATUSES.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
-      })
-    }
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: "Status is required",
+            });
+        }
+
+        if (!VALID_STATUSES.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
+            });
+        }
 
         const lead = await prisma.lead.findUnique({
             where: { id: parseInt(id) }
@@ -202,6 +297,13 @@ export const updateLeadStatus = async (req, res) => {
         }
 
         const user = await getRequestingUser(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
 
         if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
             return res.status(403).json({
@@ -218,7 +320,7 @@ export const updateLeadStatus = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Lead status updated successfully",
-            data: lead
+            data: updated
         });
     } catch (error) {
         console.error("Error updating lead status:", error);
@@ -242,6 +344,13 @@ export const deleteLead = async (req, res) => {
         const { id } = req.params;
         const userId = req.user?.id;
 
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
         const lead = await prisma.lead.findUnique({
             where: { id: parseInt(id) }
         });
@@ -254,6 +363,13 @@ export const deleteLead = async (req, res) => {
         }
 
         const user = await getRequestingUser(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
 
         if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
             return res.status(403).json({
@@ -289,6 +405,15 @@ export const deleteLead = async (req, res) => {
 // GET /api/recruiters/leads
 export const getLeads = async (req, res) => {
     try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
         const leads = await fetchScopedLeads(req);
 
         res.status(200).json({
@@ -309,6 +434,15 @@ export const getLeads = async (req, res) => {
 // GET /api/recruiters/leads/download
 export const downloadLeadsCSV = async (req, res) => {
     try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
         const leads = await fetchScopedLeads(req);
         const headers = [
             "id",
@@ -361,7 +495,21 @@ export const getLeadPackageSummary = async (req, res) => {
     try {
         const userId = req.user?.id;
 
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User not authenticated",
+            });
+        }
+
         const user = await getRequestingUser(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
 
         const where = {};
         if (user?.role !== 'admin' && user?.companyId) {
@@ -376,25 +524,29 @@ export const getLeadPackageSummary = async (req, res) => {
         const packageMap = await buildPackageDetailsMap(leads.map((l) => l.companyId));
         const enrichedLeads = leads.map((lead) => enrichLead(lead, packageMap));
 
-        const summary = {
-            total: enrichedLeads.length,
-            withPackage: enrichedLeads.filter(l => l.hasPackage).length,
-            withoutPackage: enrichedLeads.filter(l => !l.hasPackage).length,
-            byPlan: {}
-        };
+        // Calculate summary statistics
+        const withPackage = enrichedLeads.filter(l => l.hasPackage).length;
+        const withoutPackage = enrichedLeads.filter(l => !l.hasPackage).length;
+        const byPlan = {};
 
         enrichedLeads.forEach(lead => {
             if (lead.planName) {
-                summary.byPlan[lead.planName] = (summary.byPlan[lead.planName] || 0) + 1;
+                byPlan[lead.planName] = (byPlan[lead.planName] || 0) + 1;
             }
         });
+
+        // Add "unknown" category for leads without a plan
+        const withUnknownPlan = enrichedLeads.filter(l => !l.planName).length;
+        if (withUnknownPlan > 0) {
+            byPlan.unknown = withUnknownPlan;
+        }
 
         res.status(200).json({
             success: true,
             data: {
                 total: leads.length,
                 withPackage,
-                withoutPackage: leads.length - withPackage,
+                withoutPackage,
                 byPlan,
             },
         });

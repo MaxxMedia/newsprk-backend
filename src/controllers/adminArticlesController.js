@@ -1,4 +1,5 @@
 import prisma from "../prismaClient.js"
+import { getArticlePostingEligibility } from "../lib/packageContentLimits.js"
 
 /**
  * GET all pending recruiter articles
@@ -31,7 +32,25 @@ export const getPendingArticles = async (req, res) => {
       },
     })
 
-    res.json(articles)
+    const articlesWithEligibility = await Promise.all(
+      articles.map(async (article) => {
+        let eligibility = null
+        if (article.Company?.id) {
+          eligibility = await getArticlePostingEligibility(article.Company.id)
+        }
+        return {
+          ...article,
+          Company: article.Company
+            ? {
+                ...article.Company,
+                eligibility,
+              }
+            : null,
+        }
+      })
+    )
+
+    res.json(articlesWithEligibility)
   } catch (err) {
     console.error("Admin fetch pending articles error:", err)
     res.status(500).json({
@@ -71,7 +90,25 @@ export const getAdminApprovedArticles = async (req, res) => {
       },
     })
 
-    res.json(articles)
+    const articlesWithEligibility = await Promise.all(
+      articles.map(async (article) => {
+        let eligibility = null
+        if (article.Company?.id) {
+          eligibility = await getArticlePostingEligibility(article.Company.id)
+        }
+        return {
+          ...article,
+          Company: article.Company
+            ? {
+                ...article.Company,
+                eligibility,
+              }
+            : null,
+        }
+      })
+    )
+
+    res.json(articlesWithEligibility)
   } catch (err) {
     console.error("Admin fetch approved articles error:", err)
     res.status(500).json({
