@@ -931,7 +931,7 @@ if (
 ) {
 
   console.log("Sending email to:", subscriber.email);
-  console.log("Sender:", process.env.RESEND_FROM_EMAIL);
+  // console.log("Sender:", process.env.RESEND_FROM_EMAIL);
 
   const result = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL,
