@@ -73,10 +73,35 @@ export const getAllContacts = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    const contactsWithPlan = await Promise.all(
+      contacts.map(async (contact) => {
+        let plan = "free";
+        if (contact.email) {
+          const user = await prisma.user.findUnique({
+            where: { email: contact.email },
+            select: {
+              Company: {
+                select: {
+                  subscriptionPlan: true
+                }
+              }
+            }
+          });
+          if (user?.Company?.subscriptionPlan) {
+            plan = user.Company.subscriptionPlan;
+          }
+        }
+        return {
+          ...contact,
+          plan: plan.toLowerCase()
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: contacts.length,
-      data: contacts
+      count: contactsWithPlan.length,
+      data: contactsWithPlan
     });
   } catch (error) {
     console.error("Error fetching contacts:", error);
