@@ -184,7 +184,11 @@ export async function getSubscribers(req, res) {
 
         include: {
           Company: true,
-          User: true,
+          User: {
+            include: {
+              Company: true,
+            },
+          },
         },
 
         orderBy: {
@@ -201,8 +205,39 @@ export async function getSubscribers(req, res) {
       }),
     ]);
 
+    const subscribersWithPlan = await Promise.all(
+      subscribers.map(async (sub) => {
+        let plan = "free";
+
+        if (sub.Company?.subscriptionPlan) {
+          plan = sub.Company.subscriptionPlan;
+        } else if (sub.User?.Company?.subscriptionPlan) {
+          plan = sub.User.Company.subscriptionPlan;
+        } else if (sub.email) {
+          const user = await prisma.user.findUnique({
+            where: { email: sub.email },
+            select: {
+              Company: {
+                select: {
+                  subscriptionPlan: true,
+                },
+              },
+            },
+          });
+          if (user?.Company?.subscriptionPlan) {
+            plan = user.Company.subscriptionPlan;
+          }
+        }
+
+        return {
+          ...sub,
+          plan: plan.toLowerCase(),
+        };
+      })
+    );
+
     res.json({
-      subscribers,
+      subscribers: subscribersWithPlan,
 
       pagination: {
         page,
