@@ -348,12 +348,15 @@ export async function createSubscriber(req, res) {
 
     res.status(201).json(subscriber);
   } catch (err) {
-    console.error(err);
+  console.error("CREATE TEMPLATE ERROR:");
+  console.error(err);
 
-    res.status(500).json({
-      error: "Unable to create subscriber.",
-    });
-  }
+  res.status(500).json({
+    success: false,
+    error: err.message,
+    stack: err.stack, // remove this later in production
+  });
+}
 }
 
 export async function importSubscribers(req, res) {
@@ -366,10 +369,11 @@ export async function importSubscribers(req, res) {
 export async function exportSubscribers(req, res) {
   try {
     const subscribers = await prisma.newsletterSubscriber.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+  where: {
+    status: "ACTIVE",
+    emailSubscribed: true,
+  },
+});
 
     res.json({
       success: true,
@@ -724,11 +728,17 @@ export async function sendTestCampaign(req, res) {
       });
     }
 
+    if (!process.env.RESEND_FROM_EMAIL) {
+  throw new Error(
+    "RESEND_FROM_EMAIL is not configured in .env"
+  );
+}
+
     await resend.emails.send({
-      from: "Newsprk <newsletter@yourdomain.com>",
+      from: process.env.RESEND_FROM_EMAIL,
       to: email,
       subject: campaign.subject,
-      html: newsletterHtml(campaign),
+      html: campaign.content,
     });
 
     res.json({
@@ -884,12 +894,13 @@ export async function sendCampaign(req, res) {
     }
 
     // Load active subscribers
-    const subscribers =
-      await prisma.newsLetter.findMany({
-        where: {
-          isActive: true,
-        },
-      });
+   const subscribers =
+  await prisma.newsletterSubscriber.findMany({
+    where: {
+      status: "ACTIVE",
+      emailSubscribed: true,
+    },
+  });
 
     if (!subscribers.length) {
       return res.status(400).json({
@@ -903,119 +914,90 @@ export async function sendCampaign(req, res) {
 
    for (const subscriber of subscribers) {
 
-  const recipient =
-    await prisma.newsletterRecipient.create({
-      data: {
-        campaignId: campaign.id,
-
-        newsletterId: subscriber.id,
-
-        email: subscriber.email,
-
-        phone: subscriber.phone,
-
-        status: "PENDING",
-      },
-    });
+const recipient = await prisma.newsletterRecipient.create({
+  data: {
+    campaignId: campaign.id,
+    subscriberId: subscriber.id,
+    emailStatus: "PENDING",
+  },
+});
 
   try {
 
-    if (
-      campaign.emailEnabled &&
-      subscriber.emailEnabled &&
-      subscriber.email
-    ) {
+if (
+  campaign.emailEnabled &&
+  subscriber.emailSubscribed &&
+  subscriber.email
+) {
 
-      await resend.emails.send({
+  console.log("Sending email to:", subscriber.email);
+  console.log("Sender:", process.env.RESEND_FROM_EMAIL);
 
-        from: "Newsprk <newsletter@yourdomain.com>",
+  const result = await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL,
+    to: subscriber.email,
+    subject: campaign.subject,
+    html: campaign.content,
+  });
 
-        to: subscriber.email,
+  console.log("Resend Response:", result);
 
-        subject: campaign.subject,
+  await prisma.newsletterRecipient.update({
+    where: {
+      id: recipient.id,
+    },
+    data: {
+      emailStatus: "DELIVERED",
+      sentAt: new Date(),
+    },
+  });
 
-        html: newsletterHtml(campaign),
+  emailCount++;
+}
 
-      });
+} catch (err) {
 
-      await prisma.newsletterRecipient.update({
+  console.error("Email Send Error:", err);
 
-        where: {
-          id: recipient.id,
-        },
-
-        data: {
-          status: "DELIVERED",
-          deliveredAt: new Date(),
-        },
-
-      });
-
-      emailCount++;
-    }
-
-  } catch (err) {
-
-    console.error(err);
-
-    await prisma.newsletterRecipient.update({
-
-      where: {
-        id: recipient.id,
-      },
-
-      data: {
-        status: "FAILED",
-        errorMessage: err.message,
-      },
-
-    });
-
-  }
+  await prisma.newsletterRecipient.update({
+    where: {
+      id: recipient.id,
+    },
+    data: {
+      emailStatus: "FAILED",
+    },
+  });
 
 }
 
-    const delivered =
-  await prisma.newsletterRecipient.count({
+}
 
-    where: {
-      campaignId: campaign.id,
-      status: "DELIVERED",
-    },
+const delivered = await prisma.newsletterRecipient.count({
+  where: {
+    campaignId: campaign.id,
+    emailStatus: "DELIVERED",
+  },
+});
 
-  });
-
-const failed =
-  await prisma.newsletterRecipient.count({
-
-    where: {
-      campaignId: campaign.id,
-      status: "FAILED",
-    },
-
-  });
+const failed = await prisma.newsletterRecipient.count({
+  where: {
+    campaignId: campaign.id,
+    emailStatus: "FAILED",
+  },
+});
 
 await prisma.newsletterCampaign.update({
-
   where: {
     id: campaign.id,
   },
-
   data: {
-
     totalRecipients: subscribers.length,
-
     delivered,
-
     failed,
-
     status: "SENT",
-
     sentAt: new Date(),
-
   },
-
-});;
+});
 
     res.json({
       success: true,
@@ -1029,12 +1011,17 @@ await prisma.newsletterCampaign.update({
       smsRecipients: smsCount,
     });
   } catch (err) {
-    console.error(err);
 
-    res.status(500).json({
-      error: "Unable to send campaign.",
-    });
-  }
+  console.error("SEND CAMPAIGN ERROR");
+  console.error(err);
+
+  res.status(500).json({
+    success: false,
+    error: err.message,
+    stack: err.stack,
+  });
+
+}
 }
 /* ===========================
    ANALYTICS / DASHBOARD

@@ -838,4 +838,5 @@ model Lead {
   @@index([companyId])
   @@index([status])
   @@index([source])
-}
+}  
+
