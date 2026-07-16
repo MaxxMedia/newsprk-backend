@@ -1,23 +1,40 @@
-// controllers/supplierDirectoryController.js
-import prisma from "../prismaClient.js"
+// controllers/supplierDirectoryController.js - FULL COMPLETE VERSION
+
+import prisma from "../prismaClient.js";
 import {
   assertProductListingCount,
   assertAndSanitizeSupplierDirectoryMedia,
+  assertCompanyProfileLimits,
   getCompanyDirectoryCount,
   getProductListingEligibility,
-} from "../lib/packageContentLimits.js"
-import { getActiveSubscription } from "../lib/packagePurchases.js"
-import { getRfqLeadsEligibilityForSupplier } from "../lib/Leadlimits.js"
+  getCompanyProfileEligibility,
+  countWords,
+} from "../lib/packageContentLimits.js";
+import { getActiveSubscription } from "../lib/packagePurchases.js";
+import { getRfqLeadsEligibilityForSupplier } from "../lib/Leadlimits.js";
 
-/**
- * Recruiter submits directory (FIRST TIME)
- */
+async function getAllDescendantIndustryIds(parentId) {
+  const ids = [parentId];
+
+  const children = await prisma.industry.findMany({
+    where: { parentId },
+    select: { id: true },
+  });
+
+  for (const child of children) {
+    const childIds = await getAllDescendantIndustryIds(child.id);
+    ids.push(...childIds);
+  }
+
+  return ids;
+}
+
 export const createDirectory = async (req, res) => {
   try {
-    const user = req.user
+    const user = req.user;
 
     if (user.role !== "recruiter") {
-      return res.status(403).json({ error: "Only recruiters can submit directories" })
+      return res.status(403).json({ error: "Only recruiters can submit directories" });
     }
 
     const {
@@ -29,6 +46,7 @@ export const createDirectory = async (req, res) => {
       coverImageUrl,
       phoneNumber,
       email,
+      googleMapUrl,
 
       tradeNames,
       socialLinks,
@@ -57,57 +75,94 @@ export const createDirectory = async (req, res) => {
       location,
       address,
       industryId,
-    } = req.body
+    } = req.body;
 
     if (!location || !address || !industryId) {
       return res.status(400).json({
         error: "Location, address and industry are required",
-      })
+      });
     }
 
     const industry = await prisma.industry.findUnique({
       where: { id: Number(industryId) },
-    })
+    });
 
     if (!industry) {
-      return res.status(400).json({ error: "Invalid industry selected" })
+      return res.status(400).json({ error: "Invalid industry selected" });
     }
 
-    const existingDirectories = await getCompanyDirectoryCount(user.companyId)
-    const requestedDirectories = existingDirectories + 1
+    // Check directory limit
+    const existingDirectories = await getCompanyDirectoryCount(user.companyId);
+    const requestedDirectories = existingDirectories + 1;
 
     try {
-      await assertProductListingCount(user.companyId, requestedDirectories)
+      await assertProductListingCount(user.companyId, requestedDirectories);
     } catch (err) {
       return res.status(err.status || 403).json({
         error: err.message,
         code: err.code,
         eligibility: err.eligibility,
-      })
+      });
     }
 
-    // ✅ Convert coverImageUrl to array for sanitization
-    let sanitizedMedia
+    // Sanitize cover images and social links
+    let sanitizedMedia;
     try {
-      // coverImageUrl can be a string (single) or array (multiple)
-      let coverImages = []
+      let coverImages = [];
       if (Array.isArray(coverImageUrl)) {
-        coverImages = coverImageUrl
-      } else if (typeof coverImageUrl === 'string' && coverImageUrl) {
-        coverImages = [coverImageUrl]
+        coverImages = coverImageUrl;
+      } else if (typeof coverImageUrl === "string" && coverImageUrl) {
+        coverImages = [coverImageUrl];
       }
 
       sanitizedMedia = await assertAndSanitizeSupplierDirectoryMedia(user.companyId, {
         coverImages: coverImages,
         socialLinks,
-      })
+      });
     } catch (err) {
       return res.status(err.status || 403).json({
         error: err.message,
         code: err.code,
-      })
+      });
     }
 
+    // Check all other profile limits
+    let profileEligibility;
+    try {
+      profileEligibility = await assertCompanyProfileLimits(user.companyId, {
+        description,
+        googleMapUrl,
+        productGallery,
+        companyGallery,
+        factoryGallery,
+        videoGallery,
+        productCatalogues,
+        companyBrochure,
+        certifications,
+        brandsRepresented,
+        industriesServed,
+        exportMarkets,
+        manufacturingCapabilities,
+        machineryList,
+        qualityStandards,
+        coverImages: sanitizedMedia.coverImages,
+      });
+    } catch (err) {
+      return res.status(err.status || 403).json({
+        error: err.message,
+        code: err.code,
+        eligibility: err.eligibility,
+      });
+    }
+
+    // Safety: if googleMap not allowed, null it out
+    const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
+    const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
+    const safeMachineryList = profileEligibility.machineryList ? machineryList : null;
+    const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
+    const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
+
+    // Update company
     await prisma.company.update({
       where: { id: user.companyId },
       data: {
@@ -115,9 +170,9 @@ export const createDirectory = async (req, res) => {
         address,
         industryId: Number(industryId),
       },
-    })
+    });
 
-    // ✅ Store ALL cover images as an array (not just the first one)
+    // Create directory
     const directory = await prisma.supplierDirectory.create({
       data: {
         name,
@@ -125,9 +180,10 @@ export const createDirectory = async (req, res) => {
         description,
         website,
         logoUrl,
-        coverImageUrl: sanitizedMedia.coverImages, // ✅ Store the entire array
+        coverImageUrl: sanitizedMedia.coverImages,
         phoneNumber,
         email,
+        googleMapUrl: safeGoogleMapUrl,
         tradeNames,
         videoGallery,
         productGallery,
@@ -138,10 +194,10 @@ export const createDirectory = async (req, res) => {
         certifications,
         brandsRepresented,
         industriesServed,
-        exportMarkets,
-        manufacturingCapabilities,
-        machineryList,
-        qualityStandards,
+        exportMarkets: safeExportMarkets,
+        manufacturingCapabilities: safeManufacturingCapabilities,
+        machineryList: safeMachineryList,
+        qualityStandards: safeQualityStandards,
         enableInquiryForm,
         socialLinks: sanitizedMedia.socialLinks,
         productSupplies,
@@ -150,25 +206,21 @@ export const createDirectory = async (req, res) => {
         isLiveEditable: false,
         submittedById: user.id,
       },
-    })
+    });
 
-    res.status(201).json(directory)
-
+    res.status(201).json(directory);
   } catch (err) {
-    console.error("Create directory error:", err)
-    res.status(500).json({ error: "Failed to create directory" })
+    console.error("Create directory error:", err);
+    res.status(500).json({ error: "Failed to create directory" });
   }
-}
+};
 
-/**
- * Admin approves directory (ONLY ONCE)
- */
 export const approveDirectory = async (req, res) => {
   try {
-    const user = req.user
-    if (user.role !== "admin") return res.status(403).json({ error: "Admin only" })
+    const user = req.user;
+    if (user.role !== "admin") return res.status(403).json({ error: "Admin only" });
 
-    const directoryId = Number(req.params.id)
+    const directoryId = Number(req.params.id);
     const directory = await prisma.supplierDirectory.update({
       where: { id: directoryId },
       data: {
@@ -177,73 +229,83 @@ export const approveDirectory = async (req, res) => {
         approvedById: user.id,
         approvedAt: new Date(),
       },
-    })
+    });
 
     await prisma.auditLog.create({
-      data: { action: "DIRECTORY_APPROVED", entity: "SupplierDirectory", entityId: directory.id, userId: user.id },
-    })
+      data: {
+        action: "DIRECTORY_APPROVED",
+        entity: "SupplierDirectory",
+        entityId: directory.id,
+        userId: user.id,
+      },
+    });
 
-    res.json(directory)
+    res.json(directory);
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Approval failed" })
+    console.error(err);
+    res.status(500).json({ error: "Approval failed" });
   }
-}
+};
 
-/**
- * Get single recruiter directory by ID
- */
 export const getMyDirectoryById = async (req, res) => {
   try {
-    const user = req.user
-    const directoryId = Number(req.params.id)
+    const user = req.user;
+    const directoryId = Number(req.params.id);
 
-    if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" })
+    if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" });
 
     const directory = await prisma.supplierDirectory.findFirst({
       where: {
         id: directoryId,
         submittedById: user.id,
-      }
-    })
+      },
+    });
 
-    if (!directory) return res.status(404).json({ error: "Directory not found" })
+    if (!directory) return res.status(404).json({ error: "Directory not found" });
 
-    res.json(directory)
+    // Ensure coverImageUrl is array
+    let coverImageUrl = directory.coverImageUrl;
+    if (typeof coverImageUrl === "string") {
+      coverImageUrl = coverImageUrl ? [coverImageUrl] : [];
+    } else if (!Array.isArray(coverImageUrl)) {
+      coverImageUrl = [];
+    }
+
+    res.json({
+      ...directory,
+      coverImageUrl,
+    });
   } catch (err) {
-    console.error("Get directory by id error:", err)
-    res.status(500).json({ error: "Failed to load directory" })
+    console.error("Get directory by id error:", err);
+    res.status(500).json({ error: "Failed to load directory" });
   }
-}
+};
 
 export const getProductListingEligibilityHandler = async (req, res) => {
   try {
-    const user = req.user
+    const user = req.user;
     if (user.role !== "recruiter") {
-      return res.status(403).json({ error: "Not allowed" })
+      return res.status(403).json({ error: "Not allowed" });
     }
 
-    const eligibility = await getProductListingEligibility(user.companyId ?? null)
-    res.json(eligibility)
+    const eligibility = await getProductListingEligibility(user.companyId ?? null);
+    res.json(eligibility);
   } catch (err) {
-    console.error("Product listing eligibility error:", err)
-    res.status(500).json({ error: "Failed to load product listing eligibility" })
+    console.error("Product listing eligibility error:", err);
+    res.status(500).json({ error: "Failed to load product listing eligibility" });
   }
-}
+};
 
-/**
- * Get recruiter directories
- */
 export const getMyDirectories = async (req, res) => {
   try {
-    const user = req.user
-    if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" })
+    const user = req.user;
+    if (user.role !== "recruiter") return res.status(403).json({ error: "Not allowed" });
 
     if (user.companyId) {
       await prisma.supplierDirectory.updateMany({
         where: { submittedById: user.id, companyId: null },
         data: { companyId: user.companyId },
-      })
+      });
     }
 
     const directories = await prisma.supplierDirectory.findMany({
@@ -256,57 +318,63 @@ export const getMyDirectories = async (req, res) => {
         }
         : { submittedById: user.id },
       orderBy: { createdAt: "desc" },
-      // ✅ Don't use select - get all fields to preserve the array structure
-    })
+    });
 
-    // ✅ Map through and ensure coverImageUrl is always an array
-    const sanitizedDirectories = directories.map(dir => ({
-      id: dir.id,
-      name: dir.name,
-      slug: dir.slug,
-      status: dir.status,
-      isLiveEditable: dir.isLiveEditable,
-      createdAt: dir.createdAt,
-      logoUrl: dir.logoUrl,
-      coverImageUrl: Array.isArray(dir.coverImageUrl)
-        ? dir.coverImageUrl
-        : dir.coverImageUrl ? [dir.coverImageUrl] : [],
-      productSupplies: dir.productSupplies,
-      videoGallery: dir.videoGallery,
-      productGallery: dir.productGallery,
-      companyGallery: dir.companyGallery,
-      factoryGallery: dir.factoryGallery,
-      productCatalogues: dir.productCatalogues,
-      companyBrochure: dir.companyBrochure,
-      certifications: dir.certifications,
-      brandsRepresented: dir.brandsRepresented,
-      industriesServed: dir.industriesServed,
-      exportMarkets: dir.exportMarkets,
-      manufacturingCapabilities: dir.manufacturingCapabilities,
-      machineryList: dir.machineryList,
-      qualityStandards: dir.qualityStandards,
-      enableInquiryForm: dir.enableInquiryForm,
-    }))
+    const sanitizedDirectories = directories.map((dir) => {
+      let coverImageUrl = dir.coverImageUrl;
+      if (typeof coverImageUrl === "string") {
+        coverImageUrl = coverImageUrl ? [coverImageUrl] : [];
+      } else if (!Array.isArray(coverImageUrl)) {
+        coverImageUrl = [];
+      }
 
-    res.json(sanitizedDirectories)
+      return {
+        id: dir.id,
+        name: dir.name,
+        slug: dir.slug,
+        status: dir.status,
+        isLiveEditable: dir.isLiveEditable,
+        createdAt: dir.createdAt,
+        logoUrl: dir.logoUrl,
+        coverImageUrl,
+        productSupplies: dir.productSupplies,
+        videoGallery: dir.videoGallery,
+        productGallery: dir.productGallery,
+        companyGallery: dir.companyGallery,
+        factoryGallery: dir.factoryGallery,
+        productCatalogues: dir.productCatalogues,
+        companyBrochure: dir.companyBrochure,
+        certifications: dir.certifications,
+        brandsRepresented: dir.brandsRepresented,
+        industriesServed: dir.industriesServed,
+        exportMarkets: dir.exportMarkets,
+        manufacturingCapabilities: dir.manufacturingCapabilities,
+        machineryList: dir.machineryList,
+        qualityStandards: dir.qualityStandards,
+        enableInquiryForm: dir.enableInquiryForm,
+        googleMapUrl: dir.googleMapUrl,
+      };
+    });
+
+    res.json(sanitizedDirectories);
   } catch (err) {
-    console.error("Get recruiter directories error:", err)
-    res.status(500).json({ error: "Failed to load directories" })
+    console.error("Get recruiter directories error:", err);
+    res.status(500).json({ error: "Failed to load directories" });
   }
-}
-/**
- * Recruiter updates directory (LIVE after approval)
- */
+};
+
 export const updateDirectory = async (req, res) => {
   try {
-    const user = req.user
-    const directoryId = Number(req.params.id)
+    const user = req.user;
+    const directoryId = Number(req.params.id);
 
-    const directory = await prisma.supplierDirectory.findUnique({ where: { id: directoryId } })
+    const directory = await prisma.supplierDirectory.findUnique({
+      where: { id: directoryId },
+    });
 
-    if (!directory) return res.status(404).json({ error: "Directory not found" })
-    if (directory.submittedById !== user.id) return res.status(403).json({ error: "Not allowed" })
-    if (!directory.isLiveEditable) return res.status(400).json({ error: "Directory not approved yet" })
+    if (!directory) return res.status(404).json({ error: "Directory not found" });
+    if (directory.submittedById !== user.id) return res.status(403).json({ error: "Not allowed" });
+    if (!directory.isLiveEditable) return res.status(400).json({ error: "Directory not approved yet" });
 
     const {
       name,
@@ -316,6 +384,7 @@ export const updateDirectory = async (req, res) => {
       coverImageUrl,
       phoneNumber,
       email,
+      googleMapUrl,
 
       tradeNames,
       socialLinks,
@@ -342,36 +411,73 @@ export const updateDirectory = async (req, res) => {
       productSupplies,
 
       slug,
-    } = req.body
+    } = req.body;
 
-    if (slug && slug !== directory.slug) return res.status(400).json({ error: "Slug cannot be changed" })
+    if (slug && slug !== directory.slug) return res.status(400).json({ error: "Slug cannot be changed" });
 
-    // ✅ Convert coverImageUrl to array for sanitization
-    let sanitizedMedia
+    // Sanitize cover images and social links
+    let sanitizedMedia;
     try {
-      // coverImageUrl can be a string (single) or array (multiple)
-      let coverImages = []
+      let coverImages = [];
       if (Array.isArray(coverImageUrl)) {
-        coverImages = coverImageUrl
-      } else if (typeof coverImageUrl === 'string' && coverImageUrl) {
-        coverImages = [coverImageUrl]
+        coverImages = coverImageUrl;
+      } else if (typeof coverImageUrl === "string" && coverImageUrl) {
+        coverImages = [coverImageUrl];
       }
 
       sanitizedMedia = await assertAndSanitizeSupplierDirectoryMedia(
         directory.companyId ?? user.companyId,
         {
           coverImages: coverImages,
-          socialLinks
+          socialLinks,
         }
-      )
+      );
     } catch (err) {
       return res.status(err.status || 403).json({
         error: err.message,
         code: err.code,
-      })
+      });
     }
 
-    // ✅ Store ALL cover images as an array (not just the first one)
+    // Check all other profile limits
+    let profileEligibility;
+    try {
+      profileEligibility = await assertCompanyProfileLimits(
+        directory.companyId ?? user.companyId,
+        {
+          description,
+          googleMapUrl,
+          productGallery,
+          companyGallery,
+          factoryGallery,
+          videoGallery,
+          productCatalogues,
+          companyBrochure,
+          certifications,
+          brandsRepresented,
+          industriesServed,
+          exportMarkets,
+          manufacturingCapabilities,
+          machineryList,
+          qualityStandards,
+          coverImages: sanitizedMedia.coverImages,
+        }
+      );
+    } catch (err) {
+      return res.status(err.status || 403).json({
+        error: err.message,
+        code: err.code,
+        eligibility: err.eligibility,
+      });
+    }
+
+    // Safety: null out features not allowed by package
+    const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
+    const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
+    const safeMachineryList = profileEligibility.machineryList ? machineryList : null;
+    const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
+    const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
+
     const updated = await prisma.supplierDirectory.update({
       where: { id: directoryId },
       data: {
@@ -379,70 +485,60 @@ export const updateDirectory = async (req, res) => {
         description,
         website,
         logoUrl,
-        coverImageUrl: sanitizedMedia.coverImages, // ✅ Store the entire array
+        coverImageUrl: sanitizedMedia.coverImages,
         phoneNumber,
         email,
-
+        googleMapUrl: safeGoogleMapUrl,
         tradeNames,
         socialLinks: sanitizedMedia.socialLinks,
-
         videoGallery,
         productGallery,
         companyGallery,
         factoryGallery,
         productCatalogues,
-
         companyBrochure,
         certifications,
-
         brandsRepresented,
         industriesServed,
-        exportMarkets,
-
-        manufacturingCapabilities,
-        machineryList,
-        qualityStandards,
-
+        exportMarkets: safeExportMarkets,
+        manufacturingCapabilities: safeManufacturingCapabilities,
+        machineryList: safeMachineryList,
+        qualityStandards: safeQualityStandards,
         enableInquiryForm,
-
         productSupplies,
       },
-    })
+    });
 
     await prisma.auditLog.create({
-      data: { action: "DIRECTORY_UPDATED_LIVE", entity: "SupplierDirectory", entityId: updated.id, userId: user.id },
-    })
+      data: {
+        action: "DIRECTORY_UPDATED_LIVE",
+        entity: "SupplierDirectory",
+        entityId: updated.id,
+        userId: user.id,
+      },
+    });
 
-    res.json(updated)
+    res.json(updated);
   } catch (err) {
-    console.error("Update directory error:", err)
-    res.status(500).json({ error: "Update failed" })
+    console.error("Update directory error:", err);
+    res.status(500).json({ error: "Update failed" });
   }
-}
+};
 
-/* =========================================
-   ✅ HELPER: Recursively get all descendant
-   industry IDs for a given parent ID.
-========================================= */
-async function getAllDescendantIndustryIds(parentId) {
-  const ids = [parentId]
-
-  const children = await prisma.industry.findMany({
-    where: { parentId },
-    select: { id: true },
-  })
-
-  for (const child of children) {
-    const childIds = await getAllDescendantIndustryIds(child.id)
-    ids.push(...childIds)
+export const getCompanyProfileEligibilityHandler = async (req, res) => {
+  try {
+    const user = req.user;
+    if (user.role !== "recruiter") {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    const eligibility = await getCompanyProfileEligibility(user.companyId ?? null);
+    res.json(eligibility);
+  } catch (err) {
+    console.error("Company profile eligibility error:", err);
+    res.status(500).json({ error: "Failed to load company profile eligibility" });
   }
+};
 
-  return ids
-}
-
-/* =========================================
-   Get approved suppliers with full filter support
-========================================= */
 export const getSuppliers = async (req, res) => {
   try {
     const {
@@ -454,52 +550,47 @@ export const getSuppliers = async (req, res) => {
       page = "1",
       limit = "15",
       sort = "alphabetical",
-    } = req.query
+    } = req.query;
 
-    const pageNum = Math.max(1, parseInt(page))
-    const limitNum = Math.max(1, parseInt(limit))
-    const skip = (pageNum - 1) * limitNum
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.max(1, parseInt(limit));
+    const skip = (pageNum - 1) * limitNum;
 
-    let industryIds = null
+    let industryIds = null;
     if (industryId) {
-      industryIds = await getAllDescendantIndustryIds(Number(industryId))
+      industryIds = await getAllDescendantIndustryIds(Number(industryId));
     }
 
     const where = {
       status: "APPROVED",
-
       ...(name && {
         name: { contains: name },
       }),
-
       ...(location && {
         Company: {
           location: { contains: location },
         },
       }),
-
       ...(category && {
         OR: [
           { name: { contains: category } },
           { description: { contains: category } },
         ],
       }),
-
       ...(industryIds && {
         Company: {
           industryId: { in: industryIds },
         },
       }),
-
       ...(featured === "true" && {
         isFeatured: true,
       }),
-    }
+    };
 
     const orderBy =
       sort === "newest" ? { createdAt: "desc" } :
         sort === "popular" ? { views: "desc" } :
-          { name: "asc" }
+          { name: "asc" };
 
     const [total, suppliers] = await Promise.all([
       prisma.supplierDirectory.count({ where }),
@@ -523,7 +614,7 @@ export const getSuppliers = async (req, res) => {
           },
         },
       }),
-    ])
+    ]);
 
     res.json({
       data: suppliers,
@@ -531,19 +622,16 @@ export const getSuppliers = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-    })
+    });
   } catch (err) {
-    console.error("getSuppliers error:", err)
-    res.status(500).json({ error: "Failed to fetch suppliers" })
+    console.error("getSuppliers error:", err);
+    res.status(500).json({ error: "Failed to fetch suppliers" });
   }
-}
+};
 
-/**
- * Get supplier showroom by slug
- */
 export const getSupplierBySlug = async (req, res) => {
   try {
-    const { slug } = req.params
+    const { slug } = req.params;
 
     const supplier = await prisma.supplierDirectory.findUnique({
       where: { slug },
@@ -552,74 +640,69 @@ export const getSupplierBySlug = async (req, res) => {
           select: {
             id: true,
             name: true,
-            slug: true, // ✅ FIX: was missing — page.tsx needs this to build
-            // the correct /api/companies/:slug/team URL. Without it,
-            // supplier.Company?.slug was always undefined and the
-            // frontend fell back to the *directory's* slug instead,
-            // causing "company not found" 404s from /team.
+            slug: true,
             location: true,
             Industry: true,
             website: true,
           },
         },
       },
-    })
+    });
 
     if (!supplier || supplier.status !== "APPROVED") {
-      return res.status(404).json({ error: "Supplier not found" })
+      return res.status(404).json({ error: "Supplier not found" });
     }
 
     await prisma.supplierDirectory.update({
       where: { id: supplier.id },
       data: { views: { increment: 1 } },
-    })
+    });
 
-    const activeSubscription = await getActiveSubscription(supplier.companyId)
+    const activeSubscription = await getActiveSubscription(supplier.companyId);
+    const profileLimits = await getCompanyProfileEligibility(supplier.companyId);
 
-    // ✅ Ensure coverImageUrl is always an array
-    let coverImageUrl = supplier.coverImageUrl
-    if (typeof coverImageUrl === 'string') {
-      coverImageUrl = coverImageUrl ? [coverImageUrl] : []
+    let coverImageUrl = supplier.coverImageUrl;
+    if (typeof coverImageUrl === "string") {
+      coverImageUrl = coverImageUrl ? [coverImageUrl] : [];
     } else if (!Array.isArray(coverImageUrl)) {
-      coverImageUrl = []
+      coverImageUrl = [];
     }
 
     return res.json({
       ...supplier,
-      coverImageUrl, // ✅ Always an array
+      coverImageUrl,
+      googleMapUrl: supplier.googleMapUrl ?? null,
       planTier: activeSubscription.plan,
       subscription: activeSubscription,
-    })
+      profileLimits,
+    });
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Failed to fetch supplier" })
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch supplier" });
   }
-}
-
+};
 
 export const getSupplierRfqEligibility = async (req, res) => {
   try {
-    const { slug } = req.params
+    const { slug } = req.params;
 
     const supplier = await prisma.supplierDirectory.findUnique({
       where: { slug },
       select: { id: true, status: true },
-    })
+    });
 
     if (!supplier || supplier.status !== "APPROVED") {
-      return res.status(404).json({ error: "Supplier not found" })
+      return res.status(404).json({ error: "Supplier not found" });
     }
 
-    const eligibility = await getRfqLeadsEligibilityForSupplier(supplier.id)
-    return res.json(eligibility)
+    const eligibility = await getRfqLeadsEligibilityForSupplier(supplier.id);
+    return res.json(eligibility);
   } catch (err) {
-    console.error("Supplier RFQ eligibility error:", err)
-    return res.status(500).json({ error: "Failed to load RFQ eligibility" })
+    console.error("Supplier RFQ eligibility error:", err);
+    return res.status(500).json({ error: "Failed to load RFQ eligibility" });
   }
-}
-/**
- * ADMIN: Get all directories (for review & management)
- */
+};
+
 export const getAllDirectoriesForAdmin = async (req, res) => {
   try {
     const directories = await prisma.supplierDirectory.findMany({
@@ -648,50 +731,27 @@ export const getAllDirectoriesForAdmin = async (req, res) => {
           },
         },
       },
-    })
+    });
 
-    res.json(directories)
+    res.json(directories);
   } catch (err) {
-    console.error("Admin fetch directories error:", err)
-    res.status(500).json({ error: "Failed to fetch directories" })
+    console.error("Admin fetch directories error:", err);
+    res.status(500).json({ error: "Failed to fetch directories" });
   }
-}
+};
 
-/**
- * Track directory connection click
- */
 export const trackDirectoryConnection = async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
 
     await prisma.supplierDirectory.update({
       where: { id: Number(id) },
       data: { connections: { increment: 1 } },
-    })
+    });
 
-    res.json({ success: true })
+    res.json({ success: true });
   } catch (err) {
-    console.error("Track connection error:", err)
-    res.status(500).json({ error: "Failed to track connection" })
+    console.error("Track connection error:", err);
+    res.status(500).json({ error: "Failed to track connection" });
   }
-}
-/**
- * Resolves the company's active plan via getActiveSubscription() and applies
- * sanitizeSupplierDirectoryMedia(). Use this in the controller instead of
- * duplicating the plan lookup.
- */
-// export const assertAndSanitizeSupplierDirectoryMedia(companyId, { coverImages, socialLinks }) {
-//   if (!companyId) {
-//     const error = new Error("Link a company profile before submitting a supplier directory.");
-//     error.status = 403;
-//     error.code = "NO_COMPANY";
-//     throw error;
-//   }
-
-//   const activeSubscription = await getActiveSubscription(companyId, prisma);
-//   return sanitizeSupplierDirectoryMedia({
-//     plan: activeSubscription.plan,
-//     coverImages,
-//     socialLinks,
-//   });
-// }
+};

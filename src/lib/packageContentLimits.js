@@ -1,3 +1,5 @@
+// lib/packageContentLimits.js - FULL COMPLETE VERSION
+
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
 import { getActiveSubscription } from "./packagePurchases.js";
@@ -16,9 +18,6 @@ export const PLAN_PRODUCT_LISTING_LIMITS = {
   enterprise: null,
 };
 
-/* ==========================================================
-   NEW: Supplier Directory media permissions (cover images + WhatsApp)
-   ========================================================== */
 export const PLAN_COVER_IMAGE_LIMITS = {
   free: 0,
   basic: 1,
@@ -33,14 +32,17 @@ export const PLAN_WHATSAPP_ALLOWED = {
   enterprise: true,
 };
 
-/* ==========================================================
-   NEW: Team Profiles package limits.
-   Free -> 0, Basic -> 5, Professional -> 10, Enterprise -> Unlimited (null)
-   ========================================================== */
 export const PLAN_TEAM_MEMBER_LIMITS = {
   free: 0,
   basic: 5,
   professional: 10,
+  enterprise: null,
+};
+
+export const PLAN_PRODUCT_IMAGE_LIMITS = {
+  free: 10,
+  basic: 50,
+  professional: 100,
   enterprise: null,
 };
 
@@ -49,14 +51,15 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     descriptionLimit: 150,
     coverBanner: false,
     website: true,
-    googleMap: true,
+    googleMap: false,
     whatsapp: false,
+    contactDetails: "Limited",
 
     galleryImages: 0,
     factoryImages: 0,
+    productImages: 10,
     productCategories: 3,
     productListings: 5,
-    productImages: 10,
     productVideos: 0,
     productCatalogues: 0,
 
@@ -71,6 +74,7 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     machineryList: false,
     qualityStandards: false,
 
+    teamMembers: 0,
     inquiryForm: "Basic",
   },
 
@@ -80,12 +84,13 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     website: true,
     googleMap: true,
     whatsapp: true,
+    contactDetails: "Full",
 
     galleryImages: 10,
     factoryImages: 10,
+    productImages: 50,
     productCategories: 10,
     productListings: 25,
-    productImages: 50,
     productVideos: 5,
     productCatalogues: 2,
 
@@ -100,6 +105,7 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     machineryList: "Basic",
     qualityStandards: true,
 
+    teamMembers: 5,
     inquiryForm: "Standard",
   },
 
@@ -109,12 +115,13 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     website: true,
     googleMap: true,
     whatsapp: true,
+    contactDetails: "Full",
 
     galleryImages: 15,
     factoryImages: 30,
+    productImages: 100,
     productCategories: 30,
     productListings: 100,
-    productImages: 100,
     productVideos: 20,
     productCatalogues: 10,
 
@@ -129,6 +136,7 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     machineryList: "Detailed",
     qualityStandards: true,
 
+    teamMembers: 10,
     inquiryForm: "Advanced",
   },
 
@@ -138,12 +146,13 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     website: true,
     googleMap: true,
     whatsapp: true,
+    contactDetails: "Full",
 
     galleryImages: null,
     factoryImages: null,
+    productImages: null,
     productCategories: null,
     productListings: null,
-    productImages: null,
     productVideos: null,
     productCatalogues: null,
 
@@ -158,6 +167,7 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     machineryList: "Detailed with Images",
     qualityStandards: true,
 
+    teamMembers: null,
     inquiryForm: "Custom",
   },
 };
@@ -191,6 +201,12 @@ export function countProductListings(productSupplies) {
   }).length;
 }
 
+export function countWords(text) {
+  if (!text) return 0;
+  if (typeof text !== "string") return 0;
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+}
+
 export async function getCompanyDirectoryCount(companyId, prismaClient = prisma) {
   return prismaClient.supplierDirectory.count({
     where: {
@@ -205,16 +221,6 @@ export async function getCompanyDirectoryCount(companyId, prismaClient = prisma)
   });
 }
 
-/** @deprecated Use getCompanyDirectoryCount — package limit is per supplier directory */
-export async function getCompanyProductListingCount(companyId, prismaClient = prisma) {
-  return getCompanyDirectoryCount(companyId, prismaClient);
-}
-
-/* ==========================================================
-   NEW: Team member counting.
-   Only ACTIVE memberships count toward the plan limit —
-   PENDING and REJECTED are intentionally excluded.
-   ========================================================== */
 export async function getActiveTeamMemberCount(companyId, prismaClient = prisma) {
   return prismaClient.companyTeamMember.count({
     where: {
@@ -277,12 +283,6 @@ export async function getArticlePostingEligibility(companyId) {
   };
 }
 
-/**
- * ✅ EXTENDED: now also returns maxCoverImages + allowWhatsapp, computed from
- * the same `plan` this function already resolves via getActiveSubscription().
- * This lets the frontend reuse the ContentLimitEligibility object it already
- * fetches (fetchProductListingEligibility) instead of adding a new API call.
- */
 export async function getProductListingEligibility(companyId) {
   if (!companyId) {
     return {
@@ -319,7 +319,6 @@ export async function getProductListingEligibility(companyId) {
     remaining,
     isUnlimited,
     upgradeRequired: !canAdd,
-    // ---- NEW: supplier directory media permissions ----
     maxCoverImages: PLAN_COVER_IMAGE_LIMITS[plan] ?? PLAN_COVER_IMAGE_LIMITS.free,
     allowWhatsapp: PLAN_WHATSAPP_ALLOWED[plan] ?? false,
     message: canAdd
@@ -330,13 +329,6 @@ export async function getProductListingEligibility(companyId) {
   };
 }
 
-/**
- * NEW: Team Profiles eligibility.
- * Resolves the company's active subscription plan (Company.subscriptionPlan,
- * via getActiveSubscription — same source of truth used everywhere else in
- * this file), determines the plan's team member limit, and counts only
- * ACTIVE CompanyTeamMember rows for that company (PENDING/REJECTED excluded).
- */
 export async function getTeamMemberEligibility(companyId) {
   if (!companyId) {
     return {
@@ -379,11 +371,6 @@ export async function getTeamMemberEligibility(companyId) {
   };
 }
 
-/**
- * NEW: Throws a standardized error when the company's team member limit
- * has been reached. Use this in approveTeamMember before flipping a
- * membership to ACTIVE.
- */
 export async function assertCanAddTeamMember(companyId) {
   const eligibility = await getTeamMemberEligibility(companyId);
 
@@ -468,150 +455,233 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
+  // Description word limit
   if (
     eligibility.descriptionLimit !== null &&
-    data.companyDescription &&
-    data.companyDescription.length > eligibility.descriptionLimit
+    data.description &&
+    countWords(data.description) > eligibility.descriptionLimit
   ) {
     const error = new Error(
-      `Company description cannot exceed ${eligibility.descriptionLimit} characters.`
+      `Company description cannot exceed ${eligibility.descriptionLimit} words on the ${eligibility.planLabel} plan.`
     );
     error.status = 403;
     error.code = "DESCRIPTION_LIMIT_REACHED";
+    error.eligibility = eligibility;
     throw error;
   }
 
-  if (!eligibility.coverBanner && data.companyCoverImageUrl) {
+  // Google Map gating
+  if (!eligibility.googleMap && data.googleMapUrl) {
     const error = new Error(
-      "Company cover banner is available only on Basic plan and above."
+      "Google Map is not available on your current plan."
+    );
+    error.status = 403;
+    error.code = "GOOGLE_MAP_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Cover Banner - already handled by sanitizeSupplierDirectoryMedia
+  // but double-check here too
+  if (!eligibility.coverBanner && data.coverImages?.length > 0) {
+    const error = new Error(
+      "Cover images are not available on the Free plan. Upgrade to Basic or higher."
     );
     error.status = 403;
     error.code = "COVER_BANNER_NOT_ALLOWED";
+    error.eligibility = eligibility;
     throw error;
   }
 
-  if (!eligibility.whatsapp && data.companyWhatsapp) {
-    const error = new Error(
-      "WhatsApp button is available only on Basic plan and above."
-    );
-    error.status = 403;
-    error.code = "WHATSAPP_NOT_ALLOWED";
-    throw error;
-  }
+  // WhatsApp - handled by sanitizeSupplierDirectoryMedia
 
+  // Company Gallery limits
   if (
     eligibility.galleryImages !== null &&
     Array.isArray(data.companyGallery) &&
-    data.companyGallery.filter(Boolean).length >
-    eligibility.galleryImages
+    data.companyGallery.filter(Boolean).length > eligibility.galleryImages
   ) {
-    throw new Error(
-      `Only ${eligibility.galleryImages} company gallery images are allowed.`
+    const error = new Error(
+      `Only ${eligibility.galleryImages} company gallery images are allowed on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "COMPANY_GALLERY_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Factory Gallery limits
   if (
     eligibility.factoryImages !== null &&
     Array.isArray(data.factoryGallery) &&
-    data.factoryGallery.filter(Boolean).length >
-    eligibility.factoryImages
+    data.factoryGallery.filter(Boolean).length > eligibility.factoryImages
   ) {
-    throw new Error(
-      `Only ${eligibility.factoryImages} factory images are allowed.`
+    const error = new Error(
+      `Only ${eligibility.factoryImages} factory images are allowed on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "FACTORY_GALLERY_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Product Gallery limits
+  if (
+    eligibility.productImages !== null &&
+    Array.isArray(data.productGallery) &&
+    data.productGallery.filter(Boolean).length > eligibility.productImages
+  ) {
+    const error = new Error(
+      `Only ${eligibility.productImages} product images are allowed on the ${eligibility.planLabel} plan.`
+    );
+    error.status = 403;
+    error.code = "PRODUCT_IMAGE_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Product Videos limits
   if (
     eligibility.productVideos !== null &&
     Array.isArray(data.videoGallery) &&
-    data.videoGallery.filter(Boolean).length >
-    eligibility.productVideos
+    data.videoGallery.filter(Boolean).length > eligibility.productVideos
   ) {
-    throw new Error(
-      `Only ${eligibility.productVideos} product videos are allowed.`
+    const error = new Error(
+      `Only ${eligibility.productVideos} product videos are allowed on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "PRODUCT_VIDEO_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Product Catalogues limits
   if (
     eligibility.productCatalogues !== null &&
     Array.isArray(data.productCatalogues) &&
-    data.productCatalogues.filter(Boolean).length >
-    eligibility.productCatalogues
+    data.productCatalogues.filter(Boolean).length > eligibility.productCatalogues
   ) {
-    throw new Error(
-      `Only ${eligibility.productCatalogues} product catalogues are allowed.`
+    const error = new Error(
+      `Only ${eligibility.productCatalogues} product catalogues are allowed on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "PRODUCT_CATALOGUE_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Company Brochure
+  if (!eligibility.brochures && data.companyBrochure?.length > 0) {
+    const error = new Error(
+      "Company Brochure is not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "BROCHURE_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Certifications
+  if (!eligibility.certifications && data.certifications?.length > 0) {
+    const error = new Error(
+      "Certifications are not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "CERTIFICATIONS_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Brands Represented limits
   if (
     eligibility.brandsRepresented !== null &&
     Array.isArray(data.brandsRepresented) &&
-    data.brandsRepresented.filter(Boolean).length >
-    eligibility.brandsRepresented
+    data.brandsRepresented.filter(Boolean).length > eligibility.brandsRepresented
   ) {
-    throw new Error(
-      `Only ${eligibility.brandsRepresented} brands are allowed.`
+    const error = new Error(
+      `Only ${eligibility.brandsRepresented} brands can be represented on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "BRANDS_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Industries Served limits
   if (
     eligibility.industriesServed !== null &&
     Array.isArray(data.industriesServed) &&
-    data.industriesServed.filter(Boolean).length >
-    eligibility.industriesServed
+    data.industriesServed.filter(Boolean).length > eligibility.industriesServed
   ) {
-    throw new Error(
-      `Only ${eligibility.industriesServed} industries are allowed.`
+    const error = new Error(
+      `Only ${eligibility.industriesServed} industries can be served on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "INDUSTRIES_SERVED_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
 
+  // Export Markets - hide for free
+  if (!eligibility.exportMarkets && data.exportMarkets?.filter(Boolean).length > 0) {
+    const error = new Error(
+      "Export Markets are not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "EXPORT_MARKETS_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Manufacturing Capabilities
+  if (!eligibility.manufacturingCapabilities && data.manufacturingCapabilities) {
+    const error = new Error(
+      "Manufacturing Capabilities are not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "MANUFACTURING_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Machinery List
+  if (!eligibility.machineryList && data.machineryList) {
+    const error = new Error(
+      "Machinery List is not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "MACHINERY_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Quality Standards
+  if (!eligibility.qualityStandards && data.qualityStandards) {
+    const error = new Error(
+      "Quality Standards are not available on the Free plan."
+    );
+    error.status = 403;
+    error.code = "QUALITY_STANDARDS_NOT_ALLOWED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  // Team Members - handled by assertCanAddTeamMember separately
+  // but also check here for safety
   if (
-    !eligibility.exportMarkets &&
-    Array.isArray(data.exportMarkets) &&
-    data.exportMarkets.filter(Boolean).length
+    eligibility.teamMembers !== null &&
+    data.teamMembers &&
+    Array.isArray(data.teamMembers) &&
+    data.teamMembers.filter(Boolean).length > eligibility.teamMembers
   ) {
-    throw new Error(
-      "Export Markets are available only on Basic plan and above."
+    const error = new Error(
+      `Only ${eligibility.teamMembers} team members are allowed on the ${eligibility.planLabel} plan.`
     );
+    error.status = 403;
+    error.code = "TEAM_MEMBER_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
   }
-
-  if (
-    !eligibility.brochures &&
-    Array.isArray(data.companyBrochure) &&
-    data.companyBrochure.filter(Boolean).length
-  ) {
-    throw new Error(
-      "Company Brochure is available only on Basic plan and above."
-    );
-  }
-
-  if (
-    !eligibility.manufacturingCapabilities &&
-    data.manufacturingCapabilities
-  ) {
-    throw new Error(
-      "Manufacturing Capabilities are available only on Basic plan."
-    );
-  }
-
-  if (
-    !eligibility.machineryList &&
-    data.machineryList
-  ) {
-    throw new Error(
-      "Machinery List is available only on Basic plan."
-    );
-  }
-
-  if (
-    !eligibility.qualityStandards &&
-    data.qualityStandards
-  ) {
-    throw new Error(
-      "Quality Standards are available only on Basic plan."
-    );
-  }
-
 
   return eligibility;
 }
@@ -633,29 +703,11 @@ export function applyProductListingLimit(productSupplies, limit) {
   return filled.slice(0, limit);
 }
 
-/* ==========================================================
-   NEW: Supplier Directory media validation + sanitization.
-   Single source of truth used by createDirectory and
-   updateDirectory in suppliersController.js — never trust the
-   frontend, always re-derive the plan server-side.
-   ========================================================== */
-
-/**
- * Pure function: given a resolved plan + raw coverImages/socialLinks,
- * returns sanitized values or throws a validation error.
- * - FREE + non-empty coverImages -> throws (rejected, not silently dropped)
- * - paid plan exceeding its max -> throws with a clear message
- * - whatsapp is silently stripped from socialLinks when not allowed,
- *   per spec ("Remove WhatsApp from socialLinks before saving")
- * 
- * ✅ UPDATED: Handles both string (single URL) and array inputs
- */
 export function sanitizeSupplierDirectoryMedia({ plan, coverImages, socialLinks }) {
   const maxCoverImages = PLAN_COVER_IMAGE_LIMITS[plan] ?? PLAN_COVER_IMAGE_LIMITS.free;
   const allowWhatsapp = PLAN_WHATSAPP_ALLOWED[plan] ?? false;
   const planLabel = getPlanLabel(plan);
 
-  // ✅ Handle both string and array inputs
   let incomingCoverImages = [];
   if (Array.isArray(coverImages)) {
     incomingCoverImages = coverImages.filter((url) => typeof url === "string" && url.trim().length > 0);
@@ -688,16 +740,11 @@ export function sanitizeSupplierDirectoryMedia({ plan, coverImages, socialLinks 
   }
 
   return {
-    coverImages: incomingCoverImages, // Always returns an array
+    coverImages: incomingCoverImages,
     socialLinks: sanitizedSocialLinks,
   };
 }
 
-/**
- * Resolves the company's active plan via getActiveSubscription() and applies
- * sanitizeSupplierDirectoryMedia(). Use this in the controller instead of
- * duplicating the plan lookup.
- */
 export async function assertAndSanitizeSupplierDirectoryMedia(companyId, { coverImages, socialLinks }) {
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   return sanitizeSupplierDirectoryMedia({

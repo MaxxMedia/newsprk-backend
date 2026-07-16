@@ -11,6 +11,7 @@ import {
   trackDirectoryConnection,
   getProductListingEligibilityHandler,
   getSupplierRfqEligibility,
+  getCompanyProfileEligibilityHandler
 } from "../controllers/supplierDirectoryController.js"
 
 import { createQuoteRequest } from "../controllers/quoteController.js" // ✅ NEW
@@ -32,6 +33,11 @@ router.get(
   "/recruiter/product-listings/eligibility",
   requireAuth,
   getProductListingEligibilityHandler
+)
+router.get(
+  "/recruiter/company-profile/eligibility",
+  requireAuth,
+  getCompanyProfileEligibilityHandler
 )
 
 // Admin

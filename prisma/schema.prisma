@@ -471,6 +471,7 @@ model MagazineRegistration {
   @@index([magazineId])
 }
 
+
 model SupplierDirectory {
   id                                         Int                      @id @default(autoincrement())
   name                                       String
@@ -481,6 +482,7 @@ model SupplierDirectory {
   phoneNumber                                String?
   email                                      String?
   website                                    String?
+  googleMapUrl                               String?                  @db.Text  // ✅ CHANGE from String? to String? @db.Text
 
   logoUrl                                    String?
   coverImageUrl                              Json?
@@ -490,31 +492,25 @@ model SupplierDirectory {
   tradeNames                                 Json?
   socialLinks                                Json?
 
-  // EXISTING
   videoGallery                               Json?
   productSupplies                            Json?
 
-  // NEW GALLERIES
   productGallery                             Json?
   companyGallery                             Json?
   factoryGallery                             Json?
-  productCatalogues                          Json? 
+  productCatalogues                          Json?
 
-  // DOCUMENTS
   companyBrochure                            Json?
   certifications                             Json?
 
-  // LISTS
   brandsRepresented                          Json?
   industriesServed                           Json?
   exportMarkets                              Json?
 
-  // TEXT SECTIONS
   manufacturingCapabilities                  String?                  @db.LongText
   machineryList                              String?                  @db.LongText
   qualityStandards                           String?                  @db.LongText
 
-  // INQUIRY SETTINGS
   enableInquiryForm                          Boolean                  @default(true)
 
   status                                     SupplierDirectory_status @default(PENDING)
