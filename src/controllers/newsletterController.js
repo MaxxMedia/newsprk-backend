@@ -728,14 +728,14 @@ export async function sendTestCampaign(req, res) {
       });
     }
 
-    if (!process.env.RESEND_FROM_EMAIL) {
+    if (!process.env.MAIL_FROM) {
   throw new Error(
-    "RESEND_FROM_EMAIL is not configured in .env"
+    "MAIL_FROM is not configured in .env"
   );
 }
 
     await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL,
+      from: process.env.MAIL_FROM,
       to: email,
       subject: campaign.subject,
       html: campaign.content,
@@ -931,10 +931,10 @@ if (
 ) {
 
   console.log("Sending email to:", subscriber.email);
-  // console.log("Sender:", process.env.RESEND_FROM_EMAIL);
+  // console.log("Sender:", process.env.MAIL_FROM);
 
   const result = await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL,
+    from: process.env.MAIL_FROM,
     to: subscriber.email,
     subject: campaign.subject,
     html: campaign.content,
