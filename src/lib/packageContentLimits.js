@@ -1,23 +1,30 @@
 // lib/packageContentLimits.js - FULL COMPLETE VERSION
+// Every limit below is kept in sync with SUBSCRIPTION_FEATURES in lib/packages.ts.
+// If you change a number here, change the matching row in packages.ts too
+// (and vice versa) — they must always agree, since packages.ts is what
+// customers see before they buy, and this file is what actually enforces it.
 
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
 import { getActiveSubscription } from "./packagePurchases.js";
 
+// packages.ts: "Technical Articles" → free: false, basic: "4/year", professional: "12/year", enterprise: "Unlimited"
 export const PLAN_ARTICLE_LIMITS = {
   free: 0,
   basic: 4,
-  professional: null,
+  professional: 12, // ✅ FIX: was null (unlimited) — packages.ts advertises "12/year"
   enterprise: null,
 };
 
+// packages.ts: "Product Listings" → free: "5", basic: "25", professional: "100", enterprise: "Unlimited"
 export const PLAN_PRODUCT_LISTING_LIMITS = {
   free: 5,
   basic: 25,
-  professional: null,
+  professional: 100, // ✅ FIX: was null (unlimited) — packages.ts advertises "100"
   enterprise: null,
 };
 
+// packages.ts: "Cover Banner" → free: false, basic: "1", professional: "3", enterprise: "5"
 export const PLAN_COVER_IMAGE_LIMITS = {
   free: 0,
   basic: 1,
@@ -25,6 +32,7 @@ export const PLAN_COVER_IMAGE_LIMITS = {
   enterprise: 5,
 };
 
+// packages.ts: "WhatsApp Button" → free: false, basic: true, professional: true, enterprise: true
 export const PLAN_WHATSAPP_ALLOWED = {
   free: false,
   basic: true,
@@ -32,6 +40,7 @@ export const PLAN_WHATSAPP_ALLOWED = {
   enterprise: true,
 };
 
+// packages.ts: "Team Profiles" → free: false, basic: "5", professional: "10", enterprise: "Unlimited"
 export const PLAN_TEAM_MEMBER_LIMITS = {
   free: 0,
   basic: 5,
@@ -39,6 +48,7 @@ export const PLAN_TEAM_MEMBER_LIMITS = {
   enterprise: null,
 };
 
+// packages.ts: "Product Images" → free: "10", basic: "50", professional: "100", enterprise: "Unlimited"
 export const PLAN_PRODUCT_IMAGE_LIMITS = {
   free: 10,
   basic: 50,
@@ -48,37 +58,60 @@ export const PLAN_PRODUCT_IMAGE_LIMITS = {
 
 export const PLAN_COMPANY_PROFILE_LIMITS = {
   free: {
+    // packages.ts: "Company Description" → "150 Words"
     descriptionLimit: 150,
+    // packages.ts: "Cover Banner" → false
     coverBanner: false,
+    // packages.ts: "Website Link" → true
     website: true,
-    googleMap: false,
+    // packages.ts: "Google Map" → true (free tier gets it per packages.ts)
+    googleMap: true,
+    // packages.ts: "WhatsApp Button" → false
     whatsapp: false,
+    // packages.ts: "Contact Details" → "Limited"
     contactDetails: "Limited",
 
+    // packages.ts: "Company Gallery" → false
     galleryImages: 0,
+    // packages.ts: "Factory Images" → false
     factoryImages: 0,
+    // packages.ts: "Product Images" → "10"
     productImages: 10,
+    // packages.ts: "Product Categories" → "3"
     productCategories: 3,
+    // packages.ts: "Product Listings" → "5"
     productListings: 5,
+    // packages.ts: "Product Videos" → false
     productVideos: 0,
+    // packages.ts: "Product Catalogues (PDF)" → false
     productCatalogues: 0,
 
+    // packages.ts: "Company Brochure" → false
     brochures: false,
+    // packages.ts: "Certifications Display" → false
     certifications: false,
 
+    // packages.ts: "Brands Represented" → false
     brandsRepresented: 0,
+    // packages.ts: "Industries Served" → "5"
     industriesServed: 5,
+    // packages.ts: "Export Markets" → false
     exportMarkets: false,
 
+    // packages.ts: "Manufacturing Capabilities" → false
     manufacturingCapabilities: false,
+    // packages.ts: "Machinery List" → false
     machineryList: false,
+    // packages.ts: "Quality Standards" → false
     qualityStandards: false,
 
+    // packages.ts: "Team Profiles" → false
     teamMembers: 0,
     inquiryForm: "Basic",
   },
 
   basic: {
+    // "1000 Words"
     descriptionLimit: 1000,
     coverBanner: true,
     website: true,
@@ -86,30 +119,42 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     whatsapp: true,
     contactDetails: "Full",
 
+    // "10 Images"
     galleryImages: 10,
+    // "10"
     factoryImages: 10,
+    // "50"
     productImages: 50,
+    // "10"
     productCategories: 10,
+    // "25"
     productListings: 25,
+    // "5"
     productVideos: 5,
+    // "2"
     productCatalogues: 2,
 
     brochures: true,
     certifications: true,
 
+    // "10"
     brandsRepresented: 10,
+    // "20"
     industriesServed: 20,
     exportMarkets: true,
 
+    // "Basic"
     manufacturingCapabilities: "Basic",
     machineryList: "Basic",
     qualityStandards: true,
 
+    // "5"
     teamMembers: 5,
     inquiryForm: "Standard",
   },
 
   professional: {
+    // "2500 Words"
     descriptionLimit: 2500,
     coverBanner: true,
     website: true,
@@ -117,30 +162,43 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     whatsapp: true,
     contactDetails: "Full",
 
+    // "15 Images"
     galleryImages: 15,
+    // "30"
     factoryImages: 30,
+    // "100"
     productImages: 100,
+    // "30"
     productCategories: 30,
+    // "100"
     productListings: 100,
+    // "20"
     productVideos: 20,
+    // "10"
     productCatalogues: 10,
 
     brochures: true,
     certifications: true,
 
+    // "Unlimited"
     brandsRepresented: null,
+    // "Unlimited"
     industriesServed: null,
     exportMarkets: true,
 
+    // "Complete"
     manufacturingCapabilities: "Complete",
+    // "Detailed"
     machineryList: "Detailed",
     qualityStandards: true,
 
+    // "10"
     teamMembers: 10,
     inquiryForm: "Advanced",
   },
 
   enterprise: {
+    // "Unlimited"
     descriptionLimit: null,
     coverBanner: true,
     website: true,
@@ -148,6 +206,7 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     whatsapp: true,
     contactDetails: "Full",
 
+    // all "Unlimited" per packages.ts
     galleryImages: null,
     factoryImages: null,
     productImages: null,
@@ -163,10 +222,13 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     industriesServed: null,
     exportMarkets: true,
 
-    manufacturingCapabilities: "Complete + Photos + Video",
+    // "Complete + Photos+Video"
+    manufacturingCapabilities: "Complete + Photos+Video",
+    // "Detailed with Images"
     machineryList: "Detailed with Images",
     qualityStandards: true,
 
+    // "Unlimited"
     teamMembers: null,
     inquiryForm: "Custom",
   },

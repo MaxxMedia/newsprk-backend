@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import slugify from "slugify";
 import { filterJobsForPackageVisibility, enforceCompanyJobVisibility } from "../lib/jobVisibility.js";
+import { syncCompanySubscription } from "../lib/packagePurchases.js"; // ✅ NEW
 
 /**
  * Recruiter creates company
@@ -46,9 +47,35 @@ export async function createCompany(req, res) {
           isOnboarded: true,
         },
       });
+
+      // ✅ FIX (root cause #2): the recruiter may have paid for a plan
+      // BEFORE this Company existed (Package Selection happens before
+      // Onboarding in this app's flow). Those PackagePurchase rows were
+      // created with companyId: null. Backfill them now that we finally
+      // have a real companyId to attach.
+      await prisma.packagePurchase.updateMany({
+        where: {
+          userId: req.user.id,
+          companyId: null,
+          status: "PAID",
+        },
+        data: { companyId: company.id },
+      });
+
+      // ✅ FIX (root cause #2, continued): now that purchases are linked,
+      // sync Company.subscriptionPlan from them immediately. Without this,
+      // the Company row stays on its schema default ("free") forever,
+      // even though a PAID non-free PackagePurchase exists.
+      await syncCompanySubscription(company.id);
     }
 
-    res.json(company);
+    // ✅ return the post-sync company so the client gets the correct plan
+    // immediately, without needing a second round trip.
+    const finalCompany = await prisma.company.findUnique({
+      where: { id: company.id },
+    });
+
+    res.json(finalCompany);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Company creation failed" });
@@ -92,16 +119,47 @@ export async function getCompanyBySlug(req, res) {
   try {
     const { slug } = req.params;
 
-  const company = await prisma.company.findUnique({
-  where: { slug },
-  include: {
-    Job: {
+    const company = await prisma.company.findUnique({
+      where: { slug },
+      include: {
+        Job: {
+          where: {
+            isActive: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            location: true,
+            employmentType: true,
+            isRemote: true,
+            createdAt: true,
+          },
+        },
+        _count: {
+          select: {
+            CompanyFollower: true,
+          },
+        },
+      },
+    })
+
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" })
+    }
+
+    await enforceCompanyJobVisibility(company.id)
+
+    const activeJobs = await prisma.job.findMany({
       where: {
+        companyId: company.id,
         isActive: true,
+        isExternal: false,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         title: true,
@@ -110,49 +168,18 @@ export async function getCompanyBySlug(req, res) {
         employmentType: true,
         isRemote: true,
         createdAt: true,
+        companyId: true,
+        isExternal: true,
       },
-    },
-    _count: {
-      select: {
-        CompanyFollower: true,
-      },
-    },
-  },
-})
+    })
 
-if (!company) {
-  return res.status(404).json({ error: "Company not found" })
-}
+    const visibleJobs = await filterJobsForPackageVisibility(activeJobs)
 
-await enforceCompanyJobVisibility(company.id)
-
-const activeJobs = await prisma.job.findMany({
-  where: {
-    companyId: company.id,
-    isActive: true,
-    isExternal: false,
-  },
-  orderBy: { createdAt: "desc" },
-  select: {
-    id: true,
-    title: true,
-    slug: true,
-    location: true,
-    employmentType: true,
-    isRemote: true,
-    createdAt: true,
-    companyId: true,
-    isExternal: true,
-  },
-})
-
-const visibleJobs = await filterJobsForPackageVisibility(activeJobs)
-
-res.json({
-  ...company,
-  jobs: visibleJobs,
-  followers: company._count.CompanyFollower,
-})
+    res.json({
+      ...company,
+      jobs: visibleJobs,
+      followers: company._count.CompanyFollower,
+    })
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch company profile" });
@@ -243,9 +270,8 @@ export async function getCompanyPeople(req, res) {
 export async function followCompany(req, res) {
   try {
     const { companyId } = req.params;
-    const userId = req.user.id; // Use 'id' from your JWT token
+    const userId = req.user.id;
 
-    // Convert to numbers
     const companyIdNum = parseInt(companyId);
     const userIdNum = parseInt(userId);
 
@@ -272,9 +298,8 @@ export async function followCompany(req, res) {
 export async function unfollowCompany(req, res) {
   try {
     const { companyId } = req.params;
-    const userId = req.user.id; // Use 'id' from your JWT token
+    const userId = req.user.id;
 
-    // Convert to numbers
     const companyIdNum = parseInt(companyId);
     const userIdNum = parseInt(userId);
 
@@ -414,7 +439,6 @@ export const getCompanyTeam = async (req, res) => {
       total: team.length,
       data: team,
     });
-
   } catch (error) {
     console.error(error);
 
