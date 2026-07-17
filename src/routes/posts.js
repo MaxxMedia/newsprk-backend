@@ -18,13 +18,15 @@ const router = express.Router();
 /* ================= PUBLIC ROUTES ================= */
 router.get("/", getAllPosts);
 
-// ✅ SLUG ROUTES FIRST (VERY IMPORTANT)
+// Slug routes
 router.get("/slug/:slug", getPostBySlug);
 router.post("/slug/:slug/view", incrementPostView);
-router.post("/:slug/share", incrementPostShare)
+router.post("/:slug/share", incrementPostShare);
 
+// Article route
+router.get("/articles/:slug", getRecruiterArticleBySlug);
 
-// ❗ ID ROUTE AFTER slug routes
+// ID route LAST
 router.get("/:id", getPostById);
 
 router.get("/articles/:slug", getRecruiterArticleBySlug);

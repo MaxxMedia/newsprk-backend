@@ -124,10 +124,13 @@ model User {
 
   PackagePurchase                                         PackagePurchase[]
 
+  supplierClaimed                                         Boolean @default(false)
+
   // ===== Team =====
 
  teamMemberships                                         CompanyTeamMember[] @relation("TeamMemberUser")
-approvedTeamMembers                                      CompanyTeamMember[] @relation("TeamMemberApprovedBy")
+ approvedTeamMembers                                      CompanyTeamMember[] @relation("TeamMemberApprovedBy")
+ importBatches                                            ImportBatch[] @relation("ImportBatchCreatedBy")
   @@index([companyId], map: "User_companyId_fkey")
 }
 
@@ -187,9 +190,15 @@ model Company {
   NewsletterSubscriber NewsletterSubscriber[]
   teamMembers          CompanyTeamMember[]
   jobPostingCredits   Int                 @default(0)
+  isImported          Boolean @default(false)
+
+importBatchId         String?
+
+importedAt            DateTime?
   
 
   @@index([industryId], map: "Company_industryId_fkey")
+  @@index([isImported])
 }
 
 model CompanyTeamMember {
@@ -481,6 +490,24 @@ model SupplierDirectory {
 
   phoneNumber                                String?
   email                                      String?
+  // =========================
+// IMPORT / CLAIM
+// =========================
+  claimed                                   Boolean @default(false)
+
+importedEmail                               String?
+
+claimedAt                                   DateTime?
+
+importBatchId                               String?
+
+importSource                                String? @default("EXCEL")
+
+importedAt                                  DateTime?
+
+lastImportedAt                              DateTime?
+
+importNotes                                  String?
   website                                    String?
   googleMapUrl                               String?                  @db.Text  // ✅ CHANGE from String? to String? @db.Text
 
@@ -534,6 +561,61 @@ model SupplierDirectory {
   @@index([approvedById])
   @@index([companyId])
   @@index([submittedById])
+  @@index([claimed])
+  @@index([importedEmail])
+  @@index([importBatchId])
+}
+
+model ImportBatch {
+  id            Int      @id @default(autoincrement())
+
+  batchId       String   @unique
+
+  fileName      String?
+
+  totalRows     Int      @default(0)
+
+  validRows     Int      @default(0)
+
+  invalidRows   Int      @default(0)
+
+  importedRows  Int      @default(0)
+
+  failedRows    Int      @default(0)
+
+  status        ImportStatus @default(PREVIEW)
+
+  createdAt     DateTime @default(now())
+
+  importedAt    DateTime?
+
+  createdById   Int
+
+  createdBy User @relation("ImportBatchCreatedBy", fields: [createdById], references: [id])
+
+  rows ImportBatchRow[]
+
+  @@index([batchId])
+}
+
+model ImportBatchRow {
+  id          Int    @id @default(autoincrement())
+
+  batchId     String
+  batch       ImportBatch @relation(fields: [batchId], references: [batchId])
+
+  rowNumber   Int
+
+  companyName String?
+  email       String?
+  phone       String?
+  website     String?
+  description String?
+
+  status      ImportRowStatus
+  error       String?
+
+  createdAt   DateTime @default(now())
 }
 
 model NewsletterSubscriber {
@@ -805,6 +887,26 @@ enum TeamMemberStatus {
   ACTIVE
   REJECTED
   FORMER
+}
+
+enum ImportStatus {
+
+  PREVIEW
+
+  IMPORTING
+
+  COMPLETED
+
+  FAILED
+
+}
+enum ImportRowStatus {
+  READY
+  UPDATE
+  DUPLICATE
+  INVALID
+  IMPORTED
+  FAILED
 }
 
 model Lead {

@@ -1,6 +1,6 @@
 const SUBSCRIPTION_PLANS = {
   free: { name: "Free", price: 0, durationDays: null },
-  basic: { name: "Basic", price: 9999, durationDays: 365 },
+  basic: { name: "Basic", price: 1, durationDays: 365 },
   professional: { name: "Professional", price: 24999, durationDays: 365 },
   enterprise: { name: "Enterprise", price: 99999, durationDays: 365 },
 };

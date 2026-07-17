@@ -5,6 +5,7 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
 import { Resend } from "resend"
+import { autoClaimSupplier } from "../services/supplierClaimService.js"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const MAIL_FROM = process.env.MAIL_FROM
@@ -87,33 +88,44 @@ export const register = async (req, res) => {
 
 export const verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body
+    const { email, otp } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (!user || !user.otpHash)
-      return res.status(400).json({ error: "Invalid request" })
+      return res.status(400).json({ error: "Invalid request" });
 
     if (user.otpExpiry < new Date())
-      return res.status(400).json({ error: "OTP expired" })
+      return res.status(400).json({ error: "OTP expired" });
 
     if (hashValue(otp) !== user.otpHash)
-      return res.status(400).json({ error: "Invalid OTP" })
+      return res.status(400).json({ error: "Invalid OTP" });
 
-    await prisma.user.update({
+    const verifiedUser = await prisma.user.update({
       where: { email },
       data: {
         emailVerified: true,
         otpHash: null,
         otpExpiry: null,
       },
-    })
+    });
 
-    res.json({ message: "Email verified successfully" })
-  } catch {
-    res.status(500).json({ error: "Verification failed" })
+    // Only if you actually created this service
+    // await autoClaimSupplier(verifiedUser.id);
+
+    return res.json({
+      message: "Email verified successfully",
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Verification failed",
+    });
   }
-}
-
+};
 /* ================= RESEND OTP ================= */
 
 export const resendOtp = async (req, res) => {

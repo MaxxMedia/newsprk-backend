@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
+
+import supplierImportRoutes from "./routes/supplierImport.js";
 import postsRoutes from "./routes/posts.js";
 import authorsRoutes from "./routes/authors.js";
 import categoriesRoutes from "./routes/categories.js";
@@ -123,6 +125,7 @@ app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/suppliers", quoteRoutes);
 app.use("/api/admin", adminDirectoryRoutes);
+app.use("/api/admin/suppliers/import", supplierImportRoutes);
 app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/banners", bannerRoutes);

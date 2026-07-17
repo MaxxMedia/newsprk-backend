@@ -1,51 +1,63 @@
+import jwt from "jsonwebtoken";
 
-
-import jwt from "jsonwebtoken"
-
-const JWT_SECRET = process.env.JWT_SECRET || "changeme"
+const JWT_SECRET = process.env.JWT_SECRET || "changeme";
 
 export function requireAuth(req, res, next) {
   try {
-    const header = req.headers.authorization
-    if (!header) {
-      return res.status(401).json({ error: "Authorization header required" })
+    const authHeader = req.headers.authorization;
+
+    console.log("Authorization Header:", authHeader);
+
+    if (!authHeader) {
+      return res.status(401).json({
+        error: "Authorization header missing",
+      });
     }
 
-    const [type, token] = header.split(" ")
-    if (type !== "Bearer" || !token) {
-      return res.status(401).json({ error: "Invalid auth format" })
+    if (!authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Authorization format must be: Bearer <token>",
+      });
     }
 
-    const payload = jwt.verify(token, JWT_SECRET)
+    const token = authHeader.substring(7);
 
-    // ✅ MATCH JWT PAYLOAD
+    console.log("Token:", token);
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    console.log("Decoded JWT:", decoded);
+
     req.user = {
-      id: payload.id,                 // ⭐ FIX
-      role: payload.role?.toLowerCase(),
-      email: payload.email,
-      companyId: payload.companyId ?? null,
-    }
+      id: decoded.id,
+      role: decoded.role?.toLowerCase(),
+      email: decoded.email,
+      companyId: decoded.companyId ?? null,
+    };
 
-    console.log("DEBUG req.user =", req.user)
+    next();
+  } catch (err) {
+    console.error("JWT Error:", err.name, err.message);
 
-    next()
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" })
+    return res.status(401).json({
+      error: "Invalid or expired token",
+      message: err.message,
+    });
   }
 }
 
-
-
-
-
 export function requireAdmin(req, res, next) {
   if (!req.user) {
-    return res.status(401).json({ error: "Not authenticated" })
+    return res.status(401).json({
+      error: "Not authenticated",
+    });
   }
 
   if (req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin role required" })
+    return res.status(403).json({
+      error: "Admin role required",
+    });
   }
 
-  next()
+  next();
 }
