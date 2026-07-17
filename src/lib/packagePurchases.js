@@ -1,5 +1,24 @@
+// lib/packagePurchases.js — FULL FILE
+
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
+
+// ✅ NEW: explicit tier ranking. This is the single source of truth for
+// "which plan wins" when a company has more than one currently-active
+// PAID subscription purchase (e.g. bought Basic, later upgraded to
+// Professional or Enterprise — the old Basic row is still PAID and
+// still unexpired, so it must never be allowed to shadow the newer,
+// higher purchase just because of creation-date ordering).
+const PLAN_RANK = {
+  free: 0,
+  basic: 1,
+  professional: 2,
+  enterprise: 3,
+};
+
+function rankOf(planId) {
+  return PLAN_RANK[planId] ?? 0;
+}
 
 export function dedupeCompanyPurchases(purchases) {
   let seenFree = false;
@@ -18,7 +37,9 @@ export async function getActiveSubscription(companyId, prismaClient = prisma) {
     return { plan: "free", expiresAt: null, purchase: null };
   }
 
-  const paidSubscription = await prismaClient.packagePurchase.findFirst({
+  // ✅ FIX: fetch ALL currently-active (unexpired) PAID subscription
+  // purchases for this company, not just the most recently created one.
+  const activeSubscriptions = await prismaClient.packagePurchase.findMany({
     where: {
       companyId,
       packageType: "SUBSCRIPTION",
@@ -29,11 +50,19 @@ export async function getActiveSubscription(companyId, prismaClient = prisma) {
     orderBy: { createdAt: "desc" },
   });
 
-  if (paidSubscription) {
+  if (activeSubscriptions.length > 0) {
+    // ✅ FIX: pick the HIGHEST-TIER plan among all active purchases,
+    // never just the newest row. This is what makes "I bought
+    // Professional/Enterprise" win over a still-unexpired older Basic
+    // purchase, regardless of row order or creation timestamps.
+    const best = activeSubscriptions.reduce((top, current) =>
+      rankOf(current.packageId) > rankOf(top.packageId) ? current : top
+    );
+
     return {
-      plan: paidSubscription.packageId,
-      expiresAt: paidSubscription.expiresAt,
-      purchase: paidSubscription,
+      plan: best.packageId,
+      expiresAt: best.expiresAt,
+      purchase: best,
     };
   }
 

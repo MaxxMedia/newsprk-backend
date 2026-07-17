@@ -155,7 +155,16 @@ export const createDirectory = async (req, res) => {
       });
     }
 
-    // Safety: if googleMap not allowed, null it out
+    // Safety: if features not allowed by package, null them out
+    // ✅ FIX: Check for null (unlimited) or truthy values
+    const isFeatureAllowed = (value) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') return value.length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return !!value;
+    };
+
     const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
     const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
     const safeMachineryList = profileEligibility.machineryList ? machineryList : null;
@@ -415,6 +424,10 @@ export const updateDirectory = async (req, res) => {
 
     if (slug && slug !== directory.slug) return res.status(400).json({ error: "Slug cannot be changed" });
 
+    // Get active subscription to check plan
+    const activeSubscription = await getActiveSubscription(directory.companyId ?? user.companyId);
+    const plan = activeSubscription?.plan || "free";
+
     // Sanitize cover images and social links
     let sanitizedMedia;
     try {
@@ -471,7 +484,16 @@ export const updateDirectory = async (req, res) => {
       });
     }
 
-    // Safety: null out features not allowed by package
+    // ✅ FIX: Safety null out features not allowed by package
+    // Enterprise and Professional plans have null/truthy values for unlimited
+    const isFeatureAllowed = (value) => {
+      if (value === null || value === "Unlimited") return true;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') return value.length > 0 && value !== "false";
+      if (typeof value === 'number') return value > 0;
+      return !!value;
+    };
+
     const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
     const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
     const safeMachineryList = profileEligibility.machineryList ? machineryList : null;

@@ -1,3 +1,5 @@
+// controllers/paymentsController.js - FIXED VERSION
+
 import crypto from "crypto";
 import RazorpayPkg from "razorpay";
 import { prisma } from "../lib/prisma.js";
@@ -33,7 +35,12 @@ async function activatePackage(purchase) {
     expiresAt = addDays(now, purchase.durationDays);
   }
 
-    if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
+  // ✅ FIX: only try to touch Company if we actually have a companyId.
+  // (companyId may legitimately be null here if the recruiter bought a
+  // plan before completing onboarding — that gap is now closed by
+  // syncCompanySubscription() being called again from createCompany()
+  // once the Company row finally exists. See companyController.js.)
+  if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
     await prisma.company.update({
       where: { id: purchase.companyId },
       data: {
@@ -47,9 +54,6 @@ async function activatePackage(purchase) {
     const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
     await enforceCompanyJobVisibility(purchase.companyId);
   }
-
-  // Recruitment packages are monthly (30 days) and tracked on PackagePurchase.expiresAt.
-  // The base subscription plan (e.g. free) stays unchanged underneath.
 
   return { startsAt, expiresAt };
 }
@@ -94,6 +98,9 @@ export async function createPaymentOrder(req, res) {
       },
     });
 
+    // NOTE: user.companyId is very likely null here, because in this app's
+    // flow Package Selection happens BEFORE Onboarding creates the Company.
+    // That's fine now — see the backfill in companyController.js.
     const purchase = await prisma.packagePurchase.create({
       data: {
         userId: user.id,
@@ -168,6 +175,10 @@ export async function verifyPayment(req, res) {
       return res.json({ success: true, purchase });
     }
 
+    // ✅ FIX: always re-resolve companyId from the User at verify time,
+    // and persist it onto the purchase row even if it's still null
+    // (it may become non-null later, once onboarding creates the Company —
+    // the backfill in createCompany() will pick it up then).
     let companyId = purchase.companyId;
     if (!companyId) {
       const user = await prisma.user.findUnique({
@@ -204,6 +215,9 @@ export async function verifyPayment(req, res) {
     if (companyId) {
       await syncCompanySubscription(companyId);
     }
+
+    // NOTE: "packageSelected" is derived live (findFirst PAID purchase),
+    // there is no User column to write here — this is intentional.
 
     res.json({ success: true, purchase: updated });
   } catch (err) {
@@ -332,6 +346,19 @@ export async function getMyPackageInfo(req, res) {
 
     if (user.companyId) {
       await syncCompanySubscription(user.companyId);
+
+      // ✅ FIX: re-read the Company after sync so the response reflects
+      // the just-synced values instead of the pre-sync snapshot from
+      // the select above.
+      const freshCompany = await prisma.company.findUnique({
+        where: { id: user.companyId },
+        select: {
+          subscriptionPlan: true,
+          subscriptionExpiresAt: true,
+          jobPostingCredits: true,
+        },
+      });
+      user.Company = freshCompany;
     }
 
     const purchases = dedupeCompanyPurchases(
@@ -358,15 +385,15 @@ export async function getMyPackageInfo(req, res) {
     const subscription = user.Company
       ? await buildSubscriptionDisplay(user.Company, user.companyId, prisma)
       : {
-          plan: "free",
-          planLabel: "Free",
-          displayPlan: "free",
-          displayPlanLabel: "Free",
-          recruitmentExpiresAt: null,
-          expiresAt: null,
-          jobPostingCredits: 0,
-          basePlanLabel: "Free",
-        };
+        plan: "free",
+        planLabel: "Free",
+        displayPlan: "free",
+        displayPlanLabel: "Free",
+        recruitmentExpiresAt: null,
+        expiresAt: null,
+        jobPostingCredits: 0,
+        basePlanLabel: "Free",
+      };
 
     res.json({
       subscription,

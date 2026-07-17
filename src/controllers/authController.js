@@ -64,17 +64,16 @@ export const register = async (req, res) => {
     })
 
     await resend.emails.send({
-  from: `MoldMaking Technology <${MAIL_FROM}>`,
-  to: email,
-  subject: "Verify Your Email",
-  html: `
-    <h2>Email Verification</h2>
-    <p>Your OTP:</p>
-    <h1 style="letter-spacing:4px">${otp}</h1>
-    <p>Expires in 10 minutes.</p>
-  `,
-})
-
+      from: `MoldMaking Technology <${MAIL_FROM}>`,
+      to: email,
+      subject: "Verify Your Email",
+      html: `
+        <h2>Email Verification</h2>
+        <p>Your OTP:</p>
+        <h1 style="letter-spacing:4px">${otp}</h1>
+        <p>Expires in 10 minutes.</p>
+      `,
+    })
 
     res.status(201).json({ message: "OTP sent to email" })
   } catch (err) {
@@ -155,7 +154,12 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        Company: true,
+      },
+    })
     if (!user)
       return res.status(401).json({ error: "Invalid credentials" })
 
@@ -207,6 +211,19 @@ export const login = async (req, res) => {
       { expiresIn: "7d" }
     )
 
+    // ✅ Check if user has ANY PAID package purchase
+    const packagePurchase = await prisma.packagePurchase.findFirst({
+      where: {
+        userId: user.id,
+        status: "PAID",
+      },
+    })
+
+    const packageSelected = !!packagePurchase
+
+    // ✅ Get the actual subscription plan from Company (source of truth)
+    const subscriptionPlan = user.Company?.subscriptionPlan || "free"
+
     res.json({
       token,
       user: {
@@ -214,12 +231,51 @@ export const login = async (req, res) => {
         email: user.email,
         role: user.role,
         username: user.username,
-        isOnboarded: user.isOnboarded,
+        isOnboarded: user.isOnboarded || false,
         companyId: user.companyId ?? null,
+        packageSelected: packageSelected,
+        subscriptionPlan: subscriptionPlan,
       },
     })
-  } catch {
+  } catch (error) {
+    console.error("Login error:", error)
     res.status(500).json({ error: "Login failed" })
+  }
+}
+
+/* ================= ME (live refresh, no re-login needed) ================= */
+/*
+  ✅ NEW: this endpoint is the fix for stale localStorage.
+  The frontend calls this right after payment success, right after
+  onboarding/company-creation, and on every protected-route mount,
+  so packageSelected / subscriptionPlan are never stale.
+*/
+export const me = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { Company: true },
+    })
+
+    if (!user) return res.status(404).json({ error: "User not found" })
+
+    const packagePurchase = await prisma.packagePurchase.findFirst({
+      where: { userId: user.id, status: "PAID" },
+    })
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      username: user.username,
+      isOnboarded: user.isOnboarded || false,
+      companyId: user.companyId ?? null,
+      packageSelected: !!packagePurchase,
+      subscriptionPlan: user.Company?.subscriptionPlan || "free",
+    })
+  } catch (err) {
+    console.error("Me endpoint error:", err)
+    res.status(500).json({ error: "Failed to load user" })
   }
 }
 
