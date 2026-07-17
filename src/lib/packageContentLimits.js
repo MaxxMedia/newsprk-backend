@@ -5,37 +5,18 @@ import { getPlanLabel } from "./packagePricing.js";
 import { getActiveSubscription } from "./packagePurchases.js";
 
 /*
-  ✅ ROOT-CAUSE FIX
-
-  Every limit map below uses `null` to mean "unlimited" for that plan.
-  The old code resolved a plan's limit like this:
-
-      const limit = PLAN_X_LIMITS[plan] ?? PLAN_X_LIMITS.free;
-
-  `??` (nullish coalescing) treats `null` as "value is missing" and
-  falls through to the right-hand side. So whenever a plan's limit was
-  intentionally `null` (unlimited), this line silently replaced it with
-  the FREE plan's limit before any unlimited-check ever ran — which is
-  exactly why Professional/Enterprise "unlimited" fields behaved like
-  Free.
-
-  Fix: resolve limits with explicit key lookup (`plan in MAP`), which
-  only falls back to Free when the plan key genuinely doesn't exist in
-  the map at all — never when the value is intentionally `null`.
-
-  Do NOT use Infinity as an "unlimited" sentinel instead of null:
-  JSON.stringify(Infinity) produces `null` on the wire anyway, so any
-  API response silently turns your Infinity back into null for the
-  frontend — with none of the isUnlimited handling that null-as-
-  sentinel actually gets in this file. null is the one correct,
-  intentional representation of "unlimited" here; keep it consistent
-  everywhere.
+  ✅ FIXED: Explicit plan lookup - NEVER use ?? with null values
+  The old code used `PLAN_X_LIMITS[plan] ?? PLAN_X_LIMITS.free` which 
+  treats `null` (unlimited) as "missing" and falls through to Free.
+  
+  FIX: Use explicit key lookup that only falls back when the plan key
+  doesn't exist at all, not when the value is intentionally null.
 */
 function resolvePlanLimit(limitsMap, plan) {
   return plan in limitsMap ? limitsMap[plan] : limitsMap.free;
 }
 
-// packages.ts: "Technical Articles" → free: false, basic: "4/year", professional: "12/year", enterprise: "Unlimited"
+// Plan limits with null = unlimited
 export const PLAN_ARTICLE_LIMITS = {
   free: 0,
   basic: 4,
@@ -43,7 +24,6 @@ export const PLAN_ARTICLE_LIMITS = {
   enterprise: null, // unlimited
 };
 
-// packages.ts: "Product Listings" → free: "5", basic: "25", professional: "100", enterprise: "Unlimited"
 export const PLAN_PRODUCT_LISTING_LIMITS = {
   free: 5,
   basic: 25,
@@ -51,7 +31,6 @@ export const PLAN_PRODUCT_LISTING_LIMITS = {
   enterprise: null, // unlimited
 };
 
-// packages.ts: "Cover Banner" → free: false, basic: "1", professional: "3", enterprise: "5"
 export const PLAN_COVER_IMAGE_LIMITS = {
   free: 0,
   basic: 1,
@@ -59,7 +38,6 @@ export const PLAN_COVER_IMAGE_LIMITS = {
   enterprise: 5,
 };
 
-// packages.ts: "WhatsApp Button" → free: false, basic: true, professional: true, enterprise: true
 export const PLAN_WHATSAPP_ALLOWED = {
   free: false,
   basic: true,
@@ -67,7 +45,6 @@ export const PLAN_WHATSAPP_ALLOWED = {
   enterprise: true,
 };
 
-// packages.ts: "Team Profiles" → free: false, basic: "5", professional: "10", enterprise: "Unlimited"
 export const PLAN_TEAM_MEMBER_LIMITS = {
   free: 0,
   basic: 5,
@@ -75,7 +52,6 @@ export const PLAN_TEAM_MEMBER_LIMITS = {
   enterprise: null, // unlimited
 };
 
-// packages.ts: "Product Images" → free: "10", basic: "50", professional: "100", enterprise: "Unlimited"
 export const PLAN_PRODUCT_IMAGE_LIMITS = {
   free: 10,
   basic: 50,
@@ -185,22 +161,22 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
     whatsapp: true,
     contactDetails: "Full",
 
-    galleryImages: null,
-    factoryImages: null,
-    productImages: null,
-    productCategories: null,
-    productListings: null,
-    productVideos: null,
-    productCatalogues: null,
+    galleryImages: null, // unlimited
+    factoryImages: null, // unlimited
+    productImages: null, // unlimited
+    productCategories: null, // unlimited
+    productListings: null, // unlimited
+    productVideos: null, // unlimited
+    productCatalogues: null, // unlimited
 
     brochures: true,
     certifications: true,
 
-    brandsRepresented: null,
-    industriesServed: null,
+    brandsRepresented: null, // unlimited
+    industriesServed: null, // unlimited
     exportMarkets: true,
 
-    manufacturingCapabilities: "Complete + Photos+Video",
+    manufacturingCapabilities: "Complete + Photos + Video",
     machineryList: "Detailed with Images",
     qualityStandards: true,
 
@@ -209,9 +185,49 @@ export const PLAN_COMPANY_PROFILE_LIMITS = {
   },
 };
 
+export const PLAN_HOMEPAGE_FEATURED_WINDOW = {
+  free: null,
+  basic: null,
+  professional: { limit: 1, windowDays: 30 },
+  enterprise: { limit: 1, windowDays: 7 },
+};
+
+export const PLAN_HOMEPAGE_FEATURED_ALLOWED = {
+  free: false,
+  basic: false,
+  professional: true,
+  enterprise: true,
+};
+
+export const PLAN_JOB_POSTING_LIMITS = {
+  free: 2,
+  basic: 20,
+  professional: null, // unlimited
+  enterprise: null, // unlimited
+};
+
+export const PLAN_INTERNSHIP_LIMITS = {
+  free: 0,
+  basic: 10,
+  professional: null,
+  enterprise: null,
+};
+
+export const PLAN_RESUME_DOWNLOAD_LIMITS = {
+  free: 0,
+  basic: 10,
+  professional: 20,
+  enterprise: null,
+};
+
 function getYearStart() {
   const now = new Date();
   return new Date(now.getFullYear(), 0, 1);
+}
+
+function getWindowStart(windowDays) {
+  const now = new Date();
+  return new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
 }
 
 export function normalizeProductSupplies(productSupplies) {
@@ -267,6 +283,10 @@ export async function getActiveTeamMemberCount(companyId, prismaClient = prisma)
   });
 }
 
+// ============================================================================
+// ARTICLE POSTING ELIGIBILITY
+// ============================================================================
+
 export async function getArticlePostingEligibility(companyId) {
   if (!companyId) {
     return {
@@ -284,8 +304,7 @@ export async function getArticlePostingEligibility(companyId) {
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
 
-  // ✅ FIX: was `PLAN_ARTICLE_LIMITS[plan] ?? PLAN_ARTICLE_LIMITS.free`,
-  // which silently turned Enterprise's `null` (unlimited) into Free's `0`.
+  // ✅ FIX: explicit lookup
   const yearlyLimit = resolvePlanLimit(PLAN_ARTICLE_LIMITS, plan);
   const isUnlimited = yearlyLimit === null;
   const yearStart = getYearStart();
@@ -309,7 +328,7 @@ export async function getArticlePostingEligibility(companyId) {
     planLabel,
     articlesThisYear,
     effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
-    remaining,
+    remaining: isUnlimited ? "Unlimited" : remaining,
     isUnlimited,
     periodLabel: "this year",
     upgradeRequired: !canCreate,
@@ -322,6 +341,10 @@ export async function getArticlePostingEligibility(companyId) {
         : `Your ${planLabel} plan allows ${effectiveLimit} technical articles per year. You've used ${articlesThisYear} — upgrade to post more.`,
   };
 }
+
+// ============================================================================
+// PRODUCT LISTING ELIGIBILITY
+// ============================================================================
 
 export async function getProductListingEligibility(companyId) {
   if (!companyId) {
@@ -342,7 +365,7 @@ export async function getProductListingEligibility(companyId) {
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
 
-  // ✅ FIX: same `??` trap as above
+  // ✅ FIX: explicit lookup
   const baseLimit = resolvePlanLimit(PLAN_PRODUCT_LISTING_LIMITS, plan);
   const isUnlimited = baseLimit === null;
 
@@ -358,10 +381,10 @@ export async function getProductListingEligibility(companyId) {
     planLabel,
     activeListings,
     effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
-    remaining,
+    remaining: isUnlimited ? "Unlimited" : remaining,
     isUnlimited,
     upgradeRequired: !canAdd,
-    maxCoverImages: resolvePlanLimit(PLAN_COVER_IMAGE_LIMITS, plan), // ✅ FIX: consistent lookup, though this map has no nulls today
+    maxCoverImages: resolvePlanLimit(PLAN_COVER_IMAGE_LIMITS, plan),
     allowWhatsapp: plan in PLAN_WHATSAPP_ALLOWED ? PLAN_WHATSAPP_ALLOWED[plan] : false,
     message: canAdd
       ? isUnlimited
@@ -370,6 +393,10 @@ export async function getProductListingEligibility(companyId) {
       : `Your ${planLabel} plan allows ${effectiveLimit} supplier directories. You have ${activeListings} — upgrade to add more.`,
   };
 }
+
+// ============================================================================
+// TEAM MEMBER ELIGIBILITY
+// ============================================================================
 
 export async function getTeamMemberEligibility(companyId) {
   if (!companyId) {
@@ -388,8 +415,7 @@ export async function getTeamMemberEligibility(companyId) {
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
 
-  // ✅ FIX: same `??` trap — this is the exact bug behind
-  // "Enterprise team members shows like Free/Basic instead of unlimited"
+  // ✅ FIX: explicit lookup - this was the main bug!
   const baseLimit = resolvePlanLimit(PLAN_TEAM_MEMBER_LIMITS, plan);
   const isUnlimited = baseLimit === null;
 
@@ -405,7 +431,7 @@ export async function getTeamMemberEligibility(companyId) {
     planLabel,
     activeMembers,
     effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
-    remaining,
+    remaining: isUnlimited ? "Unlimited" : remaining,
     isUnlimited,
     upgradeRequired: !canAdd,
     message: canAdd
@@ -432,6 +458,10 @@ export async function assertCanAddTeamMember(companyId) {
   return eligibility;
 }
 
+// ============================================================================
+// COMPANY PROFILE ELIGIBILITY
+// ============================================================================
+
 export async function getCompanyProfileEligibility(companyId) {
   if (!companyId) {
     return {
@@ -445,11 +475,11 @@ export async function getCompanyProfileEligibility(companyId) {
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
 
-  // Note: this map's values are objects, never `null` themselves, so
-  // `??` here is safe — only truly-missing plan keys fall back to Free.
+  // ✅ FIX: explicit lookup
   const limits =
-    PLAN_COMPANY_PROFILE_LIMITS[plan] ??
-    PLAN_COMPANY_PROFILE_LIMITS.free;
+    plan in PLAN_COMPANY_PROFILE_LIMITS
+      ? PLAN_COMPANY_PROFILE_LIMITS[plan]
+      : PLAN_COMPANY_PROFILE_LIMITS.free;
 
   return {
     canEdit: true,
@@ -491,6 +521,10 @@ export async function assertProductListingCount(companyId, requestedCount) {
   return eligibility;
 }
 
+// ============================================================================
+// COMPANY PROFILE LIMITS ASSERTION
+// ============================================================================
+
 export async function assertCompanyProfileLimits(companyId, data) {
   const eligibility = await getCompanyProfileEligibility(companyId);
 
@@ -528,8 +562,7 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Cover Banner - already handled by sanitizeSupplierDirectoryMedia
-  // but double-check here too
+  // Cover Banner
   if (!eligibility.coverBanner && data.coverImages?.length > 0) {
     const error = new Error(
       "Cover images are not available on the Free plan. Upgrade to Basic or higher."
@@ -539,8 +572,6 @@ export async function assertCompanyProfileLimits(companyId, data) {
     error.eligibility = eligibility;
     throw error;
   }
-
-  // WhatsApp - handled by sanitizeSupplierDirectoryMedia
 
   // Company Gallery limits
   if (
@@ -669,7 +700,7 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Export Markets - hide for free
+  // Export Markets
   if (!eligibility.exportMarkets && data.exportMarkets?.filter(Boolean).length > 0) {
     const error = new Error(
       "Export Markets are not available on the Free plan."
@@ -713,8 +744,7 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Team Members - handled by assertCanAddTeamMember separately
-  // but also check here for safety
+  // Team Members
   if (
     eligibility.teamMembers !== null &&
     data.teamMembers &&
@@ -750,11 +780,15 @@ export function applyProductListingLimit(productSupplies, limit) {
   return filled.slice(0, limit);
 }
 
+// ============================================================================
+// MEDIA SANITIZATION
+// ============================================================================
+
 export function sanitizeSupplierDirectoryMedia({ plan, coverImages, socialLinks }) {
-  // ✅ FIX: consistent lookup (this map has no nulls today, but keeping
-  // the same resolver everywhere prevents this class of bug if it
-  // ever gets an "unlimited cover images" tier added later).
-  const maxCoverImages = resolvePlanLimit(PLAN_COVER_IMAGE_LIMITS, plan);
+  // ✅ FIX: explicit lookup
+  const maxCoverImages = plan in PLAN_COVER_IMAGE_LIMITS
+    ? PLAN_COVER_IMAGE_LIMITS[plan]
+    : PLAN_COVER_IMAGE_LIMITS.free;
   const allowWhatsapp = plan in PLAN_WHATSAPP_ALLOWED ? PLAN_WHATSAPP_ALLOWED[plan] : false;
   const planLabel = getPlanLabel(plan);
 
@@ -765,8 +799,6 @@ export function sanitizeSupplierDirectoryMedia({ plan, coverImages, socialLinks 
     incomingCoverImages = [coverImages];
   }
 
-  // maxCoverImages === null would mean "unlimited" if that map ever
-  // gains a null tier — guard against treating null as 0 here too.
   const isCoverUnlimited = maxCoverImages === null;
 
   if (!isCoverUnlimited && maxCoverImages === 0 && incomingCoverImages.length > 0) {
@@ -806,4 +838,168 @@ export async function assertAndSanitizeSupplierDirectoryMedia(companyId, { cover
     coverImages,
     socialLinks,
   });
+}
+
+// ============================================================================
+// HOMEPAGE FEATURED
+// ============================================================================
+
+export async function getHomepageFeaturedEligibility(companyId) {
+  if (!companyId) {
+    return {
+      canFeature: false,
+      reason: "NO_COMPANY",
+      message: "Link a company profile before requesting a homepage feature.",
+      upgradeRequired: false,
+    };
+  }
+
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
+  const planLabel = getPlanLabel(plan);
+
+  const allowed = plan in PLAN_HOMEPAGE_FEATURED_ALLOWED
+    ? PLAN_HOMEPAGE_FEATURED_ALLOWED[plan]
+    : false;
+
+  if (!allowed) {
+    return {
+      canFeature: false,
+      plan,
+      planLabel,
+      reason: "PLAN_NOT_ELIGIBLE",
+      message: "Homepage Featured is only available on Professional and Enterprise plans.",
+      upgradeRequired: true,
+    };
+  }
+
+  const { limit, windowDays } = PLAN_HOMEPAGE_FEATURED_WINDOW[plan];
+  const windowStart = getWindowStart(windowDays);
+  const periodLabel = windowDays === 7 ? "this week" : "this month";
+
+  const usedInWindow = await prisma.homepageFeature.count({
+    where: {
+      companyId,
+      status: "ACTIVE",
+      createdAt: { gte: windowStart },
+    },
+  });
+
+  const remaining = Math.max(0, limit - usedInWindow);
+  const canFeature = usedInWindow < limit;
+
+  return {
+    canFeature,
+    plan,
+    planLabel,
+    limit,
+    windowDays,
+    periodLabel,
+    usedInWindow,
+    remaining,
+    upgradeRequired: false,
+    message: canFeature
+      ? `You have ${remaining} Homepage Featured slot${remaining === 1 ? "" : "s"} available ${periodLabel} on the ${planLabel} plan.`
+      : `Your ${planLabel} plan allows ${limit} Homepage Featured slot ${periodLabel}. You've already used it — the next slot opens after the current ${windowDays === 7 ? "week" : "month"} window.`,
+  };
+}
+
+export async function assertCanRequestHomepageFeature(companyId) {
+  const eligibility = await getHomepageFeaturedEligibility(companyId);
+
+  if (!eligibility.canFeature) {
+    const error = new Error(eligibility.message);
+    error.status = 403;
+    error.code = "HOMEPAGE_FEATURED_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  return eligibility;
+}
+
+// ============================================================================
+// JOB POSTING ELIGIBILITY
+// ============================================================================
+
+export async function getActiveJobPostingCount(companyId, prismaClient = prisma) {
+  return prismaClient.job.count({
+    where: {
+      companyId,
+      isActive: true,
+      isExternal: false,
+    },
+  });
+}
+
+export async function getTotalApplicationCount(companyId, prismaClient = prisma) {
+  return prismaClient.jobApplication.count({
+    where: {
+      Job: { companyId },
+    },
+  });
+}
+
+export async function getJobPostingEligibility(companyId) {
+  if (!companyId) {
+    return {
+      canPost: false,
+      reason: "NO_COMPANY",
+      message: "Link a company profile before posting a job.",
+      upgradeRequired: false,
+      remaining: 0,
+      effectiveLimit: 0,
+      activeJobs: 0,
+      totalApplications: 0,
+      isUnlimited: false,
+    };
+  }
+
+  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const plan = activeSubscription.plan;
+  const planLabel = getPlanLabel(plan);
+
+  // ✅ FIX: explicit lookup
+  const baseLimit = resolvePlanLimit(PLAN_JOB_POSTING_LIMITS, plan);
+  const isUnlimited = baseLimit === null;
+
+  const [activeJobs, totalApplications] = await Promise.all([
+    getActiveJobPostingCount(companyId, prisma),
+    getTotalApplicationCount(companyId, prisma),
+  ]);
+
+  const effectiveLimit = isUnlimited ? null : baseLimit;
+  const remaining = isUnlimited ? null : Math.max(0, effectiveLimit - activeJobs);
+  const canPost = isUnlimited || activeJobs < effectiveLimit;
+
+  return {
+    canPost,
+    plan,
+    planLabel,
+    activeJobs,
+    totalApplications,
+    effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
+    remaining: isUnlimited ? "Unlimited" : remaining,
+    isUnlimited,
+    upgradeRequired: !canPost,
+    message: canPost
+      ? isUnlimited
+        ? `You can post unlimited active jobs on the ${planLabel} plan. You currently have ${activeJobs} active and ${totalApplications} total application${totalApplications === 1 ? "" : "s"}.`
+        : `${remaining} active job slot${remaining === 1 ? "" : "s"} remaining (${activeJobs} of ${effectiveLimit} used on ${planLabel}). ${totalApplications} total application${totalApplications === 1 ? "" : "s"} received.`
+      : `Your ${planLabel} plan allows ${effectiveLimit} active job postings. You have ${activeJobs} — close an existing posting or upgrade to add more.`,
+  };
+}
+
+export async function assertCanCreateJobPosting(companyId) {
+  const eligibility = await getJobPostingEligibility(companyId);
+
+  if (!eligibility.canPost) {
+    const error = new Error(eligibility.message);
+    error.status = 403;
+    error.code = "JOB_POSTING_LIMIT_REACHED";
+    error.eligibility = eligibility;
+    throw error;
+  }
+
+  return eligibility;
 }

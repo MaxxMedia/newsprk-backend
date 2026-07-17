@@ -1,3 +1,5 @@
+// lib/jobPostingLimits.js
+
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
 import { getActiveRecruitmentPackage, getActiveSubscription } from "./packagePurchases.js";
@@ -5,8 +7,8 @@ import { getActiveRecruitmentPackage, getActiveSubscription } from "./packagePur
 export const PLAN_JOB_LIMITS = {
   free: 2,
   basic: 20,
-  professional: null,
-  enterprise: null,
+  professional: null, // unlimited
+  enterprise: null, // unlimited
 };
 
 // 🔹 Internship Listings quota — separate pool from regular Job Postings.
@@ -14,11 +16,22 @@ export const PLAN_JOB_LIMITS = {
 export const PLAN_INTERNSHIP_LIMITS = {
   free: 0,
   basic: 10,
-  professional: null,
-  enterprise: null,
+  professional: null, // unlimited
+  enterprise: null, // unlimited
 };
 
 const INTERNSHIP_TYPE = "Internship";
+
+// ✅ Helper: Check if value is unlimited
+function isUnlimited(value) {
+  return value === null || value === "Unlimited" || value === Infinity;
+}
+
+// ✅ Helper: Get display value for limits
+function getDisplayValue(value) {
+  if (isUnlimited(value)) return "Unlimited";
+  return value;
+}
 
 /**
  * Shared eligibility calculator for both job postings and internship listings.
@@ -36,6 +49,10 @@ async function computeEligibility(companyId, postType) {
       reason: "NO_COMPANY",
       message: "Link a company profile before posting jobs.",
       upgradeRequired: false,
+      remaining: 0,
+      effectiveLimit: 0,
+      activeJobs: 0,
+      isUnlimited: false,
     };
   }
 
@@ -54,13 +71,19 @@ async function computeEligibility(companyId, postType) {
       reason: "NO_COMPANY",
       message: "Company not found.",
       upgradeRequired: false,
+      remaining: 0,
+      effectiveLimit: 0,
+      activeJobs: 0,
+      isUnlimited: false,
     };
   }
 
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
-  const baseLimit = limitsTable[plan] ?? limitsTable.free;
-  const isUnlimited = baseLimit === null;
+
+  // ✅ FIX: Use explicit lookup - this is the key fix!
+  const baseLimit = plan in limitsTable ? limitsTable[plan] : limitsTable.free;
+  const isUnlimitedLimit = isUnlimited(baseLimit);
 
   // Internship listings don't currently receive bonus slots from recruitment
   // packages (only job postings do), matching the packages table.
@@ -108,9 +131,22 @@ async function computeEligibility(companyId, postType) {
     };
   }
 
-  const effectiveLimit = isUnlimited ? null : baseLimit + recruitmentSlots;
-  const remaining = isUnlimited ? null : Math.max(0, effectiveLimit - totalJobs);
-  const canPost = isUnlimited || totalJobs < effectiveLimit;
+  // ✅ FIX: Calculate effective limit properly
+  let effectiveLimit;
+  let remaining;
+  let canPost;
+
+  if (isUnlimitedLimit) {
+    // ✅ For Professional and Enterprise: unlimited
+    effectiveLimit = "Unlimited";
+    remaining = "Unlimited";
+    canPost = true;
+  } else {
+    // ✅ For Free and Basic: limited
+    effectiveLimit = baseLimit + recruitmentSlots;
+    remaining = Math.max(0, effectiveLimit - totalJobs);
+    canPost = totalJobs < effectiveLimit;
+  }
 
   const planLabel = getPlanLabel(plan);
 
@@ -120,16 +156,16 @@ async function computeEligibility(companyId, postType) {
     planLabel,
     activeJobs: totalJobs,
     packageActiveJobs,
-    baseLimit: isUnlimited ? "Unlimited" : baseLimit,
+    baseLimit: isUnlimitedLimit ? "Unlimited" : baseLimit,
     recruitmentSlots,
     recruitmentExpiresAt: activeRecruitment?.expiresAt ?? null,
     recruitmentPackageName: activeRecruitment?.packageName ?? null,
-    effectiveLimit: isUnlimited ? "Unlimited" : effectiveLimit,
+    effectiveLimit,
     remaining,
-    isUnlimited,
+    isUnlimited: isUnlimitedLimit,
     upgradeRequired: !canPost,
     message: canPost
-      ? isUnlimited
+      ? isUnlimitedLimit
         ? `You can post unlimited ${noun}s on the ${planLabel} plan.`
         : activeRecruitment
           ? `${remaining} ${noun}${remaining === 1 ? "" : "s"} remaining (${totalJobs} of ${effectiveLimit} used). Recruitment package active until ${new Date(activeRecruitment.expiresAt).toLocaleDateString("en-IN")}.`
