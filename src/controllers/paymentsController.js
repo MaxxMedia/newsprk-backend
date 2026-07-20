@@ -46,7 +46,7 @@ async function activatePackage(purchase) {
   }
 
   if (purchase.companyId) {
-    const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
     await enforceCompanyJobVisibility(purchase.companyId);
   }
 
@@ -198,6 +198,15 @@ export async function verifyPayment(req, res) {
         expiresAt,
         companyId,
       },
+
+    });
+    await prisma.user.update({
+      where: {
+        id: purchase.userId,
+      },
+      data: {
+        packageSelected: true,
+      },
     });
 
     if (companyId) {
@@ -222,8 +231,10 @@ export async function activateFreePlan(req, res) {
       select: { id: true, companyId: true },
     });
 
-    if (!user?.companyId) {
-      return res.status(400).json({ error: "Link a company profile before choosing a plan" });
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+      });
     }
 
     const { getActiveSubscription } = await import("../lib/packagePurchases.js");
@@ -257,7 +268,7 @@ export async function activateFreePlan(req, res) {
         },
       });
 
-      const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+      // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
       await enforceCompanyJobVisibility(user.companyId);
 
       return res.json({
@@ -298,7 +309,45 @@ export async function activateFreePlan(req, res) {
       },
     });
 
+    // Mark package as selected
+    await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        packageSelected: true,
+      },
+    });
+
     const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
+    return res.json({
+      success: true,
+      purchase,
+      alreadyActive: false,
+    });
+
+    // ✅ Mark package as selected
+    await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        packageSelected: true,
+      },
+    });
+
+    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
+    res.json({
+      success: true,
+      purchase,
+      alreadyActive: false,
+    });
+
+    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
     await enforceCompanyJobVisibility(user.companyId);
 
     res.json({ success: true, purchase, alreadyActive: false });
