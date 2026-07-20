@@ -547,6 +547,20 @@ export async function createCampaign(req, res) {
       });
     }
 
+    // ✅ Get the count of active subscribers
+    let totalRecipients = 0;
+    try {
+      totalRecipients = await prisma.newsletterSubscriber.count({
+        where: {
+          status: "ACTIVE",
+          emailSubscribed: true,
+        },
+      });
+      console.log(`📊 Found ${totalRecipients} active subscribers for campaign`);
+    } catch (err) {
+      console.error("Error counting subscribers:", err);
+    }
+
     const campaign = await prisma.newsletterCampaign.create({
       data: {
         title,
@@ -560,6 +574,9 @@ export async function createCampaign(req, res) {
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         status,
         createdById: req.user.id,
+        // ✅ Set the recipient counts
+        totalRecipients: totalRecipients,
+        recipientsCount: totalRecipients,
       },
     });
 
@@ -570,7 +587,6 @@ export async function createCampaign(req, res) {
     });
   } catch (err) {
     console.error(err);
-
     res.status(500).json({
       success: false,
       error: "Unable to create campaign.",
@@ -608,6 +624,26 @@ export async function updateCampaign(req, res) {
       status,
     } = req.body;
 
+    // ✅ Recalculate recipients if status changes to SENT or SCHEDULED
+    let totalRecipients = exists.totalRecipients;
+    let recipientsCount = exists.recipientsCount;
+    
+    if (status === "SENT" || status === "SCHEDULED") {
+      try {
+        const subscriberCount = await prisma.newsletterSubscriber.count({
+          where: {
+            status: "ACTIVE",
+            emailSubscribed: true,
+          },
+        });
+        totalRecipients = subscriberCount;
+        recipientsCount = subscriberCount;
+        console.log(`📊 Updated recipients count: ${subscriberCount}`);
+      } catch (err) {
+        console.error("Error counting subscribers:", err);
+      }
+    }
+
     const campaign = await prisma.newsletterCampaign.update({
       where: {
         id,
@@ -623,6 +659,8 @@ export async function updateCampaign(req, res) {
         frequency,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         status,
+        totalRecipients,
+        recipientsCount,
       },
     });
 
@@ -639,7 +677,7 @@ export async function updateCampaign(req, res) {
       error: "Unable to update campaign.",
     });
   }
-}  
+}
 
 export async function scheduleCampaign(req, res) {
   try {
@@ -870,158 +908,159 @@ export async function deleteCampaign(req, res) {
   }
 }
 
+
+
 export async function sendCampaign(req, res) {
   try {
     const id = Number(req.params.id);
-
-    const campaign =
-      await prisma.newsletterCampaign.findUnique({
-        where: {
-          id,
-        },
-      });
+    const campaign = await prisma.newsletterCampaign.findUnique({
+      where: { id },
+    });
 
     if (!campaign) {
-      return res.status(404).json({
-        error: "Campaign not found.",
-      });
+      return res.status(404).json({ error: "Campaign not found." });
     }
 
     if (campaign.status === "SENT") {
-      return res.status(400).json({
-        error: "Campaign already sent.",
-      });
+      return res.status(400).json({ error: "Campaign already sent." });
     }
 
-    // Load active subscribers
-   const subscribers =
-  await prisma.newsletterSubscriber.findMany({
-    where: {
-      status: "ACTIVE",
-      emailSubscribed: true,
-    },
-  });
+    // Get active subscribers
+    const subscribers = await prisma.newsletterSubscriber.findMany({
+      where: {
+        status: "ACTIVE",
+        emailSubscribed: true,
+      },
+    });
 
     if (!subscribers.length) {
-      return res.status(400).json({
-        error: "No subscribers found.",
-      });
+      return res.status(400).json({ error: "No subscribers found." });
     }
 
+    console.log(`📊 Found ${subscribers.length} subscribers to send to`);
+
+    // ✅ Update campaign with subscriber count before sending
+    await prisma.newsletterCampaign.update({
+      where: { id: campaign.id },
+      data: {
+        totalRecipients: subscribers.length,
+        recipientsCount: subscribers.length,
+      },
+    });
+
+    // Fetch latest posts for dynamic content
+    const postsRes = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/posts?limit=6`,
+      { cache: "no-store" }
+    );
+    const postsData = await postsRes.json();
+    const posts = postsData.data || postsData;
+
     let emailCount = 0;
-    let whatsappCount = 0;
-    let smsCount = 0;
 
-   for (const subscriber of subscribers) {
+    for (const subscriber of subscribers) {
+      const recipient = await prisma.newsletterRecipient.create({
+        data: {
+          campaignId: campaign.id,
+          subscriberId: subscriber.id,
+          emailStatus: "PENDING",
+        },
+      });
 
-const recipient = await prisma.newsletterRecipient.create({
-  data: {
-    campaignId: campaign.id,
-    subscriberId: subscriber.id,
-    emailStatus: "PENDING",
-  },
-});
+      try {
+        if (campaign.emailEnabled && subscriber.emailSubscribed && subscriber.email) {
+          let htmlContent = campaign.content;
+          
+          if (htmlContent.includes('{{posts}}')) {
+            let postsHtml = '';
+            posts.slice(0, 6).forEach(post => {
+              const imageUrl = post.imageUrl?.startsWith("http")
+                ? post.imageUrl
+                : post.imageUrl
+                ? `${process.env.NEXT_PUBLIC_API_URL}${post.imageUrl}`
+                : "";
+              
+              postsHtml += `
+                <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+                  ${imageUrl ? `<img src="${imageUrl}" style="width:100%; max-height:200px; object-fit:cover; border-radius:4px;" />` : ''}
+                  <h2 style="font-size:20px; color:#121213; margin:10px 0;">
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL}/post/${post.slug}" style="color:#121213; text-decoration:none;">
+                      ${post.title}
+                    </a>
+                  </h2>
+                  <p style="color:#555;">${post.excerpt || 'Read more about the latest trends in precision manufacturing.'}</p>
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/post/${post.slug}" style="display:inline-block; background:#0073FF; color:white; padding:8px 16px; border-radius:4px; text-decoration:none;">
+                    Read Full Story →
+                  </a>
+                </div>
+              `;
+            });
+            htmlContent = htmlContent.replace('{{posts}}', postsHtml);
+          }
 
-  try {
+          await resend.emails.send({
+            from: process.env.MAIL_FROM,
+            to: subscriber.email,
+            subject: campaign.subject,
+            html: htmlContent,
+          });
 
-if (
-  campaign.emailEnabled &&
-  subscriber.emailSubscribed &&
-  subscriber.email
-) {
+          await prisma.newsletterRecipient.update({
+            where: { id: recipient.id },
+            data: {
+              emailStatus: "DELIVERED",
+              sentAt: new Date(),
+            },
+          });
 
-  console.log("Sending email to:", subscriber.email);
-  // console.log("Sender:", process.env.MAIL_FROM);
+          emailCount++;
+        }
+      } catch (err) {
+        console.error("Email Send Error:", err);
+        await prisma.newsletterRecipient.update({
+          where: { id: recipient.id },
+          data: { emailStatus: "FAILED" },
+        });
+      }
+    }
 
-  const result = await resend.emails.send({
-    from: process.env.MAIL_FROM,
-    to: subscriber.email,
-    subject: campaign.subject,
-    html: campaign.content,
-  });
+    // Update campaign stats after sending
+    const delivered = await prisma.newsletterRecipient.count({
+      where: {
+        campaignId: campaign.id,
+        emailStatus: "DELIVERED",
+      },
+    });
 
-  console.log("Resend Response:", result);
+    const failed = await prisma.newsletterRecipient.count({
+      where: {
+        campaignId: campaign.id,
+        emailStatus: "FAILED",
+      },
+    });
 
-  await prisma.newsletterRecipient.update({
-    where: {
-      id: recipient.id,
-    },
-    data: {
-      emailStatus: "DELIVERED",
-      sentAt: new Date(),
-    },
-  });
-
-  emailCount++;
-}
-
-} catch (err) {
-
-  console.error("Email Send Error:", err);
-
-  await prisma.newsletterRecipient.update({
-    where: {
-      id: recipient.id,
-    },
-    data: {
-      emailStatus: "FAILED",
-    },
-  });
-
-}
-
-}
-
-const delivered = await prisma.newsletterRecipient.count({
-  where: {
-    campaignId: campaign.id,
-    emailStatus: "DELIVERED",
-  },
-});
-
-const failed = await prisma.newsletterRecipient.count({
-  where: {
-    campaignId: campaign.id,
-    emailStatus: "FAILED",
-  },
-});
-
-await prisma.newsletterCampaign.update({
-  where: {
-    id: campaign.id,
-  },
-  data: {
-    totalRecipients: subscribers.length,
-    delivered,
-    failed,
-    status: "SENT",
-    sentAt: new Date(),
-  },
-});
+    await prisma.newsletterCampaign.update({
+      where: { id: campaign.id },
+      data: {
+        delivered,
+        failed,
+        status: "SENT",
+        sentAt: new Date(),
+      },
+    });
 
     res.json({
       success: true,
-
       totalRecipients: subscribers.length,
-
       emailRecipients: emailCount,
-
-      whatsappRecipients: whatsappCount,
-
-      smsRecipients: smsCount,
     });
   } catch (err) {
-
-  console.error("SEND CAMPAIGN ERROR");
-  console.error(err);
-
-  res.status(500).json({
-    success: false,
-    error: err.message,
-    stack: err.stack,
-  });
-
-}
+    console.error("SEND CAMPAIGN ERROR", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
 }
 /* ===========================
    ANALYTICS / DASHBOARD
@@ -1029,8 +1068,29 @@ await prisma.newsletterCampaign.update({
 
 export async function getAnalytics(req, res) {
   try {
-    // console.log("📊 getAnalytics called by user:", req.user?.id || 'unknown');
+    console.log("📊 getAnalytics called by user:", req.user?.id || 'unknown');
 
+    // Get all subscribers for detailed breakdown
+    const allSubscribers = await prisma.newsletterSubscriber.findMany({
+      where: {
+        status: "ACTIVE",
+      },
+    });
+
+    // Calculate channel breakdown
+    const emailSubscribers = allSubscribers.filter(s => s.emailSubscribed === true).length;
+    const whatsappSubscribers = allSubscribers.filter(s => s.whatsappSubscribed === true).length;
+    const smsSubscribers = allSubscribers.filter(s => s.smsSubscribed === true).length;
+
+    // Calculate source breakdown
+    const formSubscribers = allSubscribers.filter(s => s.source === "NEWSLETTER_FORM").length;
+    const companySubscribers = allSubscribers.filter(s => s.source === "COMPANY_PROFILE").length;
+    const adminSubscribers = allSubscribers.filter(s => s.source === "ADMIN").length;
+    const importSubscribers = allSubscribers.filter(s => s.source === "IMPORT").length;
+    const eventSubscribers = allSubscribers.filter(s => s.source === "EVENT").length;
+    const magazineSubscribers = allSubscribers.filter(s => s.source === "MAGAZINE").length;
+
+    // Get campaign counts
     const [
       totalSubscribers,
       activeSubscribers,
@@ -1067,6 +1127,17 @@ export async function getAnalytics(req, res) {
       draftCampaigns,
       scheduledCampaigns,
       sentCampaigns,
+      // Channel breakdown
+      emailSubscribers,
+      whatsappSubscribers,
+      smsSubscribers,
+      // Source breakdown
+      formSubscribers,
+      companySubscribers,
+      adminSubscribers,
+      importSubscribers,
+      eventSubscribers,
+      magazineSubscribers,
     };
 
     console.log("📊 Analytics result:", result);
