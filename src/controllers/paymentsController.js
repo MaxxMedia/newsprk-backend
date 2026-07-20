@@ -260,8 +260,54 @@ export async function activateFreePlan(req, res) {
         packageId: "free",
         status: "PAID",
       },
-      orderBy: {
-        createdAt: "desc",
+
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (existingFreePurchase) {
+      if (active.plan !== "free") {
+        return res.json({
+          success: true,
+          purchase: existingFreePurchase,
+          alreadyActive: true,
+          message: `Your company is on the ${getPlanLabel(active.plan)} plan.`,
+        });
+      }
+
+      await prisma.company.update({
+        where: { id: user.companyId },
+        data: {
+          subscriptionPlan: "free",
+          subscriptionExpiresAt: null,
+        },
+      });
+
+      // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+      await enforceCompanyJobVisibility(user.companyId);
+
+      return res.json({
+        success: true,
+        purchase: existingFreePurchase,
+        alreadyActive: true,
+        message: "Free plan is already active for your company.",
+      });
+    }
+
+    if (active.plan !== "free") {
+      return res.json({
+        success: true,
+        alreadyActive: true,
+        message: `Your company is on the ${getPlanLabel(active.plan)} plan. Free plan cannot replace a paid subscription.`,
+      });
+    }
+
+    await prisma.company.update({
+      where: { id: user.companyId },
+      data: {
+        subscriptionPlan: "free",
+        subscriptionExpiresAt: null,
+        jobPostingCredits: 0,
+
       },
     });
 
@@ -288,7 +334,8 @@ export async function activateFreePlan(req, res) {
       },
     });
 
-    // Mark package selected
+
+
     await prisma.user.update({
       where: {
         id: user.id,
@@ -298,12 +345,42 @@ export async function activateFreePlan(req, res) {
       },
     });
 
+
+    const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
     return res.json({
       success: true,
       purchase,
       alreadyActive: false,
+
       message: "Free package selected successfully.",
+    
     });
+
+    // ✅ Mark package as selected
+    await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        packageSelected: true,
+      },
+    });
+
+    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
+    res.json({
+      success: true,
+      purchase,
+      alreadyActive: false,
+    });
+
+    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
+    await enforceCompanyJobVisibility(user.companyId);
+
+    res.json({ success: true, purchase, alreadyActive: false });
   } catch (err) {
     console.error("Activate free plan error:", err);
 
