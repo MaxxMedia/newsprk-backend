@@ -97,6 +97,8 @@ model User {
   websiteUrl          String?
   isOnboarded         Boolean   @default(false)
   companyId           Int?
+  packageSelected     Boolean   @default(false)
+
 
   AdvertisementBanner AdvertisementBanner[]
   CompanyFollower     CompanyFollower[]
