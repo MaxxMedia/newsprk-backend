@@ -580,6 +580,52 @@ model NewsletterRecipient {
   @@index([campaignId])
   @@index([subscriberId])
 }
+model Lead {
+  id          Int         @id @default(autoincrement())
+  source      Lead_source
+  contactId   Int?
+  supplierId  Int?
+  userId      Int?
+  companyId   Int?
+  fullName    String
+  email       String
+  phoneNumber String?
+  website     String?
+  companyName String?
+  message     String      @db.Text
+  hasPackage  Boolean     @default(false)
+  planName    String?
+  status      LeadStatus  @default(NEW)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([contactId])
+  @@index([supplierId])
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([source])
+}
+model Package {
+  id            String   @id @default(cuid())
+  name          String
+  type          PackageType
+  price         Int
+  billingCycle  BillingCycle
+  description   String?
+  badge         String?
+  displayOrder  Int      @default(0)
+  isHighlighted Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  metadata      Json?    // For additional data like durationDays, features, etc.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([type])
+  @@index([isActive])
+  @@index([displayOrder])
+}
 
 model NewsletterTemplate {
   id          Int      @id @default(autoincrement())
@@ -609,6 +655,20 @@ enum AdvertisementBanner_placement {
   INDUSTRY_TALKS_RIGHT
   MAGAZINE_RIGHT
   Archive
+}
+
+enum PackageType {
+  SUBSCRIPTION
+  BANNER
+  SPONSORED
+  RECRUITMENT
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  ONE_TIME
 }
 
 enum AdvertisementBanner_status {
@@ -726,29 +786,4 @@ enum TeamMemberStatus {
   FORMER
 }
 
-model Lead {
-  id          Int         @id @default(autoincrement())
-  source      Lead_source
-  contactId   Int?
-  supplierId  Int?
-  userId      Int?
-  companyId   Int?
-  fullName    String
-  email       String
-  phoneNumber String?
-  website     String?
-  companyName String?
-  message     String      @db.Text
-  hasPackage  Boolean     @default(false)
-  planName    String?
-  status      LeadStatus  @default(NEW)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
 
-  @@index([contactId])
-  @@index([supplierId])
-  @@index([userId])
-  @@index([companyId])
-  @@index([status])
-  @@index([source])
-}
