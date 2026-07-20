@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Author {
@@ -28,7 +29,7 @@ model Post {
   slug                         String      @unique
   badge                        String?
   excerpt                      String?
-  content                      String      @db.LongText
+  content                      String      @db.Text
   imageUrl                     String?
   facebookUrl                  String?
   linkedinUrl                  String?
@@ -55,11 +56,11 @@ model Post {
   Company                      Company?    @relation(fields: [companyId], references: [id])
   User_Post_createdByIdToUser  User?       @relation("Post_createdByIdToUser", fields: [createdById], references: [id])
 
-  @@index([approvedById], map: "Post_approvedById_fkey")
-  @@index([authorId], map: "Post_authorId_fkey")
-  @@index([categoryId], map: "Post_categoryId_fkey")
-  @@index([companyId], map: "Post_companyId_fkey")
-  @@index([createdById], map: "Post_createdById_fkey")
+  @@index([approvedById])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([companyId])
+  @@index([createdById])
 }
 
 model Comment {
@@ -71,64 +72,63 @@ model Comment {
   createdAt DateTime @default(now())
   post      Post     @relation(fields: [postId], references: [id])
 
-  @@index([postId], map: "Comment_postId_fkey")
+  @@index([postId])
 }
 
 model User {
-  id                                                      Int                   @id @default(autoincrement())
-  email                                                   String                @unique
-  password                                                String
-  role                                                    String                @default("candidate")
-  emailVerified                                           Boolean               @default(false)
-  otpHash                                                 String?
-  otpExpiry                                               DateTime?
-  resetOtpHash                                            String?
-  resetOtpExpiry                                          DateTime?
-  failedLoginAttempts                                     Int                   @default(0)
-  lockUntil                                               DateTime?
-  createdAt                                               DateTime              @default(now())
-  username                                                String                @unique
-  fullName                                                String?
-  headline                                                String?
-  about                                                   String?               @db.LongText
-  location                                                String?
-  avatarUrl                                               String?
-  websiteUrl                                              String?
-  isOnboarded                                             Boolean               @default(false)
-  companyId                                               Int?
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  password            String
+  role                String    @default("candidate")
+  emailVerified       Boolean   @default(false)
+  otpHash             String?
+  otpExpiry           DateTime?
+  resetOtpHash        String?
+  resetOtpExpiry      DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockUntil           DateTime?
+  createdAt           DateTime  @default(now())
+  username            String    @unique
+  fullName            String?
+  headline            String?
+  about               String?   @db.Text
+  location            String?
+  avatarUrl           String?
+  websiteUrl          String?
+  isOnboarded         Boolean   @default(false)
+  companyId           Int?
 
-  AdvertisementBanner                                     AdvertisementBanner[]
-  CompanyFollower                                         CompanyFollower[]
+  AdvertisementBanner AdvertisementBanner[]
+  CompanyFollower     CompanyFollower[]
 
-  Event_Event_approvedByIdToUser                          Event[]               @relation("Event_approvedByIdToUser")
-  Event_Event_createdByIdToUser                           Event[]               @relation("Event_createdByIdToUser")
+  Event_Event_approvedByIdToUser Event[] @relation("Event_approvedByIdToUser")
+  Event_Event_createdByIdToUser  Event[] @relation("Event_createdByIdToUser")
 
-  Job                                                     Job[]
-  JobApplication                                          JobApplication[]
-  SavedJob                                                SavedJob[]
-  JobAlert                                                JobAlert[]
+  Job            Job[]
+  JobApplication JobApplication[]
+  SavedJob       SavedJob[]
+  JobAlert       JobAlert[]
 
-  Magazine                                                Magazine[]
+  Magazine Magazine[]
 
-  NewsletterSubscriber                                    NewsletterSubscriber[]
-  NewsletterCampaign                                      NewsletterCampaign[]
-  NewsletterTemplate                                      NewsletterTemplate[]
+  NewsletterSubscriber NewsletterSubscriber[]
+  NewsletterCampaign   NewsletterCampaign[]
+  NewsletterTemplate   NewsletterTemplate[]
 
-  Post_Post_approvedByIdToUser                            Post[]                @relation("Post_approvedByIdToUser")
-  Post_Post_createdByIdToUser                             Post[]                @relation("Post_createdByIdToUser")
+  Post_Post_approvedByIdToUser Post[] @relation("Post_approvedByIdToUser")
+  Post_Post_createdByIdToUser  Post[] @relation("Post_createdByIdToUser")
 
-  SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]   @relation("SupplierDirectory_approvedByIdToUser")
-  SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[]   @relation("SupplierDirectory_submittedByIdToUser")
+  SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[] @relation("SupplierDirectory_approvedByIdToUser")
+  SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[] @relation("SupplierDirectory_submittedByIdToUser")
 
-  Company                                                 Company?              @relation(fields: [companyId], references: [id])
+  Company Company? @relation(fields: [companyId], references: [id])
 
-  PackagePurchase                                         PackagePurchase[]
+  PackagePurchase PackagePurchase[]
 
-  // ===== Team =====
+  teamMemberships     CompanyTeamMember[] @relation("TeamMemberUser")
+  approvedTeamMembers CompanyTeamMember[] @relation("TeamMemberApprovedBy")
 
- teamMemberships                                         CompanyTeamMember[] @relation("TeamMemberUser")
-approvedTeamMembers                                      CompanyTeamMember[] @relation("TeamMemberApprovedBy")
-  @@index([companyId], map: "User_companyId_fkey")
+  @@index([companyId])
 }
 
 model AdvertisementBanner {
@@ -148,7 +148,7 @@ model AdvertisementBanner {
   updatedAt   DateTime
   User        User                          @relation(fields: [createdById], references: [id])
 
-  @@index([createdById], map: "AdvertisementBanner_createdById_fkey")
+  @@index([createdById])
 }
 
 model AuditLog {
@@ -161,68 +161,56 @@ model AuditLog {
 }
 
 model Company {
-  id                Int                 @id @default(autoincrement())
-  name              String
-  slug              String              @unique
-  tagline           String?
-  description       String?
-  location          String?
-  companySize       String?
-  website           String?
-  logoUrl           String?
-  coverImageUrl     String?
-  isVerified        Boolean             @default(false)
-  createdAt         DateTime            @default(now())
-  industryId        Int?
-  address           String?
-  Industry          Industry?           @relation(fields: [industryId], references: [id])
-  CompanyFollower   CompanyFollower[]
-  Job               Job[]
-  Post              Post[]
-  SupplierDirectory   SupplierDirectory[]
-  User                User[]
-  PackagePurchase     PackagePurchase[]
-  subscriptionPlan    String              @default("free")
+  id                    Int                    @id @default(autoincrement())
+  name                  String
+  slug                  String                 @unique
+  tagline               String?
+  description           String?
+  location              String?
+  companySize           String?
+  website               String?
+  logoUrl               String?
+  coverImageUrl         String?
+  isVerified            Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  industryId            Int?
+  address               String?
+  Industry              Industry?              @relation(fields: [industryId], references: [id])
+  CompanyFollower       CompanyFollower[]
+  Job                   Job[]
+  Post                  Post[]
+  SupplierDirectory     SupplierDirectory[]
+  User                  User[]
+  PackagePurchase       PackagePurchase[]
+  subscriptionPlan      String                 @default("free")
   subscriptionExpiresAt DateTime?
-  NewsletterSubscriber NewsletterSubscriber[]
-  teamMembers          CompanyTeamMember[]
-  jobPostingCredits   Int                 @default(0)
-  
+  NewsletterSubscriber  NewsletterSubscriber[]
+  teamMembers           CompanyTeamMember[]
+  jobPostingCredits     Int                    @default(0)
 
-  @@index([industryId], map: "Company_industryId_fkey")
+  @@index([industryId])
 }
 
 model CompanyTeamMember {
-  id               Int      @id @default(autoincrement())
-
-  companyId        Int
-  userId           Int
-
-  designation      String
-  department       String?
-  employmentType   String?
-
-  startDate        DateTime?
-  endDate          DateTime?
-
-  status           TeamMemberStatus @default(PENDING)
-
-  approvedById     Int?
-  approvedAt       DateTime?
-
-  rejectionReason  String?
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  user User @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
-
-  approvedBy User? @relation("TeamMemberApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  id              Int              @id @default(autoincrement())
+  companyId       Int
+  userId          Int
+  designation     String
+  department      String?
+  employmentType  String?
+  startDate       DateTime?
+  endDate         DateTime?
+  status          TeamMemberStatus @default(PENDING)
+  approvedById    Int?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User             @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  approvedBy      User?            @relation("TeamMemberApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([companyId, userId])
-
   @@index([companyId])
   @@index([userId])
   @@index([status])
@@ -263,7 +251,7 @@ model CompanyFollower {
   User      User     @relation(fields: [userId], references: [id])
 
   @@unique([companyId, userId])
-  @@index([userId], map: "CompanyFollower_userId_fkey")
+  @@index([userId])
 }
 
 model CoverStory {
@@ -273,7 +261,7 @@ model CoverStory {
   shortDescription String?
   keyCategories    Json?
   imageBrief       String?
-  fullDescription  String          @db.LongText
+  fullDescription  String          @db.Text
   badge            String?
   coverImageUrl    String?
   slugImageUrls    Json?
@@ -282,7 +270,7 @@ model CoverStory {
   MagazineAuthor   MagazineAuthor? @relation(fields: [authorId], references: [id])
   Magazine         Magazine[]
 
-  @@index([authorId], map: "CoverStory_authorId_fkey")
+  @@index([authorId])
 }
 
 model Event {
@@ -293,7 +281,7 @@ model Event {
   bannerUrl                     String?
   startDate                     DateTime
   endDate                       DateTime
-  description                   String              @db.LongText
+  description                   String              @db.Text
   websiteUrl                    String?
   registerUrl                   String?
   location                      String?
@@ -309,8 +297,8 @@ model Event {
   User_Event_createdByIdToUser  User                @relation("Event_createdByIdToUser", fields: [createdById], references: [id])
   EventRegistration             EventRegistration[]
 
-  @@index([approvedById], map: "Event_approvedById_fkey")
-  @@index([createdById], map: "Event_createdById_fkey")
+  @@index([approvedById])
+  @@index([createdById])
 }
 
 model EventRegistration {
@@ -328,7 +316,7 @@ model EventRegistration {
   attendeeType        String?
   ticketType          String?
   interests           Json?
-  specialRequirements String?  @db.LongText
+  specialRequirements String?  @db.Text
   status              String   @default("REGISTERED")
   createdAt           DateTime @default(now())
   Event               Event    @relation(fields: [eventId], references: [id])
@@ -353,7 +341,7 @@ model Job {
   id             Int              @id @default(autoincrement())
   title          String
   slug           String           @unique
-  description    String           @db.LongText
+  description    String           @db.Text
   employmentType String
   experience     String?
   salaryRange    String?
@@ -373,8 +361,8 @@ model Job {
   JobApplication JobApplication[]
   SavedJob       SavedJob[]
 
-  @@index([companyId], map: "Job_companyId_fkey")
-  @@index([postedById], map: "Job_postedById_fkey")
+  @@index([companyId])
+  @@index([postedById])
 }
 
 model SavedJob {
@@ -386,7 +374,7 @@ model SavedJob {
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, userId])
-  @@index([userId], map: "SavedJob_userId_fkey")
+  @@index([userId])
 }
 
 model JobAlert {
@@ -402,7 +390,7 @@ model JobAlert {
   updatedAt      DateTime @updatedAt
   User           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "JobAlert_userId_fkey")
+  @@index([userId])
 }
 
 model JobApplication {
@@ -417,14 +405,14 @@ model JobApplication {
   User      User     @relation(fields: [userId], references: [id])
 
   @@unique([jobId, userId])
-  @@index([userId], map: "JobApplication_userId_fkey")
+  @@index([userId])
 }
 
 model Magazine {
   id                   Int                    @id @default(autoincrement())
   title                String
   slug                 String                 @unique
-  description          String?                @db.LongText
+  description          String?                @db.Text
   coverImageUrl        String?
   pdfUrl               String
   flipbookPages        Json?
@@ -440,9 +428,9 @@ model Magazine {
   User                 User                   @relation(fields: [createdById], references: [id])
   MagazineRegistration MagazineRegistration[]
 
-  @@index([authorId], map: "Magazine_authorId_fkey")
-  @@index([coverStoryId], map: "Magazine_coverStoryId_fkey")
-  @@index([createdById], map: "Magazine_createdById_fkey")
+  @@index([authorId])
+  @@index([coverStoryId])
+  @@index([createdById])
 }
 
 model MagazineAuthor {
@@ -471,65 +459,51 @@ model MagazineRegistration {
   @@index([magazineId])
 }
 
-
 model SupplierDirectory {
   id                                         Int                      @id @default(autoincrement())
   name                                       String
   slug                                       String                   @unique
-
   companyId                                  Int?
-
   phoneNumber                                String?
   email                                      String?
   website                                    String?
-  googleMapUrl                               String?                  @db.Text  // ✅ CHANGE from String? to String? @db.Text
-
+  googleMapUrl                               String?                  @db.Text
   logoUrl                                    String?
   coverImageUrl                              Json?
-  
-  description                                String                   @db.LongText
-
+  description                                String                   @db.Text
   tradeNames                                 Json?
   socialLinks                                Json?
-
   videoGallery                               Json?
   productSupplies                            Json?
-
   productGallery                             Json?
   companyGallery                             Json?
   factoryGallery                             Json?
   productCatalogues                          Json?
-
   companyBrochure                            Json?
   certifications                             Json?
-
   brandsRepresented                          Json?
   industriesServed                           Json?
   exportMarkets                              Json?
-
-  manufacturingCapabilities                  String?                  @db.LongText
-  machineryList                              String?                  @db.LongText
-  qualityStandards                           String?                  @db.LongText
-
+  manufacturingCapabilities                  String?                  @db.Text
+  machineryList                              String?                  @db.Text
+  qualityStandards                           String?                  @db.Text
   enableInquiryForm                          Boolean                  @default(true)
-
   status                                     SupplierDirectory_status @default(PENDING)
   isLiveEditable                             Boolean                  @default(false)
-
   views                                      Int                      @default(0)
   connections                                Int                      @default(0)
-
   submittedById                              Int
   approvedById                               Int?
-
   createdAt                                  DateTime                 @default(now())
   approvedAt                                 DateTime?
-
   isFeatured                                 Boolean                  @default(false)
-
   User_SupplierDirectory_approvedByIdToUser  User?                    @relation("SupplierDirectory_approvedByIdToUser", fields: [approvedById], references: [id])
   Company                                    Company?                 @relation(fields: [companyId], references: [id])
   User_SupplierDirectory_submittedByIdToUser User                     @relation("SupplierDirectory_submittedByIdToUser", fields: [submittedById], references: [id])
+  
+  manufacturingCapabilityImages              Json?                    // NEW: Array of image URLs
+  manufacturingCapabilityVideos              Json?                    // NEW: Array of video URLs
+  machineryImages                            Json?                    // NEW: Array of image URLs
 
   @@index([approvedById])
   @@index([companyId])
@@ -537,33 +511,23 @@ model SupplierDirectory {
 }
 
 model NewsletterSubscriber {
-  id          Int      @id @default(autoincrement())
-
-  fullName    String?
-  email       String?  @unique
-  phoneNumber String?
-
-  companyName String?
-
-  userId      Int?
-  companyId   Int?
-
-  source NewsletterSubscriberSource
-
-  emailSubscribed     Boolean @default(true)
-  whatsappSubscribed  Boolean @default(false)
-  smsSubscribed       Boolean @default(false)
-
-  frequency NewsletterFrequency @default(MONTHLY)
-
-  status NewsletterStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  User User? @relation(fields: [userId], references: [id])
-  Company Company? @relation(fields: [companyId], references: [id])
-
+  id                  Int                        @id @default(autoincrement())
+  fullName            String?
+  email               String?                    @unique
+  phoneNumber         String?
+  companyName         String?
+  userId              Int?
+  companyId           Int?
+  source              NewsletterSubscriberSource
+  emailSubscribed     Boolean                    @default(true)
+  whatsappSubscribed  Boolean                    @default(false)
+  smsSubscribed       Boolean                    @default(false)
+  frequency           NewsletterFrequency        @default(MONTHLY)
+  status              NewsletterStatus           @default(ACTIVE)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  User                User?                      @relation(fields: [userId], references: [id])
+  Company             Company?                   @relation(fields: [companyId], references: [id])
   NewsletterRecipient NewsletterRecipient[]
 
   @@index([email])
@@ -573,105 +537,60 @@ model NewsletterSubscriber {
 }
 
 model NewsletterCampaign {
-
-  id Int @id @default(autoincrement())
-
-  title String
-
-  subject String
-
-  content String @db.LongText
-
-  coverImage String?
-
-  emailEnabled Boolean @default(true)
-
-  whatsappEnabled Boolean @default(false)
-
-  smsEnabled Boolean @default(false)
-
-  frequency NewsletterFrequency?
-
-  scheduledAt DateTime?
-
-  sentAt DateTime?
-
-  status CampaignStatus @default(DRAFT)
-
-  totalRecipients Int @default(0)
-
-  delivered Int @default(0)
-
-  opened Int @default(0)
-
-  clicked Int @default(0)
-
-  failed Int @default(0)
-
-  createdById Int
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  User User @relation(fields: [createdById], references: [id])
-
+  id                  Int                   @id @default(autoincrement())
+  title               String
+  subject             String
+  content             String                @db.Text
+  coverImage          String?
+  emailEnabled        Boolean               @default(true)
+  whatsappEnabled     Boolean               @default(false)
+  smsEnabled          Boolean               @default(false)
+  frequency           NewsletterFrequency?
+  scheduledAt         DateTime?
+  sentAt              DateTime?
+  status              CampaignStatus        @default(DRAFT)
+  totalRecipients     Int                   @default(0)
+  delivered           Int                   @default(0)
+  opened              Int                   @default(0)
+  clicked             Int                   @default(0)
+  failed              Int                   @default(0)
+  createdById         Int
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  User                User                  @relation(fields: [createdById], references: [id])
   NewsletterRecipient NewsletterRecipient[]
 
   @@index([status])
 }
 
 model NewsletterRecipient {
-
-  id Int @id @default(autoincrement())
-
-  campaignId Int
-
-  subscriberId Int
-
-  emailStatus DeliveryStatus @default(PENDING)
-
-  whatsappStatus DeliveryStatus @default(PENDING)
-
-  smsStatus DeliveryStatus @default(PENDING)
-
-  sentAt DateTime?
-
-  openedAt DateTime?
-
-  clickedAt DateTime?
-
-  NewsletterCampaign NewsletterCampaign @relation(fields:[campaignId], references:[id])
-
-  NewsletterSubscriber NewsletterSubscriber @relation(fields:[subscriberId], references:[id])
+  id                   Int                  @id @default(autoincrement())
+  campaignId           Int
+  subscriberId         Int
+  emailStatus          DeliveryStatus       @default(PENDING)
+  whatsappStatus       DeliveryStatus       @default(PENDING)
+  smsStatus            DeliveryStatus       @default(PENDING)
+  sentAt               DateTime?
+  openedAt             DateTime?
+  clickedAt            DateTime?
+  NewsletterCampaign   NewsletterCampaign   @relation(fields: [campaignId], references: [id])
+  NewsletterSubscriber NewsletterSubscriber @relation(fields: [subscriberId], references: [id])
 
   @@unique([campaignId, subscriberId])
-
   @@index([campaignId])
-
   @@index([subscriberId])
 }
 
 model NewsletterTemplate {
-
-  id Int @id @default(autoincrement())
-
-  name String
-
-  subject String
-
-  content String @db.LongText
-
+  id          Int      @id @default(autoincrement())
+  name        String
+  subject     String
+  content     String   @db.Text
   createdById Int
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  User User @relation(fields:[createdById], references:[id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  User        User     @relation(fields: [createdById], references: [id])
 }
-
-
 
 enum AdvertisementBanner_placement {
   HOME_TOP
@@ -734,13 +653,13 @@ enum PackagePurchase_status {
   FAILED
 }
 
-enum NewsletterStatus{
+enum NewsletterStatus {
   ACTIVE
   UNSUBSCRIBED
   BLOCKED
 }
 
-enum NewsletterSubscriberSource{
+enum NewsletterSubscriberSource {
   NEWSLETTER_FORM
   COMPANY_PROFILE
   ADMIN
@@ -749,7 +668,7 @@ enum NewsletterSubscriberSource{
   MAGAZINE
 }
 
-enum NewsletterFrequency{
+enum NewsletterFrequency {
   WEEKLY
   BIWEEKLY
   MONTHLY
@@ -760,7 +679,7 @@ enum NewsletterFrequency{
   CUSTOM
 }
 
-enum CampaignStatus{
+enum CampaignStatus {
   DRAFT
   SCHEDULED
   SENDING
@@ -768,7 +687,7 @@ enum CampaignStatus{
   FAILED
 }
 
-enum DeliveryStatus{
+enum DeliveryStatus {
   PENDING
   SENT
   DELIVERED
@@ -783,7 +702,7 @@ model ContactMessage {
   email       String
   phoneNumber String?
   website     String?
-  message     String   @db.LongText
+  message     String   @db.Text
   status      String   @default("NEW")
   createdAt   DateTime @default(now())
 }
@@ -810,25 +729,19 @@ enum TeamMemberStatus {
 model Lead {
   id          Int         @id @default(autoincrement())
   source      Lead_source
-
-  // Plain IDs only — intentionally NOT Prisma relations.
   contactId   Int?
   supplierId  Int?
   userId      Int?
   companyId   Int?
-
   fullName    String
   email       String
   phoneNumber String?
   website     String?
   companyName String?
-  message     String      @db.LongText
-
+  message     String      @db.Text
   hasPackage  Boolean     @default(false)
   planName    String?
-
   status      LeadStatus  @default(NEW)
-
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -838,5 +751,4 @@ model Lead {
   @@index([companyId])
   @@index([status])
   @@index([source])
-}  
-
+}
