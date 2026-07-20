@@ -500,6 +500,10 @@ model SupplierDirectory {
   User_SupplierDirectory_approvedByIdToUser  User?                    @relation("SupplierDirectory_approvedByIdToUser", fields: [approvedById], references: [id])
   Company                                    Company?                 @relation(fields: [companyId], references: [id])
   User_SupplierDirectory_submittedByIdToUser User                     @relation("SupplierDirectory_submittedByIdToUser", fields: [submittedById], references: [id])
+  
+  manufacturingCapabilityImages              Json?                    // NEW: Array of image URLs
+  manufacturingCapabilityVideos              Json?                    // NEW: Array of video URLs
+  machineryImages                            Json?                    // NEW: Array of image URLs
 
   @@index([approvedById])
   @@index([companyId])

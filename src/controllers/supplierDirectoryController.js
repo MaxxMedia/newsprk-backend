@@ -9,6 +9,8 @@ import {
   getProductListingEligibility,
   getCompanyProfileEligibility,
   countWords,
+  getManufacturingCapabilitiesConfig,
+  getMachineryListConfig,
 } from "../lib/packageContentLimits.js";
 import { getActiveSubscription } from "../lib/packagePurchases.js";
 import { getRfqLeadsEligibilityForSupplier } from "../lib/Leadlimits.js";
@@ -65,7 +67,10 @@ export const createDirectory = async (req, res) => {
       exportMarkets,
 
       manufacturingCapabilities,
+      manufacturingCapabilityImages,
+      manufacturingCapabilityVideos,
       machineryList,
+      machineryImages,
       qualityStandards,
 
       enableInquiryForm,
@@ -143,7 +148,10 @@ export const createDirectory = async (req, res) => {
         industriesServed,
         exportMarkets,
         manufacturingCapabilities,
+        manufacturingCapabilityImages,
+        manufacturingCapabilityVideos,
         machineryList,
+        machineryImages,
         qualityStandards,
         coverImages: sanitizedMedia.coverImages,
       });
@@ -155,8 +163,13 @@ export const createDirectory = async (req, res) => {
       });
     }
 
-    // Safety: if features not allowed by package, null them out
-    // ✅ FIX: Check for null (unlimited) or truthy values
+    // Get plan for configs
+    const activeSubscription = await getActiveSubscription(user.companyId);
+    const plan = activeSubscription.plan;
+    const mfgConfig = getManufacturingCapabilitiesConfig(plan);
+    const machineryConfig = getMachineryListConfig(plan);
+
+    // Safety: null out features not allowed by package
     const isFeatureAllowed = (value) => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'boolean') return value;
@@ -166,8 +179,11 @@ export const createDirectory = async (req, res) => {
     };
 
     const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
-    const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
-    const safeMachineryList = profileEligibility.machineryList ? machineryList : null;
+    const safeManufacturingCapabilities = mfgConfig.enabled ? manufacturingCapabilities : null;
+    const safeManufacturingCapabilityImages = mfgConfig.hasImages ? manufacturingCapabilityImages : null;
+    const safeManufacturingCapabilityVideos = mfgConfig.hasVideos ? manufacturingCapabilityVideos : null;
+    const safeMachineryList = machineryConfig.enabled ? machineryList : null;
+    const safeMachineryImages = machineryConfig.hasImages ? machineryImages : null;
     const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
     const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
 
@@ -205,7 +221,10 @@ export const createDirectory = async (req, res) => {
         industriesServed,
         exportMarkets: safeExportMarkets,
         manufacturingCapabilities: safeManufacturingCapabilities,
+        manufacturingCapabilityImages: safeManufacturingCapabilityImages,
+        manufacturingCapabilityVideos: safeManufacturingCapabilityVideos,
         machineryList: safeMachineryList,
+        machineryImages: safeMachineryImages,
         qualityStandards: safeQualityStandards,
         enableInquiryForm,
         socialLinks: sanitizedMedia.socialLinks,
@@ -283,6 +302,9 @@ export const getMyDirectoryById = async (req, res) => {
     res.json({
       ...directory,
       coverImageUrl,
+      manufacturingCapabilityImages: directory.manufacturingCapabilityImages || [],
+      manufacturingCapabilityVideos: directory.manufacturingCapabilityVideos || [],
+      machineryImages: directory.machineryImages || [],
     });
   } catch (err) {
     console.error("Get directory by id error:", err);
@@ -358,7 +380,10 @@ export const getMyDirectories = async (req, res) => {
         industriesServed: dir.industriesServed,
         exportMarkets: dir.exportMarkets,
         manufacturingCapabilities: dir.manufacturingCapabilities,
+        manufacturingCapabilityImages: dir.manufacturingCapabilityImages || [],
+        manufacturingCapabilityVideos: dir.manufacturingCapabilityVideos || [],
         machineryList: dir.machineryList,
+        machineryImages: dir.machineryImages || [],
         qualityStandards: dir.qualityStandards,
         enableInquiryForm: dir.enableInquiryForm,
         googleMapUrl: dir.googleMapUrl,
@@ -412,7 +437,10 @@ export const updateDirectory = async (req, res) => {
       exportMarkets,
 
       manufacturingCapabilities,
+      manufacturingCapabilityImages,
+      manufacturingCapabilityVideos,
       machineryList,
+      machineryImages,
       qualityStandards,
 
       enableInquiryForm,
@@ -471,7 +499,10 @@ export const updateDirectory = async (req, res) => {
           industriesServed,
           exportMarkets,
           manufacturingCapabilities,
+          manufacturingCapabilityImages,
+          manufacturingCapabilityVideos,
           machineryList,
+          machineryImages,
           qualityStandards,
           coverImages: sanitizedMedia.coverImages,
         }
@@ -484,8 +515,11 @@ export const updateDirectory = async (req, res) => {
       });
     }
 
-    // ✅ FIX: Safety null out features not allowed by package
-    // Enterprise and Professional plans have null/truthy values for unlimited
+    // Get configs
+    const mfgConfig = getManufacturingCapabilitiesConfig(plan);
+    const machineryConfig = getMachineryListConfig(plan);
+
+    // Safety: null out features not allowed by package
     const isFeatureAllowed = (value) => {
       if (value === null || value === "Unlimited") return true;
       if (typeof value === 'boolean') return value;
@@ -495,8 +529,11 @@ export const updateDirectory = async (req, res) => {
     };
 
     const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
-    const safeManufacturingCapabilities = profileEligibility.manufacturingCapabilities ? manufacturingCapabilities : null;
-    const safeMachineryList = profileEligibility.machineryList ? machineryList : null;
+    const safeManufacturingCapabilities = mfgConfig.enabled ? manufacturingCapabilities : null;
+    const safeManufacturingCapabilityImages = mfgConfig.hasImages ? manufacturingCapabilityImages : null;
+    const safeManufacturingCapabilityVideos = mfgConfig.hasVideos ? manufacturingCapabilityVideos : null;
+    const safeMachineryList = machineryConfig.enabled ? machineryList : null;
+    const safeMachineryImages = machineryConfig.hasImages ? machineryImages : null;
     const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
     const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
 
@@ -524,7 +561,10 @@ export const updateDirectory = async (req, res) => {
         industriesServed,
         exportMarkets: safeExportMarkets,
         manufacturingCapabilities: safeManufacturingCapabilities,
+        manufacturingCapabilityImages: safeManufacturingCapabilityImages,
+        manufacturingCapabilityVideos: safeManufacturingCapabilityVideos,
         machineryList: safeMachineryList,
+        machineryImages: safeMachineryImages,
         qualityStandards: safeQualityStandards,
         enableInquiryForm,
         productSupplies,
@@ -697,6 +737,9 @@ export const getSupplierBySlug = async (req, res) => {
       planTier: activeSubscription.plan,
       subscription: activeSubscription,
       profileLimits,
+      manufacturingCapabilityImages: supplier.manufacturingCapabilityImages || [],
+      manufacturingCapabilityVideos: supplier.manufacturingCapabilityVideos || [],
+      machineryImages: supplier.machineryImages || [],
     });
   } catch (err) {
     console.error(err);
