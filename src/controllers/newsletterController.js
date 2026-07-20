@@ -574,9 +574,8 @@ export async function createCampaign(req, res) {
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         status,
         createdById: req.user.id,
-        // ✅ Set the recipient counts
+        // ✅ Only use totalRecipients (remove recipientsCount)
         totalRecipients: totalRecipients,
-        recipientsCount: totalRecipients,
       },
     });
 
@@ -626,7 +625,6 @@ export async function updateCampaign(req, res) {
 
     // ✅ Recalculate recipients if status changes to SENT or SCHEDULED
     let totalRecipients = exists.totalRecipients;
-    let recipientsCount = exists.recipientsCount;
     
     if (status === "SENT" || status === "SCHEDULED") {
       try {
@@ -637,7 +635,6 @@ export async function updateCampaign(req, res) {
           },
         });
         totalRecipients = subscriberCount;
-        recipientsCount = subscriberCount;
         console.log(`📊 Updated recipients count: ${subscriberCount}`);
       } catch (err) {
         console.error("Error counting subscribers:", err);
@@ -659,8 +656,8 @@ export async function updateCampaign(req, res) {
         frequency,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         status,
+        // ✅ Only use totalRecipients
         totalRecipients,
-        recipientsCount,
       },
     });
 
@@ -908,8 +905,6 @@ export async function deleteCampaign(req, res) {
   }
 }
 
-
-
 export async function sendCampaign(req, res) {
   try {
     const id = Number(req.params.id);
@@ -939,12 +934,11 @@ export async function sendCampaign(req, res) {
 
     console.log(`📊 Found ${subscribers.length} subscribers to send to`);
 
-    // ✅ Update campaign with subscriber count before sending
+    // ✅ Update campaign with subscriber count before sending (only totalRecipients)
     await prisma.newsletterCampaign.update({
       where: { id: campaign.id },
       data: {
         totalRecipients: subscribers.length,
-        recipientsCount: subscribers.length,
       },
     });
 
@@ -1062,6 +1056,7 @@ export async function sendCampaign(req, res) {
     });
   }
 }
+
 /* ===========================
    ANALYTICS / DASHBOARD
 =========================== */
@@ -1151,6 +1146,7 @@ export async function getAnalytics(req, res) {
     });
   }
 }
+
 /* ===========================
    TEMPLATES
 =========================== */
