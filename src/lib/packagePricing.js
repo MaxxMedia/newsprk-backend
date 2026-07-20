@@ -8,7 +8,7 @@ const SUBSCRIPTION_PLANS = {
 const BANNER_PACKAGES = {
   "homepage-hero": {
     label: "Homepage Hero Banner",
-    monthly: 40000,
+    monthly: 40000, 
     quarterly: 108000,
     annual: 360000,
   },

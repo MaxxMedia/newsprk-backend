@@ -9,6 +9,7 @@ import {
   getProductListingEligibility,
   getCompanyProfileEligibility,
   assertCompanyProfileLimits,
+  getHomepageFeaturedEligibility,
 } from "../lib/packageContentLimits.js";
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"
@@ -296,6 +297,7 @@ export async function getRecruiterDashboard(req, res) {
       },
     })
 
+    // ✅ MAKE SURE ALL THESE VARIABLES ARE DEFINED
     const jobsCount = await prisma.job.count({
       where: {
         postedById: recruiterId,
@@ -320,59 +322,59 @@ export async function getRecruiterDashboard(req, res) {
       },
     })
 
-   const recentJobsRaw = await prisma.job.findMany({
-  where: {
-    postedById: recruiterId,
-    isActive: true,
-  },
-  orderBy: { createdAt: "desc" },
-  take: 5,
-  select: {
-    id: true,
-    title: true,
-    _count: {
-      select: {
-        JobApplication: true,
+    const recentJobsRaw = await prisma.job.findMany({
+      where: {
+        postedById: recruiterId,
+        isActive: true,
       },
-    },
-  },
-})
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        _count: {
+          select: {
+            JobApplication: true,
+          },
+        },
+      },
+    })
 
-const recentJobs = recentJobsRaw.map(job => ({
-  id: job.id,
-  title: job.title,
-  applications: job._count.JobApplication,
-}))
+    const recentJobs = recentJobsRaw.map(job => ({
+      id: job.id,
+      title: job.title,
+      applications: job._count.JobApplication,
+    }))
 
-const articles = await prisma.post.findMany({
-  where: {
-    category: {
-      slug: "articles",
-    },
-    ...(recruiter?.companyId
-      ? { companyId: recruiter.companyId }
-      : { createdById: recruiterId }),
-  },
-  orderBy: {
-    createdAt: "desc",
-  },
-  take: 5,
-  select: {
-    id: true,
-    title: true,
-    status: true,
-    createdAt: true,
-  },
-})
+    const articles = await prisma.post.findMany({
+      where: {
+        category: {
+          slug: "articles",
+        },
+        ...(recruiter?.companyId
+          ? { companyId: recruiter.companyId }
+          : { createdById: recruiterId }),
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+      },
+    })
 
     const directories = await prisma.supplierDirectory.findMany({
       where: recruiter?.companyId
         ? {
-            OR: [
-              { companyId: recruiter.companyId },
-              { submittedById: recruiterId },
-            ],
-          }
+          OR: [
+            { companyId: recruiter.companyId },
+            { submittedById: recruiterId },
+          ],
+        }
         : { submittedById: recruiterId },
       orderBy: { createdAt: "desc" },
       select: {
@@ -417,21 +419,28 @@ const articles = await prisma.post.findMany({
     const jobPosting = await getJobPostingEligibility(recruiter?.companyId ?? null)
     const articlePosting = await getArticlePostingEligibility(recruiter?.companyId ?? null)
     const productListings = await getProductListingEligibility(recruiter?.companyId ?? null)
+
+    // ✅ HOMEPAGE FEATURED - Added here
+    const homepageFeaturedAd = await getHomepageFeaturedEligibility(
+      recruiter?.companyId ?? null
+    )
+
     const analytics = await buildRecruiterAnalytics(recruiterId, recruiter?.companyId ?? null)
 
     const subscription = recruiter?.Company
       ? await buildSubscriptionDisplay(recruiter.Company, recruiter.companyId, prisma)
       : {
-          plan: "free",
-          planLabel: "Free",
-          displayPlan: "free",
-          displayPlanLabel: "Free",
-          recruitmentExpiresAt: null,
-          expiresAt: null,
-          jobPostingCredits: 0,
-          basePlanLabel: "Free",
-        }
+        plan: "free",
+        planLabel: "Free",
+        displayPlan: "free",
+        displayPlanLabel: "Free",
+        recruitmentExpiresAt: null,
+        expiresAt: null,
+        jobPostingCredits: 0,
+        basePlanLabel: "Free",
+      }
 
+    // ✅ MAKE SURE ALL VARIABLES ARE INCLUDED IN THE RESPONSE
     res.json({
       jobsCount,
       applicationsCount,
@@ -445,6 +454,7 @@ const articles = await prisma.post.findMany({
       jobPosting,
       articlePosting,
       productListings,
+      homepageFeaturedAd, // ✅ Added here
       analytics,
     })
   } catch (err) {
@@ -452,7 +462,6 @@ const articles = await prisma.post.findMany({
     res.status(500).json({ error: "Failed to load dashboard" })
   }
 }
-
 
 // ================= UPDATE RECRUITER PROFILE =================
 export async function updateRecruiterProfile(req, res) {
