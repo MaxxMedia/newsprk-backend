@@ -35,11 +35,6 @@ async function activatePackage(purchase) {
     expiresAt = addDays(now, purchase.durationDays);
   }
 
-  // ✅ FIX: only try to touch Company if we actually have a companyId.
-  // (companyId may legitimately be null here if the recruiter bought a
-  // plan before completing onboarding — that gap is now closed by
-  // syncCompanySubscription() being called again from createCompany()
-  // once the Company row finally exists. See companyController.js.)
   if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
     await prisma.company.update({
       where: { id: purchase.companyId },
@@ -65,7 +60,7 @@ export async function createPaymentOrder(req, res) {
     }
 
     const { packageType, packageId } = req.body;
-    const resolved = resolvePackage(packageType, packageId);
+    const resolved = await resolvePackage(packageType, packageId);
 
     if (!resolved) {
       return res.status(400).json({ error: "Invalid package" });
@@ -98,9 +93,6 @@ export async function createPaymentOrder(req, res) {
       },
     });
 
-    // NOTE: user.companyId is very likely null here, because in this app's
-    // flow Package Selection happens BEFORE Onboarding creates the Company.
-    // That's fine now — see the backfill in companyController.js.
     const purchase = await prisma.packagePurchase.create({
       data: {
         userId: user.id,
@@ -175,10 +167,6 @@ export async function verifyPayment(req, res) {
       return res.json({ success: true, purchase });
     }
 
-    // ✅ FIX: always re-resolve companyId from the User at verify time,
-    // and persist it onto the purchase row even if it's still null
-    // (it may become non-null later, once onboarding creates the Company —
-    // the backfill in createCompany() will pick it up then).
     let companyId = purchase.companyId;
     if (!companyId) {
       const user = await prisma.user.findUnique({
@@ -194,7 +182,7 @@ export async function verifyPayment(req, res) {
       }
     }
 
-    const resolved = resolvePackage(purchase.packageType, purchase.packageId);
+    const resolved = await resolvePackage(purchase.packageType, purchase.packageId);
     const { startsAt, expiresAt } = await activatePackage({
       ...purchase,
       companyId,
@@ -215,9 +203,6 @@ export async function verifyPayment(req, res) {
     if (companyId) {
       await syncCompanySubscription(companyId);
     }
-
-    // NOTE: "packageSelected" is derived live (findFirst PAID purchase),
-    // there is no User column to write here — this is intentional.
 
     res.json({ success: true, purchase: updated });
   } catch (err) {
@@ -347,9 +332,6 @@ export async function getMyPackageInfo(req, res) {
     if (user.companyId) {
       await syncCompanySubscription(user.companyId);
 
-      // ✅ FIX: re-read the Company after sync so the response reflects
-      // the just-synced values instead of the pre-sync snapshot from
-      // the select above.
       const freshCompany = await prisma.company.findUnique({
         where: { id: user.companyId },
         select: {

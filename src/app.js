@@ -41,7 +41,6 @@ import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
 import adminPackageRoutes from "./routes/adminPackageRoutes.js";
 
-
 /* ======================================================
    ✅ FIX: Proper .env loading
 ====================================================== */
@@ -124,26 +123,31 @@ app.use("/api/recruiter", recruiterDashboardRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/suppliers", quoteRoutes);
+
+// ✅ ADMIN ROUTES - ORDER MATTERS!
+// Mount adminPackageRoutes FIRST before other admin routes
+console.log("🔵 Mounting admin package routes...");
+app.use("/api/admin", adminPackageRoutes);
+console.log("✅ Admin package routes mounted at /api/admin");
+
+// Then other admin routes
 app.use("/api/admin", adminDirectoryRoutes);
-app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/admin", adminArticlesRoutes);
+app.use("/api/admin", adminUsersRoutes);
+app.use("/api/admin", adminAnalyticsRoutes);
+
 app.use("/api/banners", bannerRoutes);
 app.use("/api/banners", bannerUploadRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api", publicRoutes);
 app.use("/api/magazines", magazineRoutes);
-app.use("/api/admin", adminUsersRoutes);
 app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);
-app.use("/api/admin", adminAnalyticsRoutes);
 app.use("/api", adminIndustriesRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/quotes", quoteRoutes);
-app.use("/api/admin/package", adminPackageRoutes);
-
-
 
 /* ==========================
    🚀 Start Server
@@ -154,3 +158,14 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+console.log("📋 All routes registered:");
+console.log("  - /api/admin/packages");
+console.log("  - /api/admin/packages/:id");
+console.log("  - /api/admin/packages (POST)");
+console.log("  - /api/admin/packages/:id (PUT)");
+console.log("  - /api/admin/packages/:id (DELETE)");
+console.log("  - /api/admin/packages/:id/toggle");
+console.log("  - /api/admin/companies");
+console.log("  - /api/admin/companies/:id");
+console.log("  - /api/admin/stats");
