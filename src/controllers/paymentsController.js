@@ -183,11 +183,19 @@ export async function verifyPayment(req, res) {
     }
 
     const resolved = await resolvePackage(purchase.packageType, purchase.packageId);
-    const { startsAt, expiresAt } = await activatePackage({
-      ...purchase,
-      companyId,
-      durationDays: resolved?.durationDays ?? null,
-    });
+    let startsAt = new Date();
+    let expiresAt = null;
+
+    if (companyId) {
+      const result = await activatePackage({
+        ...purchase,
+        companyId,
+        durationDays: resolved?.durationDays ?? null,
+      });
+
+      startsAt = result.startsAt;
+      expiresAt = result.expiresAt;
+    }
 
     const updated = await prisma.packagePurchase.update({
       where: { id: purchase.id },
@@ -223,12 +231,19 @@ export async function verifyPayment(req, res) {
 export async function activateFreePlan(req, res) {
   try {
     if (!["recruiter", "admin"].includes(req.user.role)) {
-      return res.status(403).json({ error: "Only recruiters can activate plans" });
+      return res.status(403).json({
+        error: "Only recruiters can activate plans",
+      });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, companyId: true },
+      where: {
+        id: req.user.id,
+      },
+      select: {
+        id: true,
+        companyId: true,
+      },
     });
 
     if (!user) {
@@ -237,69 +252,33 @@ export async function activateFreePlan(req, res) {
       });
     }
 
-    const { getActiveSubscription } = await import("../lib/packagePurchases.js");
-    const active = await getActiveSubscription(user.companyId);
-
-    const existingFreePurchase = await prisma.packagePurchase.findFirst({
+    // Check if user already selected free package
+    const existingPurchase = await prisma.packagePurchase.findFirst({
       where: {
-        companyId: user.companyId,
+        userId: user.id,
         packageType: "SUBSCRIPTION",
         packageId: "free",
         status: "PAID",
       },
-      orderBy: { createdAt: "asc" },
-    });
-
-    if (existingFreePurchase) {
-      if (active.plan !== "free") {
-        return res.json({
-          success: true,
-          purchase: existingFreePurchase,
-          alreadyActive: true,
-          message: `Your company is on the ${getPlanLabel(active.plan)} plan.`,
-        });
-      }
-
-      await prisma.company.update({
-        where: { id: user.companyId },
-        data: {
-          subscriptionPlan: "free",
-          subscriptionExpiresAt: null,
-        },
-      });
-
-      // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
-      await enforceCompanyJobVisibility(user.companyId);
-
-      return res.json({
-        success: true,
-        purchase: existingFreePurchase,
-        alreadyActive: true,
-        message: "Free plan is already active for your company.",
-      });
-    }
-
-    if (active.plan !== "free") {
-      return res.json({
-        success: true,
-        alreadyActive: true,
-        message: `Your company is on the ${getPlanLabel(active.plan)} plan. Free plan cannot replace a paid subscription.`,
-      });
-    }
-
-    await prisma.company.update({
-      where: { id: user.companyId },
-      data: {
-        subscriptionPlan: "free",
-        subscriptionExpiresAt: null,
-        jobPostingCredits: 0,
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
+    if (existingPurchase) {
+      return res.json({
+        success: true,
+        purchase: existingPurchase,
+        alreadyActive: true,
+        message: "Free package already selected.",
+      });
+    }
+
+    // Create free package purchase
     const purchase = await prisma.packagePurchase.create({
       data: {
         userId: user.id,
-        companyId: user.companyId,
+        companyId: user.companyId, // null until onboarding
         packageType: "SUBSCRIPTION",
         packageId: "free",
         packageName: "Free Subscription",
@@ -309,7 +288,7 @@ export async function activateFreePlan(req, res) {
       },
     });
 
-    // Mark package as selected
+    // Mark package selected
     await prisma.user.update({
       where: {
         id: user.id,
@@ -318,42 +297,19 @@ export async function activateFreePlan(req, res) {
         packageSelected: true,
       },
     });
-
-    const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
-    await enforceCompanyJobVisibility(user.companyId);
 
     return res.json({
       success: true,
       purchase,
       alreadyActive: false,
+      message: "Free package selected successfully.",
     });
-
-    // ✅ Mark package as selected
-    await prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        packageSelected: true,
-      },
-    });
-
-    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
-    await enforceCompanyJobVisibility(user.companyId);
-
-    res.json({
-      success: true,
-      purchase,
-      alreadyActive: false,
-    });
-
-    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
-    await enforceCompanyJobVisibility(user.companyId);
-
-    res.json({ success: true, purchase, alreadyActive: false });
   } catch (err) {
     console.error("Activate free plan error:", err);
-    res.status(500).json({ error: "Failed to activate free plan" });
+
+    return res.status(500).json({
+      error: "Failed to activate free plan",
+    });
   }
 }
 
