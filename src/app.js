@@ -12,7 +12,7 @@ import authRoutes from "./routes/auth.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import jobsRoutes from "./routes/jobs.js";
 import companiesRoutes from "./routes/companies.js";
-import adminCompaniesRoutes from "./routes/adminCompanies.js";
+import adminCompaniesRoutes from "./routes/Admincompanies.js";
 import applicationsRoutes from "./routes/applications.js";
 import recruitersRoutes from "./routes/recruiters.js";
 import candidatesRoutes from "./routes/candidates.js";

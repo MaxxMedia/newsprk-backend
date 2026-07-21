@@ -227,11 +227,6 @@ export async function verifyPayment(req, res) {
     res.status(500).json({ error: "Payment verification failed" });
   }
 }
-// At the top of the file, add this import if the function exists
-// import { enforceCompanyJobVisibility } from "../lib/jobVisibility.js";
-
-// OR if the function doesn't exist yet, you can comment it out or create a placeholder
-
 export async function activateFreePlan(req, res) {
   try {
     if (!["recruiter", "admin"].includes(req.user.role)) {
