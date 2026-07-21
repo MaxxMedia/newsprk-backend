@@ -22,12 +22,22 @@ export async function createJob(req, res) {
     let companyId = null
     let companyName = null
     let isExternal = false
+    let companyPlan = null
+    let companyPlanExpiresAt = null
 
     // 🔹 Recruiter → Internal Job
     if (req.user.role === "recruiter") {
       const recruiter = await prisma.user.findUnique({
         where: { id: req.user.id },
-        select: { companyId: true },
+        select: {
+          companyId: true,
+          Company: {
+            select: {
+              subscriptionPlan: true,
+              subscriptionExpiresAt: true,
+            },
+          },
+        },
       })
 
       if (!recruiter?.companyId) {
@@ -37,10 +47,11 @@ export async function createJob(req, res) {
       }
 
       companyId = recruiter.companyId
+      companyPlan = recruiter.Company?.subscriptionPlan
+      companyPlanExpiresAt = recruiter.Company?.subscriptionExpiresAt
       isExternal = false
 
       try {
-        // 🔹 Routes to job quota or internship quota depending on employmentType
         await assertCanPostByType(companyId, req.body.employmentType)
       } catch (limitErr) {
         return res.status(limitErr.status || 403).json({
@@ -63,6 +74,32 @@ export async function createJob(req, res) {
       }
     }
 
+    /* ================= FEATURED ELIGIBILITY ================= */
+
+    const requestedFeatured = Boolean(req.body.isFeatured)
+    let isFeatured = false
+
+    if (requestedFeatured) {
+      const FEATURED_ELIGIBLE_PLANS = ["professional", "enterprise"]
+      const plan = (companyPlan || "free").toLowerCase()
+
+      const isEligiblePlan = FEATURED_ELIGIBLE_PLANS.includes(plan)
+      const isPlanActive =
+        !companyPlanExpiresAt || new Date(companyPlanExpiresAt) > new Date()
+
+      if (!isEligiblePlan || !isPlanActive) {
+        return res.status(403).json({
+          error: "Featured jobs are only available on Professional and Enterprise plans",
+          code: "PLAN_NOT_ELIGIBLE",
+          currentPlan: plan,
+        })
+      }
+
+      // Admin-posted external jobs have no companyId/plan to check against —
+      // decide separately if admins should be allowed to feature freely.
+      isFeatured = true
+    }
+
     const job = await prisma.job.create({
       data: {
         title: req.body.title,
@@ -74,16 +111,16 @@ export async function createJob(req, res) {
         location: req.body.location,
         isRemote: req.body.isRemote ?? false,
 
-        // 🔥 External fields
         companyName,
         applyUrl: req.body.applyUrl,
         linkedinUrl: req.body.linkedinUrl,
         isExternal,
 
-        // 🔥 Internal relation (only recruiter jobs)
         companyId,
-
         postedById: req.user.id,
+
+        isFeatured,
+        featuredAt: isFeatured ? new Date() : null,
       },
     })
 
@@ -358,25 +395,57 @@ export async function updateJob(req, res) {
         id: Number(req.params.id),
         postedById: req.user.id,
       },
+      include: {
+        Company: {
+          select: { subscriptionPlan: true, subscriptionExpiresAt: true },
+        },
+      },
     });
 
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
 
+    const data = {
+      title: req.body.title,
+      description: req.body.description,
+      employmentType: req.body.employmentType,
+      experience: req.body.experience,
+      salaryRange: req.body.salaryRange,
+      location: req.body.location,
+      isRemote: req.body.isRemote,
+    };
+
+    // Only touch isFeatured if the request explicitly includes it —
+    // this way a plain "edit job details" save doesn't accidentally
+    // reset featured status.
+    if (typeof req.body.isFeatured === "boolean") {
+      if (req.body.isFeatured) {
+        const FEATURED_ELIGIBLE_PLANS = ["professional", "enterprise"];
+        const plan = (job.Company?.subscriptionPlan || "free").toLowerCase();
+        const isEligiblePlan = FEATURED_ELIGIBLE_PLANS.includes(plan);
+        const isPlanActive =
+          !job.Company?.subscriptionExpiresAt ||
+          new Date(job.Company.subscriptionExpiresAt) > new Date();
+
+        if (!isEligiblePlan || !isPlanActive) {
+          return res.status(403).json({
+            error: "Featured jobs are only available on Professional and Enterprise plans",
+            code: "PLAN_NOT_ELIGIBLE",
+            currentPlan: plan,
+          });
+        }
+        data.isFeatured = true;
+        data.featuredAt = new Date();
+      } else {
+        data.isFeatured = false;
+        data.featuredAt = null;
+      }
+    }
+
     const updatedJob = await prisma.job.update({
-      where: {
-        id: Number(req.params.id),
-      },
-      data: {
-        title: req.body.title,
-        description: req.body.description,
-        employmentType: req.body.employmentType,
-        experience: req.body.experience,
-        salaryRange: req.body.salaryRange,
-        location: req.body.location,
-        isRemote: req.body.isRemote,
-      },
+      where: { id: Number(req.params.id) },
+      data,
     });
 
     res.json(updatedJob);

@@ -57,6 +57,7 @@ export async function getCompaniesForAdmin(req, res) {
       orderBy: { name: "asc" },
     });
 
+    // ✅ Return the array directly, not wrapped in an object
     const formatted = companies.map((c) => ({
       id: c.id,
       name: c.name,
@@ -67,7 +68,7 @@ export async function getCompaniesForAdmin(req, res) {
       subscriptionExpiresAt: c.subscriptionExpiresAt,
     }));
 
-    res.json(formatted);
+    res.json(formatted); // Send the array directly
   } catch (err) {
     console.error("Admin get companies error:", err);
     res.status(500).json({ error: "Failed to fetch companies" });
