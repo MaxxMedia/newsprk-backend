@@ -36,7 +36,7 @@ import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
 import newsletterRoutes from "./routes/newsletter.js";
 import leadRoutes from "./routes/Leadroutes.js";
-import quoteRoutes from "./routes/quoteRoutes.js";
+import quoteRoutes from "./routes/Quoteroutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
 import adminPackageRoutes from "./routes/adminPackageRoutes.js";
