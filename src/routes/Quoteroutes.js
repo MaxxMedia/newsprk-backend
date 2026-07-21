@@ -1,8 +1,7 @@
 // routes/quoteRoutes.js
 import express from "express";
-import { getSupplierQuotes } from "../controllers/quoteController.js";
 import { requireAuth } from "../middleware/auth.js";
-import { createQuoteRequest } from "../controllers/Quotecontroller.js";
+import { createQuoteRequest, getSupplierQuotes } from "../controllers/Quotecontroller.js";
 
 const router = express.Router();
 
