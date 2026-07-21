@@ -6,7 +6,7 @@ import {
     updateLeadStatus,
     deleteLead,
     getLeadPackageSummary
-} from "../controllers/leadController.js";
+} from "../controllers/Leadcontroller.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
