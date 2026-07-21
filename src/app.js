@@ -35,7 +35,7 @@ import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
 import newsletterRoutes from "./routes/newsletter.js";
-import leadRoutes from "./routes/leadRoutes.js";
+import leadRoutes from "./routes/Leadroutes.js";
 import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
