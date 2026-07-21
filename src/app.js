@@ -12,7 +12,7 @@ import authRoutes from "./routes/auth.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import jobsRoutes from "./routes/jobs.js";
 import companiesRoutes from "./routes/companies.js";
-import adminCompaniesRoutes from "./routes/Admincompanies.js";
+import adminCompaniesRoutes from "./routes/adminCompanies.js";
 import applicationsRoutes from "./routes/applications.js";
 import recruitersRoutes from "./routes/recruiters.js";
 import candidatesRoutes from "./routes/candidates.js";
@@ -35,11 +35,12 @@ import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 import contactRoutes from "./routes/contact.js";
 import newsletterRoutes from "./routes/newsletter.js";
-import leadRoutes from "./routes/Leadroutes.js";
-import quoteRoutes from "./routes/Quoteroutes.js";
+import leadRoutes from "./routes/leadRoutes.js";
+import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
 import adminPackageRoutes from "./routes/adminPackageRoutes.js";
+
 
 /* ======================================================
    ✅ FIX: Proper .env loading
@@ -120,6 +121,7 @@ app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
 app.use("/api/recruiter", recruiterDashboardRoutes);
+app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/suppliers", quoteRoutes);
