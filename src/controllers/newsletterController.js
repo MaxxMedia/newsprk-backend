@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 
 import { resend } from "../lib/resend.js";
 import { newsletterHtml } from "../lib/newsletterEmail.js";
+import { sendWhatsAppViaInterakt, trackUserInInterakt } from '../services/interaktService.js';
 
 /* ===========================
    PUBLIC
@@ -920,11 +921,11 @@ export async function sendCampaign(req, res) {
       return res.status(400).json({ error: "Campaign already sent." });
     }
 
-    // Get active subscribers
+    // Get active subscribers (including those with WhatsApp enabled)
     const subscribers = await prisma.newsletterSubscriber.findMany({
       where: {
         status: "ACTIVE",
-        emailSubscribed: true,
+        // Include all subscribers regardless of channel preference
       },
     });
 
@@ -934,7 +935,7 @@ export async function sendCampaign(req, res) {
 
     console.log(`📊 Found ${subscribers.length} subscribers to send to`);
 
-    // ✅ Update campaign with subscriber count before sending (only totalRecipients)
+    // ✅ Update campaign with subscriber count before sending
     await prisma.newsletterCampaign.update({
       where: { id: campaign.id },
       data: {
@@ -943,47 +944,68 @@ export async function sendCampaign(req, res) {
     });
 
     // Fetch latest posts for dynamic content
-    const postsRes = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/posts?limit=6`,
-      { cache: "no-store" }
-    );
-    const postsData = await postsRes.json();
-    const posts = postsData.data || postsData;
+    const apiUrl = process.env.API_URL || process.env.BACKEND_URL || 'http://localhost:5000';
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    
+    console.log(`📡 Fetching posts from: ${apiUrl}/api/posts?limit=6`);
+
+    let posts = [];
+    try {
+      const postsRes = await fetch(
+        `${apiUrl}/api/posts?limit=6`,
+        { cache: "no-store" }
+      );
+      
+      if (postsRes.ok) {
+        const postsData = await postsRes.json();
+        posts = postsData.data || postsData || [];
+        console.log(`📰 Found ${posts.length} posts for dynamic content`);
+      }
+    } catch (fetchErr) {
+      console.error("⚠️ Error fetching posts:", fetchErr.message);
+    }
 
     let emailCount = 0;
+    let whatsappCount = 0;
 
     for (const subscriber of subscribers) {
+      // Create recipient record
       const recipient = await prisma.newsletterRecipient.create({
         data: {
           campaignId: campaign.id,
           subscriberId: subscriber.id,
           emailStatus: "PENDING",
+          whatsappStatus: "PENDING",
+          smsStatus: "PENDING",
         },
       });
 
+      // ============================================
+      // SEND EMAIL
+      // ============================================
       try {
         if (campaign.emailEnabled && subscriber.emailSubscribed && subscriber.email) {
           let htmlContent = campaign.content;
           
-          if (htmlContent.includes('{{posts}}')) {
+          if (htmlContent.includes('{{posts}}') && posts.length > 0) {
             let postsHtml = '';
             posts.slice(0, 6).forEach(post => {
               const imageUrl = post.imageUrl?.startsWith("http")
                 ? post.imageUrl
                 : post.imageUrl
-                ? `${process.env.NEXT_PUBLIC_API_URL}${post.imageUrl}`
+                ? `${apiUrl}${post.imageUrl}`
                 : "";
               
               postsHtml += `
                 <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
                   ${imageUrl ? `<img src="${imageUrl}" style="width:100%; max-height:200px; object-fit:cover; border-radius:4px;" />` : ''}
                   <h2 style="font-size:20px; color:#121213; margin:10px 0;">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL}/post/${post.slug}" style="color:#121213; text-decoration:none;">
+                    <a href="${appUrl}/post/${post.slug}" style="color:#121213; text-decoration:none;">
                       ${post.title}
                     </a>
                   </h2>
                   <p style="color:#555;">${post.excerpt || 'Read more about the latest trends in precision manufacturing.'}</p>
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/post/${post.slug}" style="display:inline-block; background:#0073FF; color:white; padding:8px 16px; border-radius:4px; text-decoration:none;">
+                  <a href="${appUrl}/post/${post.slug}" style="display:inline-block; background:#0073FF; color:white; padding:8px 16px; border-radius:4px; text-decoration:none;">
                     Read Full Story →
                   </a>
                 </div>
@@ -993,7 +1015,7 @@ export async function sendCampaign(req, res) {
           }
 
           await resend.emails.send({
-            from: process.env.MAIL_FROM,
+            from: process.env.MAIL_FROM || 'noreply@toolingtrends.com',
             to: subscriber.email,
             subject: campaign.subject,
             html: htmlContent,
@@ -1008,6 +1030,7 @@ export async function sendCampaign(req, res) {
           });
 
           emailCount++;
+          console.log(`📧 Email sent to: ${subscriber.email}`);
         }
       } catch (err) {
         console.error("Email Send Error:", err);
@@ -1016,13 +1039,92 @@ export async function sendCampaign(req, res) {
           data: { emailStatus: "FAILED" },
         });
       }
+
+      // ============================================
+      // SEND WHATSAPP VIA INTERAKT
+      // ============================================
+      try {
+        if (campaign.whatsappEnabled && subscriber.whatsappSubscribed && subscriber.phoneNumber) {
+          console.log(`💬 Sending WhatsApp to: ${subscriber.phoneNumber}`);
+          
+          // Track user in Interakt first (optional but recommended)
+          await trackUserInInterakt({
+            phoneNumber: subscriber.phoneNumber,
+            fullName: subscriber.fullName,
+            email: subscriber.email,
+            companyName: subscriber.companyName,
+            source: 'newsletter'
+          });
+
+          // Format the content for WhatsApp (plain text, shorter)
+          const plainTextContent = campaign.content
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 200);
+
+          // Prepare template parameters
+          // You need to create this template in Interakt dashboard
+          // Template name: newsletter_update
+          // Template: Hello {{1}},\n\n{{2}}\n\n{{3}}\n\nRead more: {{4}}
+          const templateName = 'newsletter_update';
+          const parameters = [
+            subscriber.fullName || 'Subscriber',
+            campaign.subject,
+            plainTextContent,
+            `${appUrl}/posts`
+          ];
+
+          // Send via Interakt
+          const result = await sendWhatsAppViaInterakt(
+            subscriber.phoneNumber,
+            {
+              template: templateName,
+              language: 'en',
+              parameters: parameters
+            }
+          );
+
+          if (result.success) {
+            await prisma.newsletterRecipient.update({
+              where: { id: recipient.id },
+              data: {
+                whatsappStatus: "DELIVERED",
+                sentAt: new Date(),
+              },
+            });
+            whatsappCount++;
+            console.log(`✅ WhatsApp sent to: ${subscriber.phoneNumber}`);
+          } else {
+            console.error(`❌ WhatsApp failed for ${subscriber.phoneNumber}:`, result.error);
+            await prisma.newsletterRecipient.update({
+              where: { id: recipient.id },
+              data: { whatsappStatus: "FAILED" },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("WhatsApp Send Error:", err);
+        await prisma.newsletterRecipient.update({
+          where: { id: recipient.id },
+          data: { whatsappStatus: "FAILED" },
+        });
+      }
     }
 
-    // Update campaign stats after sending
+    // Update campaign stats
     const delivered = await prisma.newsletterRecipient.count({
       where: {
         campaignId: campaign.id,
         emailStatus: "DELIVERED",
+      },
+    });
+
+    const whatsappDelivered = await prisma.newsletterRecipient.count({
+      where: {
+        campaignId: campaign.id,
+        whatsappStatus: "DELIVERED",
       },
     });
 
@@ -1047,6 +1149,8 @@ export async function sendCampaign(req, res) {
       success: true,
       totalRecipients: subscribers.length,
       emailRecipients: emailCount,
+      whatsappRecipients: whatsappCount,
+      message: `✅ Campaign sent! ${emailCount} emails, ${whatsappCount} WhatsApp messages`,
     });
   } catch (err) {
     console.error("SEND CAMPAIGN ERROR", err);
