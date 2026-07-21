@@ -14,7 +14,7 @@ import {
   getCompanyProfileEligibilityHandler
 } from "../controllers/supplierDirectoryController.js"
 
-import { createQuoteRequest } from "../controllers/quoteController.js" // ✅ NEW
+import { createQuoteRequest } from "../controllers/Quotecontroller.js"
 
 import { requireAuth, requireAdmin } from "../middleware/auth.js"
 
