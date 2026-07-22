@@ -1,10 +1,21 @@
+// C:\Users\Dell\OneDrive\Desktop\tooling\newsprk-backend\src\controllers\adminDirectoryController.js
+
 import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt";
 import slugify from "slugify";
 
+// ✅ Updated include to include lastLoginAt and emailSentForBulkImport
 const submittedByInclude = {
   User_SupplierDirectory_submittedByIdToUser: {
-    select: { id: true, email: true, fullName: true },
+    select: { 
+      id: true, 
+      email: true, 
+      fullName: true,
+      username: true,
+      isOnboarded: true,
+      lastLoginAt: true,
+      emailSentForBulkImport: true,
+    },
   },
 }
 
@@ -245,6 +256,9 @@ export async function adminCreateFullSetup(req, res) {
           fullName: recruiter.fullName,
           companyId: newCompany.id,
           emailVerified: true,
+          emailSentForBulkImport: false,
+          isOnboarded: false,
+          lastLoginAt: null,
         },
       });
 

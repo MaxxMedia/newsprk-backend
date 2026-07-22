@@ -60,6 +60,10 @@ export const register = async (req, res) => {
         username,
         otpHash,
         otpExpiry,
+        // ✅ Set default values
+        emailSentForBulkImport: false,
+        isOnboarded: false,
+        lastLoginAt: null,
       },
     })
 
@@ -195,9 +199,23 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" })
     }
 
+    // ✅ UPDATE: Set lastLoginAt on successful login
     await prisma.user.update({
       where: { email },
-      data: { failedLoginAttempts: 0, lockUntil: null },
+      data: { 
+        failedLoginAttempts: 0, 
+        lockUntil: null,
+        lastLoginAt: new Date(), // ✅ This tracks when user last logged in
+        // ❌ DO NOT set isOnboarded here - only set when onboarding is completed
+      },
+    })
+
+    // ✅ Get fresh user data after update
+    const updatedUser = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        Company: true,
+      },
     })
 
     const token = jwt.sign(
@@ -222,19 +240,20 @@ export const login = async (req, res) => {
     const packageSelected = !!packagePurchase
 
     // ✅ Get the actual subscription plan from Company (source of truth)
-    const subscriptionPlan = user.Company?.subscriptionPlan || "free"
+    const subscriptionPlan = updatedUser?.Company?.subscriptionPlan || "free"
 
     res.json({
       token,
       user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
-        isOnboarded: user.isOnboarded || false,
-        companyId: user.companyId ?? null,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        username: updatedUser.username,
+        isOnboarded: updatedUser.isOnboarded || false,
+        companyId: updatedUser.companyId ?? null,
         packageSelected: packageSelected,
         subscriptionPlan: subscriptionPlan,
+        lastLoginAt: updatedUser.lastLoginAt, // ✅ Include in response
       },
     })
   } catch (error) {
@@ -244,12 +263,7 @@ export const login = async (req, res) => {
 }
 
 /* ================= ME (live refresh, no re-login needed) ================= */
-/*
-  ✅ NEW: this endpoint is the fix for stale localStorage.
-  The frontend calls this right after payment success, right after
-  onboarding/company-creation, and on every protected-route mount,
-  so packageSelected / subscriptionPlan are never stale.
-*/
+
 export const me = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -272,10 +286,56 @@ export const me = async (req, res) => {
       companyId: user.companyId ?? null,
       packageSelected: !!packagePurchase,
       subscriptionPlan: user.Company?.subscriptionPlan || "free",
+      lastLoginAt: user.lastLoginAt, // ✅ Include in response
     })
   } catch (err) {
     console.error("Me endpoint error:", err)
     res.status(500).json({ error: "Failed to load user" })
+  }
+}
+
+/* ================= COMPLETE ONBOARDING ================= */
+
+export const completeOnboarding = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" })
+    }
+
+    // ✅ Set isOnboarded to true when onboarding is completed
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isOnboarded: true,
+      },
+    })
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { Company: true },
+    })
+
+    res.json({
+      message: "Onboarding completed successfully",
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        username: updatedUser.username,
+        isOnboarded: updatedUser.isOnboarded,
+        companyId: updatedUser.companyId,
+        lastLoginAt: updatedUser.lastLoginAt,
+      },
+    })
+  } catch (error) {
+    console.error("Complete onboarding error:", error)
+    res.status(500).json({ error: "Failed to complete onboarding" })
   }
 }
 
