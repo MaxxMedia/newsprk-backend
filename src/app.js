@@ -40,6 +40,14 @@ import quoteRoutes from "./routes/Quoteroutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
 import adminPackageRoutes from "./routes/adminPackageRoutes.js";
+import candidateSkillsRoutes from "./routes/candidateSkillsRoutes.js";
+import candidateEducationRoutes from "./routes/candidateEducationRoutes.js";
+import candidateProjectRoutes from "./routes/candidateProjectRoutes.js";
+import candidateSocialRoutes from "./routes/candidateSocialRoutes.js";
+import candidateCertificationRoutes from "./routes/candidateCertificationRoutes.js";
+import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
+import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
+import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
 
 /* ======================================================
    ✅ FIX: Proper .env loading
@@ -119,6 +127,14 @@ app.use("/api/admin/companies", adminCompaniesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
+app.use("/api/candidate-skills", candidateSkillsRoutes);
+app.use("/api/candidate-education", candidateEducationRoutes);
+app.use("/api/candidate-projects", candidateProjectRoutes);
+app.use("/api/candidate-socials", candidateSocialRoutes);
+app.use("/api/candidate-certifications", candidateCertificationRoutes);
+app.use("/api/candidate-languages", candidateLanguageRoutes);
+app.use("/api/candidate-achievements", candidateAchievementRoutes);
+app.use("/api/candidate-interests", candidateInterestRoutes);
 app.use("/api/recruiter", recruiterDashboardRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
