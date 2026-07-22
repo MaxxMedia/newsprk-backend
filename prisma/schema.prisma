@@ -98,6 +98,8 @@ model User {
   isOnboarded         Boolean   @default(false)
   companyId           Int?
   packageSelected     Boolean   @default(false)
+  emailSentForBulkImport Boolean @default(false) 
+  lastLoginAt            DateTime?  
 
 
   AdvertisementBanner AdvertisementBanner[]
@@ -116,6 +118,7 @@ model User {
   NewsletterSubscriber NewsletterSubscriber[]
   NewsletterCampaign   NewsletterCampaign[]
   NewsletterTemplate   NewsletterTemplate[]
+  
 
   Post_Post_approvedByIdToUser Post[] @relation("Post_approvedByIdToUser")
   Post_Post_createdByIdToUser  Post[] @relation("Post_createdByIdToUser")

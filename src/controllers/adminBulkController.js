@@ -1,8 +1,9 @@
+// C:\Users\Dell\OneDrive\Desktop\tooling\newsprk-backend\src\controllers\adminBulkController.js
+
 import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt"
 import slugify from "slugify"
 import xlsx from "xlsx"
-import { sendRecruiterEmail } from "../../utils/resendEmail.js"
 
 /* =====================================================
    🔐 Generate Strong Random Password
@@ -64,6 +65,8 @@ export async function bulkCreateFullSetup(req, res) {
     const failed = []
 
     for (const row of rows) {
+      let recruiter = null
+
       try {
         if (!row.email || !row.companyName || !row.industryPath) {
           throw new Error("Missing required fields")
@@ -86,11 +89,8 @@ export async function bulkCreateFullSetup(req, res) {
         const hashedPassword = await bcrypt.hash(plainPassword, 10)
 
         await prisma.$transaction(async (tx) => {
-
-          /* 🔍 Resolve Industry */
           const industryId = await resolveIndustryPath(tx, row.industryPath)
 
-          /* 1️⃣ Create Company */
           const companySlug = slugify(row.companyName, {
             lower: true,
             strict: true,
@@ -110,8 +110,7 @@ export async function bulkCreateFullSetup(req, res) {
             },
           })
 
-          /* 2️⃣ Create Recruiter */
-          const recruiter = await tx.user.create({
+          recruiter = await tx.user.create({
             data: {
               email: row.email,
               username,
@@ -119,10 +118,12 @@ export async function bulkCreateFullSetup(req, res) {
               role: "recruiter",
               companyId: company.id,
               emailVerified: true,
+              emailSentForBulkImport: false,
+              isOnboarded: false,
+              lastLoginAt: null,
             },
           })
 
-          /* 3️⃣ Create Supplier Directory */
           await tx.supplierDirectory.create({
             data: {
               name: row.companyName,
@@ -132,11 +133,9 @@ export async function bulkCreateFullSetup(req, res) {
               email: row.email,
               website: row.website || null,
               logoUrl: row.logoUrl || null,
-
               videoGallery: row.videoGallery
                 ? row.videoGallery.split(",").map(v => v.trim())
                 : [],
-
               socialLinks: {
                 facebook: row.facebook || "",
                 linkedin: row.linkedin || "",
@@ -144,7 +143,6 @@ export async function bulkCreateFullSetup(req, res) {
                 youtube: row.youtube || "",
                 instagram: row.instagram || "",
               },
-
               companyId: company.id,
               submittedById: recruiter.id,
               status: "APPROVED",
@@ -155,16 +153,10 @@ export async function bulkCreateFullSetup(req, res) {
           })
         })
 
-        /* 📧 Send Email */
-        await sendRecruiterEmail(
-          row.email,
-          username,
-          plainPassword
-        )
-
         success.push({
           email: row.email,
           company: row.companyName,
+          userId: recruiter ? recruiter.id : null,
         })
 
       } catch (err) {
@@ -176,7 +168,7 @@ export async function bulkCreateFullSetup(req, res) {
     }
 
     res.json({
-      message: "Bulk upload completed",
+      message: "Bulk upload completed. Use the Send Email button to send credentials.",
       total: rows.length,
       successCount: success.length,
       failedCount: failed.length,
@@ -261,5 +253,54 @@ export async function downloadBulkTemplate(req, res) {
   } catch (error) {
     console.error("Template download error:", error)
     res.status(500).json({ error: "Failed to generate template" })
+  }
+}
+
+/* =====================================================
+   📋 GET ALL BULK IMPORTED USERS
+   ✅ UPDATED: Returns ALL recruiter users
+===================================================== */
+export async function getBulkImportedUsers(req, res) {
+  if (req.user.role?.toLowerCase() !== "admin") {
+    return res.status(403).json({ error: "Admin only" })
+  }
+
+  try {
+    // ✅ Fetch ALL recruiter users - no filters
+    const users = await prisma.$queryRaw`
+      SELECT 
+        u.id,
+        u.email,
+        u.username,
+        u."createdAt",
+        u."emailSentForBulkImport",
+        u."isOnboarded",
+        u."lastLoginAt",
+        c.name as "companyName"
+      FROM "User" u
+      LEFT JOIN "Company" c ON u."companyId" = c.id
+      WHERE u.role = 'recruiter'
+      ORDER BY u."createdAt" DESC
+    `
+
+    console.log(`📊 Found ${users.length} recruiter users`)
+
+    const formattedUsers = users.map(user => ({
+      id: Number(user.id),
+      email: user.email,
+      username: user.username,
+      companyName: user.companyName || "N/A",
+      createdAt: user.createdAt,
+      emailSentForBulkImport: user.emailSentForBulkImport || false,
+      isOnboarded: user.isOnboarded || false,
+      lastLoginAt: user.lastLoginAt || null,
+    }))
+
+    console.log(`📤 Sending ${formattedUsers.length} users`)
+    res.json(formattedUsers)
+
+  } catch (error) {
+    console.error("Error fetching bulk users:", error)
+    res.status(500).json({ error: "Failed to fetch users" })
   }
 }

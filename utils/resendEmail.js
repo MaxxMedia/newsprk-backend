@@ -1,60 +1,67 @@
-// import { Resend } from "resend"
-
-// const resend = new Resend(process.env.RESEND_API_KEY)
-
-// export async function sendRecruiterEmail(email, username, password) {
-//   try {
-//     await resend.emails.send({
-//       from: "MouldMakingTech <no-reply@toolingtrends.com>", 
-//       to: email,
-//       subject: "Your Supplier Account is Ready 🚀",
-//       html: `
-//         <div style="font-family:Arial;padding:20px">
-//           <h2>Welcome to MouldMakingTech</h2>
-//           <p>Your supplier account has been created successfully.</p>
-//           <p><strong>Email:</strong> ${email}</p>
-//           <p><strong>Username:</strong> ${username}</p>
-//           <p><strong>Password:</strong> ${password}</p>
-//           <br/>
-//           <p>Please login and change your password.</p>
-//         </div>
-//       `,
-//     })
-//   } catch (error) {
-//     console.error("Email failed:", error)
-//   }
-// }
-
+// C:\Users\Dell\OneDrive\Desktop\tooling\newsprk-backend\utils\resendEmail.js
 
 import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Get from email from env, fallback to a default
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.MAIL_FROM || "no-reply@fitnessfest.in"
+const FROM_NAME = "Tooling Trends"
+
 export async function sendRecruiterEmail(email, username, password) {
   try {
-    await resend.emails.send({
-      from: "Tooling Trends <no-reply@fitnessfest.in>", // Change to no-reply@toolingtrends.com if verified
+    const result = await resend.emails.send({
+      // ✅ Use environment variable for from address
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      
+      // ✅ Add reply-to (use a real email if you have one)
+      reply_to: "support@toolingtrends.com",
+      
       to: email,
+      
       subject: "Your Supplier Account is Ready 🚀",
-      html: `
-      <div style="margin:0;padding:20px;background-color:#f4f6f9;font-family:Arial,sans-serif;">
+      
+      // ✅ Plain text version
+      text: `
+Welcome to Tooling Trends
 
-        <!-- EMAIL CONTAINER -->
+Your supplier account has been created successfully. Please use the credentials below to access your account.
+
+Email: ${email}
+Username: ${username}
+Password: ${password}
+
+Login to Your Account: https://toolingtrends.com/login
+
+Security Tip: Please change your password immediately after your first login to keep your account secure.
+
+© ${new Date().getFullYear()} Tooling Trends. All rights reserved.
+      `,
+      
+      html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Tooling Trends</title>
+      </head>
+      <body style="margin:0;padding:20px;background-color:#f4f6f9;font-family:Arial,sans-serif;">
         <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.08);">
 
           <!-- HEADER -->
-          <div style="background:#0F5B78;padding:8px 12px;">
+          <div style="background:#0F5B78;padding:8px 12px;text-align:center;">
             <img
-              src="https://res.cloudinary.com/dlkuk7rok/image/upload/v1771244281/mould-tech/xoskdfqbu9ihxzzyhd9e.jpg"
+              src="https://toolingtrends.com/images/logo.jpg"
               alt="Tooling Trends"
-              style="display:block;width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin:0 auto;"
+              style="display:block;width:100%;max-width:200px;height:auto;margin:0 auto;border-radius:6px;"
             />
           </div>
 
           <!-- BODY -->
           <div style="padding:32px;">
 
-            <h2 style="margin:0 0 12px;color:#0F5B78;font-size:28px;">
+            <h2 style="margin:0 0 12px;color:#0F5B78;font-size:28px;font-weight:700;">
               Welcome to Tooling Trends 🚀
             </h2>
 
@@ -65,16 +72,16 @@ export async function sendRecruiterEmail(email, username, password) {
             <!-- CREDENTIALS -->
             <div style="background:#f8fafc;border-left:4px solid #B30F24;border-radius:6px;padding:18px;margin:25px 0;">
 
-              <p style="margin:8px 0;font-size:15px;">
-                <strong>Email:</strong> ${email}
+              <p style="margin:8px 0;font-size:15px;color:#333;">
+                <strong style="color:#0F5B78;">Email:</strong> ${email}
               </p>
 
-              <p style="margin:8px 0;font-size:15px;">
-                <strong>Username:</strong> ${username}
+              <p style="margin:8px 0;font-size:15px;color:#333;">
+                <strong style="color:#0F5B78;">Username:</strong> ${username}
               </p>
 
-              <p style="margin:8px 0;font-size:15px;">
-                <strong>Password:</strong> ${password}
+              <p style="margin:8px 0;font-size:15px;color:#333;">
+                <strong style="color:#0F5B78;">Password:</strong> ${password}
               </p>
 
             </div>
@@ -91,7 +98,8 @@ export async function sendRecruiterEmail(email, username, password) {
                   padding:14px 28px;
                   border-radius:6px;
                   font-weight:bold;
-                  font-size:15px;
+                  font-size:16px;
+                  transition: background 0.3s ease;
                 "
               >
                 Login to Your Account
@@ -109,14 +117,23 @@ export async function sendRecruiterEmail(email, username, password) {
             <p style="margin:0;color:#ffffff;font-size:12px;">
               © ${new Date().getFullYear()} Tooling Trends. All rights reserved.
             </p>
+            <p style="margin:5px 0 0;color:#8aa9b9;font-size:11px;">
+              This is an automated message. Please do not reply to this email.
+            </p>
           </div>
 
         </div>
-
-      </div>
+      </body>
+      </html>
       `,
     })
+
+    console.log("✅ Email sent successfully to:", email)
+    console.log("📧 Email ID:", result?.id)
+    return result
+
   } catch (error) {
-    console.error("Email failed:", error)
+    console.error("❌ Email failed:", error)
+    throw error
   }
 }
