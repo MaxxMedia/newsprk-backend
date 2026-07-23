@@ -7,8 +7,9 @@ export async function getMyInterests(req, res) {
       where: {
         userId: req.user.id,
       },
+      // ✅ Use 'id' instead of 'createdAt' (which doesn't exist)
       orderBy: {
-        createdAt: "asc",
+        id: "asc",
       },
     });
 
@@ -24,22 +25,24 @@ export async function getMyInterests(req, res) {
 /* ADD Interest */
 export async function addInterest(req, res) {
   try {
-    const { name } = req.body;
+    const { title, type } = req.body;
 
-    if (!name?.trim()) {
+    // Validate
+    if (!title?.trim()) {
       return res.status(400).json({
-        error: "Interest name is required",
+        error: "Interest title is required",
       });
     }
 
-    const interest = await prisma.candidateInterest.create({
+    const newInterest = await prisma.candidateInterest.create({
       data: {
         userId: req.user.id,
-        name: name.trim(),
+        title: title.trim(),
+        type: type || null,
       },
     });
 
-    res.status(201).json(interest);
+    res.status(201).json(newInterest);
   } catch (err) {
     console.error(err);
     res.status(500).json({
@@ -52,7 +55,6 @@ export async function addInterest(req, res) {
 export async function updateInterest(req, res) {
   try {
     const { id } = req.params;
-    const { name } = req.body;
 
     const existing = await prisma.candidateInterest.findUnique({
       where: {
@@ -66,12 +68,15 @@ export async function updateInterest(req, res) {
       });
     }
 
+    const { title, type } = req.body;
+
     const updated = await prisma.candidateInterest.update({
       where: {
         id: Number(id),
       },
       data: {
-        name,
+        title: title?.trim() || existing.title,
+        type: type !== undefined ? type : existing.type,
       },
     });
 

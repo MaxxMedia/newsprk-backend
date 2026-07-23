@@ -49,6 +49,9 @@ import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
 import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
 import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
 
+// ✅ ADD THIS MISSING IMPORT
+import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
+
 /* ======================================================
    ✅ FIX: Proper .env loading
 ====================================================== */
@@ -59,9 +62,6 @@ const __dirname = path.dirname(__filename);
 dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
-
-// console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
-// console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
 
 /* ======================================================
    🚀 APP INIT
@@ -127,6 +127,8 @@ app.use("/api/admin/companies", adminCompaniesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
+
+// ✅ CANDIDATE ROUTES - All mounted
 app.use("/api/candidate-skills", candidateSkillsRoutes);
 app.use("/api/candidate-education", candidateEducationRoutes);
 app.use("/api/candidate-projects", candidateProjectRoutes);
@@ -135,6 +137,10 @@ app.use("/api/candidate-certifications", candidateCertificationRoutes);
 app.use("/api/candidate-languages", candidateLanguageRoutes);
 app.use("/api/candidate-achievements", candidateAchievementRoutes);
 app.use("/api/candidate-interests", candidateInterestRoutes);
+
+// ✅ ADD THIS - Mount the experience routes
+app.use("/api/candidate-experience", candidateExperienceRoutes);
+
 app.use("/api/recruiter", recruiterDashboardRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
@@ -175,13 +181,13 @@ app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
 
-console.log("📋 All routes registered:");
-console.log("  - /api/admin/packages");
-console.log("  - /api/admin/packages/:id");
-console.log("  - /api/admin/packages (POST)");
-console.log("  - /api/admin/packages/:id (PUT)");
-console.log("  - /api/admin/packages/:id (DELETE)");
-console.log("  - /api/admin/packages/:id/toggle");
-console.log("  - /api/admin/companies");
-console.log("  - /api/admin/companies/:id");
-console.log("  - /api/admin/stats");
+console.log("📋 All candidate routes registered:");
+console.log("  - /api/candidate-experience ✅");
+console.log("  - /api/candidate-skills ✅");
+console.log("  - /api/candidate-education ✅");
+console.log("  - /api/candidate-projects ✅");
+console.log("  - /api/candidate-socials ✅");
+console.log("  - /api/candidate-certifications ✅");
+console.log("  - /api/candidate-languages ✅");
+console.log("  - /api/candidate-achievements ✅");
+console.log("  - /api/candidate-interests ✅");

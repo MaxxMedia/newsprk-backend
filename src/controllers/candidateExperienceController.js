@@ -1,6 +1,5 @@
 import { prisma } from "../lib/prisma.js";
 
-/* GET My Experience */
 export async function getMyExperience(req, res) {
   try {
     const experiences = await prisma.candidateExperience.findMany({
@@ -22,13 +21,12 @@ export async function getMyExperience(req, res) {
   }
 }
 
-/* ADD Experience */
 export async function addExperience(req, res) {
   try {
     const {
       companyId,
       companyName,
-      designation,
+      designation,  // ✅ Use 'designation' not 'title'
       employmentType,
       location,
       startDate,
@@ -37,21 +35,34 @@ export async function addExperience(req, res) {
       description,
     } = req.body;
 
+    // Validate
+    if (!designation?.trim()) {
+      return res.status(400).json({
+        error: "Job designation is required",
+      });
+    }
+
+    if (!companyName?.trim() && !companyId) {
+      return res.status(400).json({
+        error: "Company name or ID is required",
+      });
+    }
+
     const experience = await prisma.candidateExperience.create({
       data: {
         userId: req.user.id,
         companyId: companyId || null,
-        companyName,
-        designation,
-        employmentType,
-        location,
-        startDate: new Date(startDate),
-        endDate:
-          currentlyWorking || !endDate
-            ? null
-            : new Date(endDate),
+        companyName: companyName?.trim() || "",
+        designation: designation.trim(),
+        employmentType: employmentType || null,
+        location: location || null,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: currentlyWorking || !endDate ? null : new Date(endDate),
         currentlyWorking: currentlyWorking || false,
-        description,
+        description: description || null,
+      },
+      include: {
+        company: true,
       },
     });
 
@@ -61,6 +72,8 @@ export async function addExperience(req, res) {
     res.status(500).json({ error: "Failed to add experience" });
   }
 }
+
+
 
 /* UPDATE Experience */
 export async function updateExperience(req, res) {
