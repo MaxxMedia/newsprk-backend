@@ -7,8 +7,9 @@ export async function getMyLanguages(req, res) {
       where: {
         userId: req.user.id,
       },
+      // ✅ Use 'id' instead of 'createdAt' (which doesn't exist)
       orderBy: {
-        createdAt: "asc",
+        id: "asc",
       },
     });
 
@@ -26,11 +27,18 @@ export async function addLanguage(req, res) {
   try {
     const { language, proficiency } = req.body;
 
+    // Validate
+    if (!language?.trim()) {
+      return res.status(400).json({
+        error: "Language name is required",
+      });
+    }
+
     const newLanguage = await prisma.candidateLanguage.create({
       data: {
         userId: req.user.id,
-        language,
-        proficiency,
+        language: language.trim(),
+        proficiency: proficiency || null,
       },
     });
 
@@ -67,8 +75,8 @@ export async function updateLanguage(req, res) {
         id: Number(id),
       },
       data: {
-        language,
-        proficiency,
+        language: language?.trim() || existing.language,
+        proficiency: proficiency !== undefined ? proficiency : existing.proficiency,
       },
     });
 

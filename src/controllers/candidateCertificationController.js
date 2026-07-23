@@ -25,21 +25,26 @@ export async function getMyCertifications(req, res) {
 export async function addCertification(req, res) {
   try {
     const {
-      name,
+      title,           // ✅ Use 'title' (matches schema)
       organization,
-      credentialId,
       credentialUrl,
       issueDate,
       expiryDate,
     } = req.body;
 
+    // Validate required fields
+    if (!title?.trim()) {
+      return res.status(400).json({
+        error: "Certification title is required",
+      });
+    }
+
     const certification = await prisma.candidateCertification.create({
       data: {
         userId: req.user.id,
-        name,
-        organization,
-        credentialId,
-        credentialUrl,
+        title: title.trim(),        // ✅ Use 'title'
+        organization: organization || null,
+        credentialUrl: credentialUrl || null,
         issueDate: issueDate ? new Date(issueDate) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
       },
@@ -47,9 +52,10 @@ export async function addCertification(req, res) {
 
     res.status(201).json(certification);
   } catch (err) {
-    console.error(err);
+    console.error("Error adding certification:", err);
     res.status(500).json({
       error: "Failed to add certification",
+      details: err.message,
     });
   }
 }
@@ -72,9 +78,8 @@ export async function updateCertification(req, res) {
     }
 
     const {
-      name,
+      title,
       organization,
-      credentialId,
       credentialUrl,
       issueDate,
       expiryDate,
@@ -85,20 +90,20 @@ export async function updateCertification(req, res) {
         id: Number(id),
       },
       data: {
-        name,
-        organization,
-        credentialId,
-        credentialUrl,
-        issueDate: issueDate ? new Date(issueDate) : null,
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        title: title?.trim() || existing.title,  // ✅ Use 'title'
+        organization: organization !== undefined ? organization : existing.organization,
+        credentialUrl: credentialUrl !== undefined ? credentialUrl : existing.credentialUrl,
+        issueDate: issueDate ? new Date(issueDate) : existing.issueDate,
+        expiryDate: expiryDate ? new Date(expiryDate) : existing.expiryDate,
       },
     });
 
     res.json(updated);
   } catch (err) {
-    console.error(err);
+    console.error("Error updating certification:", err);
     res.status(500).json({
       error: "Failed to update certification",
+      details: err.message,
     });
   }
 }
@@ -130,9 +135,10 @@ export async function deleteCertification(req, res) {
       message: "Certification deleted successfully",
     });
   } catch (err) {
-    console.error(err);
+    console.error("Error deleting certification:", err);
     res.status(500).json({
       error: "Failed to delete certification",
+      details: err.message,
     });
   }
 }
