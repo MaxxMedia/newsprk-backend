@@ -7,14 +7,27 @@ export async function getCandidateProfile(req, res) {
 
     const candidate = await prisma.user.findUnique({
       where: { username },
-      select: {
-        username: true,
-        fullName: true,
-        headline: true,
-        about: true,
-        location: true,
-        avatarUrl: true,
-        role: true,
+      include: {
+        skills: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+        experiences: {
+          include: {
+            company: true,
+          },
+          orderBy: {
+            startDate: "desc",
+          },
+        },
+        education: true,
+        projects: true,
+        certifications: true,
+        languages: true,
+        socials: true,
+        interests: true,
+        achievements: true,
       },
     })
 
@@ -38,15 +51,27 @@ export async function getMyCandidateProfile(req, res) {
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: {
-        email: true,
-        username: true,
-        fullName: true,
-        headline: true,
-        about: true,
-        location: true,
-        avatarUrl: true,
-        websiteUrl: true,
+      include: {
+        skills: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+        experiences: {
+          include: {
+            company: true,
+          },
+          orderBy: {
+            startDate: "desc",
+          },
+        },
+        education: true,
+        projects: true,
+        certifications: true,
+        languages: true,
+        socials: true,
+        interests: true,
+        achievements: true,
       },
     })
 

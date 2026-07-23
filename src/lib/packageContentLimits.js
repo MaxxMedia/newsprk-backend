@@ -380,14 +380,12 @@ export async function getActiveTeamMemberCount(companyId, prismaClient = prisma)
   });
 }
 
-// ============================================================================
-// ARTICLE POSTING ELIGIBILITY
-// ============================================================================
-
 export async function getArticlePostingEligibility(companyId) {
   if (!companyId) {
     return {
       canCreate: false,
+      plan: "free",
+      planLabel: "Free",
       reason: "NO_COMPANY",
       message: "Link a company profile before publishing articles.",
       upgradeRequired: false,
@@ -398,6 +396,7 @@ export async function getArticlePostingEligibility(companyId) {
     };
   }
 
+  // Get active subscription
   const activeSubscription = await getActiveSubscription(companyId, prisma);
   const plan = activeSubscription.plan;
 
@@ -406,12 +405,27 @@ export async function getArticlePostingEligibility(companyId) {
   const isUnlimited = yearlyLimit === null;
   const yearStart = getYearStart();
 
+  // ✅ CRITICAL FIX: Count ONLY APPROVED articles
+  // PENDING and REJECTED articles should NOT count toward the limit
   const articlesThisYear = await prisma.post.count({
     where: {
       companyId,
-      category: { slug: "articles" },
-      createdAt: { gte: yearStart },
+      category: {
+        slug: "articles",
+      },
+      status: "APPROVED",  // ✅ Only count APPROVED articles
+      createdAt: {
+        gte: yearStart,
+      },
     },
+  });
+
+  console.log("📊 Article eligibility:", {
+    companyId,
+    plan,
+    yearlyLimit,
+    articlesThisYear,
+    isUnlimited
   });
 
   const planLabel = getPlanLabel(plan);
@@ -438,7 +452,6 @@ export async function getArticlePostingEligibility(companyId) {
         : `Your ${planLabel} plan allows ${effectiveLimit} technical articles per year. You've used ${articlesThisYear} — upgrade to post more.`,
   };
 }
-
 // ============================================================================
 // PRODUCT LISTING ELIGIBILITY
 // ============================================================================
@@ -670,11 +683,11 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Company Gallery limits
+  // Company Gallery limits - NOW USES countGalleryItems
   if (
     eligibility.galleryImages !== null &&
-    Array.isArray(data.companyGallery) &&
-    data.companyGallery.filter(Boolean).length > eligibility.galleryImages
+    data.companyGallery &&
+    countGalleryItems(data.companyGallery) > eligibility.galleryImages
   ) {
     const error = new Error(
       `Only ${eligibility.galleryImages} company gallery images are allowed on the ${eligibility.planLabel} plan.`
@@ -685,11 +698,11 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Factory Gallery limits
+  // Factory Gallery limits - NOW USES countGalleryItems
   if (
     eligibility.factoryImages !== null &&
-    Array.isArray(data.factoryGallery) &&
-    data.factoryGallery.filter(Boolean).length > eligibility.factoryImages
+    data.factoryGallery &&
+    countGalleryItems(data.factoryGallery) > eligibility.factoryImages
   ) {
     const error = new Error(
       `Only ${eligibility.factoryImages} factory images are allowed on the ${eligibility.planLabel} plan.`
@@ -700,213 +713,17 @@ export async function assertCompanyProfileLimits(companyId, data) {
     throw error;
   }
 
-  // Product Gallery limits
+  // Product Gallery limits - NOW USES countGalleryItems
   if (
     eligibility.productImages !== null &&
-    Array.isArray(data.productGallery) &&
-    data.productGallery.filter(Boolean).length > eligibility.productImages
+    data.productGallery &&
+    countGalleryItems(data.productGallery) > eligibility.productImages
   ) {
     const error = new Error(
       `Only ${eligibility.productImages} product images are allowed on the ${eligibility.planLabel} plan.`
     );
     error.status = 403;
     error.code = "PRODUCT_IMAGE_LIMIT_REACHED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Product Videos limits
-  if (
-    eligibility.productVideos !== null &&
-    Array.isArray(data.videoGallery) &&
-    data.videoGallery.filter(Boolean).length > eligibility.productVideos
-  ) {
-    const error = new Error(
-      `Only ${eligibility.productVideos} product videos are allowed on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "PRODUCT_VIDEO_LIMIT_REACHED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Product Catalogues limits
-  if (
-    eligibility.productCatalogues !== null &&
-    Array.isArray(data.productCatalogues) &&
-    data.productCatalogues.filter(Boolean).length > eligibility.productCatalogues
-  ) {
-    const error = new Error(
-      `Only ${eligibility.productCatalogues} product catalogues are allowed on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "PRODUCT_CATALOGUE_LIMIT_REACHED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Company Brochure
-  if (!eligibility.brochures && data.companyBrochure?.length > 0) {
-    const error = new Error(
-      "Company Brochure is not available on the Free plan."
-    );
-    error.status = 403;
-    error.code = "BROCHURE_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Certifications
-  if (!eligibility.certifications && data.certifications?.length > 0) {
-    const error = new Error(
-      "Certifications are not available on the Free plan."
-    );
-    error.status = 403;
-    error.code = "CERTIFICATIONS_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Brands Represented limits
-  if (
-    eligibility.brandsRepresented !== null &&
-    Array.isArray(data.brandsRepresented) &&
-    data.brandsRepresented.filter(Boolean).length > eligibility.brandsRepresented
-  ) {
-    const error = new Error(
-      `Only ${eligibility.brandsRepresented} brands can be represented on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "BRANDS_LIMIT_REACHED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Industries Served limits
-  if (
-    eligibility.industriesServed !== null &&
-    Array.isArray(data.industriesServed) &&
-    data.industriesServed.filter(Boolean).length > eligibility.industriesServed
-  ) {
-    const error = new Error(
-      `Only ${eligibility.industriesServed} industries can be served on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "INDUSTRIES_SERVED_LIMIT_REACHED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Export Markets
-  if (!eligibility.exportMarkets && data.exportMarkets?.filter(Boolean).length > 0) {
-    const error = new Error(
-      "Export Markets are not available on the Free plan."
-    );
-    error.status = 403;
-    error.code = "EXPORT_MARKETS_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // ============================================================================
-  // MANUFACTURING CAPABILITIES VALIDATION
-  // ============================================================================
-
-  const mfgConfig = getManufacturingCapabilitiesConfig(eligibility.plan);
-
-  // Check if manufacturing capabilities are allowed at all
-  if (data.manufacturingCapabilities && !mfgConfig.enabled) {
-    const error = new Error(
-      `Manufacturing Capabilities are not available on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "MANUFACTURING_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Check manufacturing images
-  if (data.manufacturingCapabilityImages && data.manufacturingCapabilityImages.length > 0) {
-    if (!mfgConfig.hasImages) {
-      const error = new Error(
-        `Manufacturing images are only available on Enterprise plan.`
-      );
-      error.status = 403;
-      error.code = "MANUFACTURING_IMAGES_NOT_ALLOWED";
-      error.eligibility = eligibility;
-      throw error;
-    }
-    // Enterprise has unlimited, so no limit check needed
-  }
-
-  // Check manufacturing videos
-  if (data.manufacturingCapabilityVideos && data.manufacturingCapabilityVideos.length > 0) {
-    if (!mfgConfig.hasVideos) {
-      const error = new Error(
-        `Manufacturing videos are only available on Enterprise plan.`
-      );
-      error.status = 403;
-      error.code = "MANUFACTURING_VIDEOS_NOT_ALLOWED";
-      error.eligibility = eligibility;
-      throw error;
-    }
-    // Enterprise has unlimited, so no limit check needed
-  }
-
-  // ============================================================================
-  // MACHINERY LIST VALIDATION
-  // ============================================================================
-
-  const machineryConfig = getMachineryListConfig(eligibility.plan);
-
-  // Check if machinery list is allowed at all
-  if (data.machineryList && !machineryConfig.enabled) {
-    const error = new Error(
-      `Machinery List is not available on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "MACHINERY_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Check machinery images
-  if (data.machineryImages && data.machineryImages.length > 0) {
-    if (!machineryConfig.hasImages) {
-      const error = new Error(
-        `Machinery images are only available on Enterprise plan.`
-      );
-      error.status = 403;
-      error.code = "MACHINERY_IMAGES_NOT_ALLOWED";
-      error.eligibility = eligibility;
-      throw error;
-    }
-    // Enterprise has unlimited, so no limit check needed
-  }
-
-  // Quality Standards
-  if (!eligibility.qualityStandards && data.qualityStandards) {
-    const error = new Error(
-      "Quality Standards are not available on the Free plan."
-    );
-    error.status = 403;
-    error.code = "QUALITY_STANDARDS_NOT_ALLOWED";
-    error.eligibility = eligibility;
-    throw error;
-  }
-
-  // Team Members
-  if (
-    eligibility.teamMembers !== null &&
-    data.teamMembers &&
-    Array.isArray(data.teamMembers) &&
-    data.teamMembers.filter(Boolean).length > eligibility.teamMembers
-  ) {
-    const error = new Error(
-      `Only ${eligibility.teamMembers} team members are allowed on the ${eligibility.planLabel} plan.`
-    );
-    error.status = 403;
-    error.code = "TEAM_MEMBER_LIMIT_REACHED";
     error.eligibility = eligibility;
     throw error;
   }

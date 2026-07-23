@@ -40,6 +40,33 @@ import quoteRoutes from "./routes/quoteRoutes.js";
 import teamRoutes from "./routes/team.js";
 import companyTeamRoutes from "./routes/companyTeam.js";
 import adminPackageRoutes from "./routes/adminPackageRoutes.js";
+import candidateSkillsRoutes from "./routes/candidateSkillsRoutes.js";
+import candidateEducationRoutes from "./routes/candidateEducationRoutes.js";
+import candidateProjectRoutes from "./routes/candidateProjectRoutes.js";
+import candidateSocialRoutes from "./routes/candidateSocialRoutes.js";
+import candidateCertificationRoutes from "./routes/candidateCertificationRoutes.js";
+import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
+import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
+import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
+
+import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
+// ✅ RBAC: sub-admin management routes
+import adminSubAdminRoutes from "./routes/adminSubAdminRoutes.js";
+// ✅ RBAC v2: role management + activity log routes
+import adminRoleRoutes from "./routes/adminRoleRoutes.js";
+import adminActivityRoutes from "./routes/adminActivityRoutes.js";
+// ✅ FIX: this route file existed in the controller but was never
+// wired up anywhere — GET /api/admin/permissions was 404ing because
+// of this missing import + mount, not because of anything in
+// adminSubAdminRoutes.js (despite the old log message claiming so).
+import adminPermissionRoutes from "./routes/adminPermissionRoutes.js";
+
+// ✅ auto-seed Permission table + prisma client for it
+import { prisma } from "./lib/prisma.js";
+import { ensurePermissionsSeeded } from "./lib/permissions.js";
+// ✅ RBAC v2: auto-seed default system Roles (Super Admin, Sub
+// Admin, Moderator, Support Staff) + their default RolePermission sets
+import { ensureRolesSeeded } from "./lib/roles.js";
 
 
 /* ======================================================
@@ -52,9 +79,6 @@ const __dirname = path.dirname(__filename);
 dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
-
-// console.log("🔑 TURNSTILE_SECRET_KEY Loaded?:", !!process.env.TURNSTILE_SECRET_KEY);
-// console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY)
 
 /* ======================================================
    🚀 APP INIT
@@ -120,6 +144,19 @@ app.use("/api/admin/companies", adminCompaniesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/recruiters", recruitersRoutes);
 app.use("/api/candidates", candidatesRoutes);
+
+// ✅ CANDIDATE ROUTES - All mounted
+app.use("/api/candidate-skills", candidateSkillsRoutes);
+app.use("/api/candidate-education", candidateEducationRoutes);
+app.use("/api/candidate-projects", candidateProjectRoutes);
+app.use("/api/candidate-socials", candidateSocialRoutes);
+app.use("/api/candidate-certifications", candidateCertificationRoutes);
+app.use("/api/candidate-languages", candidateLanguageRoutes);
+app.use("/api/candidate-achievements", candidateAchievementRoutes);
+app.use("/api/candidate-interests", candidateInterestRoutes);
+
+app.use("/api/candidate-experience", candidateExperienceRoutes);
+
 app.use("/api/recruiter", recruiterDashboardRoutes);
 app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/team", teamRoutes);
@@ -127,16 +164,35 @@ app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/suppliers", quoteRoutes);
 
 // ✅ ADMIN ROUTES - ORDER MATTERS!
-// Mount adminPackageRoutes FIRST before other admin routes
 console.log("🔵 Mounting admin package routes...");
 app.use("/api/admin", adminPackageRoutes);
 console.log("✅ Admin package routes mounted at /api/admin");
 
-// Then other admin routes
 app.use("/api/admin", adminDirectoryRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
+
+// ✅ RBAC — sub-admin CRUD
+console.log("🔵 Mounting admin sub-admin (RBAC) routes...");
+app.use("/api/admin", adminSubAdminRoutes);
+console.log("✅ Admin sub-admin routes mounted at /api/admin");
+
+// ✅ RBAC v2 — role CRUD + role permission management
+console.log("🔵 Mounting admin role (RBAC v2) routes...");
+app.use("/api/admin", adminRoleRoutes);
+console.log("✅ Admin role routes mounted at /api/admin");
+
+// ✅ FIX: this was the actually-missing mount — GET /api/admin/permissions
+// (and any future permission-catalogue endpoints) live here.
+console.log("🔵 Mounting admin permission catalogue routes...");
+app.use("/api/admin", adminPermissionRoutes);
+console.log("✅ Admin permission routes mounted at /api/admin");
+
+// ✅ sub-admin activity / tracking dashboard feed
+console.log("🔵 Mounting admin activity routes...");
+app.use("/api/admin", adminActivityRoutes);
+console.log("✅ Admin activity routes mounted at /api/admin");
 
 app.use("/api/banners", bannerRoutes);
 app.use("/api/banners", bannerUploadRoutes);
@@ -157,17 +213,13 @@ app.use("/api/quotes", quoteRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+async function start() {
+  await ensurePermissionsSeeded(prisma);
+  await ensureRolesSeeded(prisma);
 
-console.log("📋 All routes registered:");
-console.log("  - /api/admin/packages");
-console.log("  - /api/admin/packages/:id");
-console.log("  - /api/admin/packages (POST)");
-console.log("  - /api/admin/packages/:id (PUT)");
-console.log("  - /api/admin/packages/:id (DELETE)");
-console.log("  - /api/admin/packages/:id/toggle");
-console.log("  - /api/admin/companies");
-console.log("  - /api/admin/companies/:id");
-console.log("  - /api/admin/stats");
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+  });
+}
+
+start();

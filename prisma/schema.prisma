@@ -99,7 +99,31 @@ model User {
   companyId           Int?
   packageSelected     Boolean   @default(false)
   emailSentForBulkImport Boolean @default(false) 
-  lastLoginAt            DateTime?  
+  lastLoginAt            DateTime?
+
+  // ✅ RBAC: account can be deactivated without deleting it (used for sub-admins)
+  isActive            Boolean   @default(true)
+  roleId Int?
+
+  roleTemplate Role? @relation(fields: [roleId], references: [id])
+
+  skills CandidateSkill[]
+
+  experiences CandidateExperience[]
+
+  education CandidateEducation[]
+
+  projects CandidateProject[]
+
+  certifications CandidateCertification[]
+
+  languages CandidateLanguage[]
+
+  socials CandidateSocial[]
+
+  interests CandidateInterest[]
+
+  achievements CandidateAchievement[]
 
 
   AdvertisementBanner AdvertisementBanner[]
@@ -133,7 +157,191 @@ model User {
   teamMemberships     CompanyTeamMember[] @relation("TeamMemberUser")
   approvedTeamMembers CompanyTeamMember[] @relation("TeamMemberApprovedBy")
 
+  // ✅ RBAC: permissions this user has been granted (relevant for role = "sub_admin"),
+  // and permissions this user has granted to others (relevant for role = "super_admin"/"admin")
+  userPermissions     UserPermission[] @relation("UserPermissions")
+  grantedPermissions  UserPermission[] @relation("PermissionGrantedBy")
+
   @@index([companyId])
+}
+
+model CandidateSkill {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String
+  level       String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CandidateExperience {
+  id               Int       @id @default(autoincrement())
+  userId           Int
+
+  companyId        Int?
+  companyName      String
+
+  designation      String
+
+  employmentType   String?
+
+  location         String?
+
+  startDate        DateTime
+
+  endDate          DateTime?
+
+  currentlyWorking Boolean @default(false)
+
+  description      String? @db.Text
+
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+  company Company? @relation(fields:[companyId],references:[id])
+
+  @@index([userId])
+
+  @@index([companyId])
+}
+
+model CandidateEducation {
+
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  institution String
+
+  degree String
+
+  fieldOfStudy String?
+
+  startYear Int?
+
+  endYear Int?
+
+  grade String?
+
+  description String? @db.Text
+
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+  @@index([userId])
+}
+
+model CandidateProject {
+
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  title String
+
+  role String?
+
+  description String? @db.Text
+
+  imageUrl String?
+
+  websiteUrl String?
+
+  githubUrl String?
+
+  technologies Json?
+
+  startDate DateTime?
+
+  endDate DateTime?
+
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+  @@index([userId])
+}
+
+model CandidateCertification {
+
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  title String
+
+  organization String?
+
+  issueDate DateTime?
+
+  expiryDate DateTime?
+
+  credentialUrl String?
+
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+  @@index([userId])
+}
+
+model CandidateLanguage{
+
+id Int @id @default(autoincrement())
+
+userId Int
+
+language String
+
+proficiency String
+
+user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+@@index([userId])
+}
+
+model CandidateSocial{
+
+id Int @id @default(autoincrement())
+
+userId Int
+
+platform String
+
+url String
+
+user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+@@index([userId])
+}
+
+model CandidateInterest{
+
+id Int @id @default(autoincrement())
+
+userId Int
+
+title String
+
+type String?
+
+user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+@@index([userId])
+}
+
+model CandidateAchievement{
+
+id Int @id @default(autoincrement())
+
+userId Int
+
+title String
+
+description String?
+
+achievementDate DateTime?
+
+user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+
+@@index([userId])
 }
 
 model AdvertisementBanner {
@@ -185,6 +393,8 @@ model Company {
   Job                   Job[]
   Post                  Post[]
   SupplierDirectory     SupplierDirectory[]
+  candidateExperiences CandidateExperience[]
+
   User                  User[]
   PackagePurchase       PackagePurchase[]
   subscriptionPlan      String                 @default("free")
@@ -351,7 +561,7 @@ model Job {
   experience     String?
   salaryRange    String?
   location       String
-  isRemote       Boolean          @default(false)
+  isRemote       Boolean          @default(false) 
   isActive       Boolean          @default(true)
   views          Int              @default(0)
   isFeatured     Boolean          @default(false)   
@@ -633,6 +843,34 @@ model Package {
   @@index([isActive])
   @@index([displayOrder])
 }
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(100)
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+  rolePermissions RolePermission[]
+}
+model RolePermission {
+  id           Int @id @default(autoincrement())
+
+  roleId       Int
+  permissionId Int
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
 
 model NewsletterTemplate {
   id          Int      @id @default(autoincrement())
@@ -643,6 +881,43 @@ model NewsletterTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   User        User     @relation(fields: [createdById], references: [id])
+}
+
+// =====================================================================
+// ✅ RBAC ADDITIONS (Permission / UserPermission) — everything above
+// this line is unchanged from the original schema.
+// =====================================================================
+
+model Permission {
+
+  id              Int @id @default(autoincrement())
+  key             String @unique
+  label           String?
+  module          String?
+  createdAt       DateTime @default(now())
+
+  userPermissions UserPermission[]
+  rolePermissions RolePermission[]
+
+  @@index([module])
+}
+
+model UserPermission {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  permissionId Int
+  grantedById  Int?
+  granted      Boolean  @default(true) 
+  createdAt    DateTime @default(now())
+
+  user       User       @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy  User?      @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+  @@index([grantedById])
 }
 
 enum AdvertisementBanner_placement {
@@ -792,5 +1067,3 @@ enum TeamMemberStatus {
   REJECTED
   FORMER
 }
-
-
