@@ -1,4 +1,4 @@
-// controllers/supplierDirectoryController.js - FULL COMPLETE VERSION
+// controllers/supplierDirectoryController.js
 
 import prisma from "../prismaClient.js";
 import {
@@ -14,6 +14,11 @@ import {
 } from "../lib/packageContentLimits.js";
 import { getActiveSubscription } from "../lib/packagePurchases.js";
 import { getRfqLeadsEligibilityForSupplier } from "../lib/Leadlimits.js";
+import {
+  normalizeGalleryArray,
+  validateAndSanitizeGalleryArray,
+  countGalleryItems,
+} from "../lib/galleryUtils.js";
 
 async function getAllDescendantIndustryIds(parentId) {
   const ids = [parentId];
@@ -29,6 +34,16 @@ async function getAllDescendantIndustryIds(parentId) {
   }
 
   return ids;
+}
+
+// Helper function to normalize gallery fields in response
+function normalizeGalleryFields(directory) {
+  return {
+    ...directory,
+    productGallery: normalizeGalleryArray(directory.productGallery),
+    companyGallery: normalizeGalleryArray(directory.companyGallery),
+    factoryGallery: normalizeGalleryArray(directory.factoryGallery),
+  };
 }
 
 export const createDirectory = async (req, res) => {
@@ -131,15 +146,33 @@ export const createDirectory = async (req, res) => {
       });
     }
 
+    // Validate gallery arrays
+    const productGalleryValidation = validateAndSanitizeGalleryArray(productGallery);
+    const companyGalleryValidation = validateAndSanitizeGalleryArray(companyGallery);
+    const factoryGalleryValidation = validateAndSanitizeGalleryArray(factoryGallery);
+
+    const allErrors = [
+      ...productGalleryValidation.errors.map(e => `Product Gallery: ${e}`),
+      ...companyGalleryValidation.errors.map(e => `Company Gallery: ${e}`),
+      ...factoryGalleryValidation.errors.map(e => `Factory Gallery: ${e}`),
+    ];
+
+    if (allErrors.length > 0) {
+      return res.status(400).json({
+        error: "Gallery validation failed",
+        details: allErrors,
+      });
+    }
+
     // Check all other profile limits
     let profileEligibility;
     try {
       profileEligibility = await assertCompanyProfileLimits(user.companyId, {
         description,
         googleMapUrl,
-        productGallery,
-        companyGallery,
-        factoryGallery,
+        productGallery: productGalleryValidation.data,
+        companyGallery: companyGalleryValidation.data,
+        factoryGallery: factoryGalleryValidation.data,
         videoGallery,
         productCatalogues,
         companyBrochure,
@@ -169,15 +202,6 @@ export const createDirectory = async (req, res) => {
     const mfgConfig = getManufacturingCapabilitiesConfig(plan);
     const machineryConfig = getMachineryListConfig(plan);
 
-    // Safety: null out features not allowed by package
-    const isFeatureAllowed = (value) => {
-      if (value === null || value === undefined) return false;
-      if (typeof value === 'boolean') return value;
-      if (typeof value === 'string') return value.length > 0;
-      if (Array.isArray(value)) return value.length > 0;
-      return !!value;
-    };
-
     const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
     const safeManufacturingCapabilities = mfgConfig.enabled ? manufacturingCapabilities : null;
     const safeManufacturingCapabilityImages = mfgConfig.hasImages ? manufacturingCapabilityImages : null;
@@ -197,7 +221,7 @@ export const createDirectory = async (req, res) => {
       },
     });
 
-    // Create directory
+    // Create directory with validated gallery data
     const directory = await prisma.supplierDirectory.create({
       data: {
         name,
@@ -211,9 +235,9 @@ export const createDirectory = async (req, res) => {
         googleMapUrl: safeGoogleMapUrl,
         tradeNames,
         videoGallery,
-        productGallery,
-        companyGallery,
-        factoryGallery,
+        productGallery: productGalleryValidation.data,
+        companyGallery: companyGalleryValidation.data,
+        factoryGallery: factoryGalleryValidation.data,
         productCatalogues,
         companyBrochure,
         certifications,
@@ -236,7 +260,7 @@ export const createDirectory = async (req, res) => {
       },
     });
 
-    res.status(201).json(directory);
+    res.status(201).json(normalizeGalleryFields(directory));
   } catch (err) {
     console.error("Create directory error:", err);
     res.status(500).json({ error: "Failed to create directory" });
@@ -268,7 +292,7 @@ export const approveDirectory = async (req, res) => {
       },
     });
 
-    res.json(directory);
+    res.json(normalizeGalleryFields(directory));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Approval failed" });
@@ -300,7 +324,7 @@ export const getMyDirectoryById = async (req, res) => {
     }
 
     res.json({
-      ...directory,
+      ...normalizeGalleryFields(directory),
       coverImageUrl,
       manufacturingCapabilityImages: directory.manufacturingCapabilityImages || [],
       manufacturingCapabilityVideos: directory.manufacturingCapabilityVideos || [],
@@ -359,34 +383,36 @@ export const getMyDirectories = async (req, res) => {
         coverImageUrl = [];
       }
 
+      const normalized = normalizeGalleryFields(dir);
+
       return {
-        id: dir.id,
-        name: dir.name,
-        slug: dir.slug,
-        status: dir.status,
-        isLiveEditable: dir.isLiveEditable,
-        createdAt: dir.createdAt,
-        logoUrl: dir.logoUrl,
+        id: normalized.id,
+        name: normalized.name,
+        slug: normalized.slug,
+        status: normalized.status,
+        isLiveEditable: normalized.isLiveEditable,
+        createdAt: normalized.createdAt,
+        logoUrl: normalized.logoUrl,
         coverImageUrl,
-        productSupplies: dir.productSupplies,
-        videoGallery: dir.videoGallery,
-        productGallery: dir.productGallery,
-        companyGallery: dir.companyGallery,
-        factoryGallery: dir.factoryGallery,
-        productCatalogues: dir.productCatalogues,
-        companyBrochure: dir.companyBrochure,
-        certifications: dir.certifications,
-        brandsRepresented: dir.brandsRepresented,
-        industriesServed: dir.industriesServed,
-        exportMarkets: dir.exportMarkets,
-        manufacturingCapabilities: dir.manufacturingCapabilities,
-        manufacturingCapabilityImages: dir.manufacturingCapabilityImages || [],
-        manufacturingCapabilityVideos: dir.manufacturingCapabilityVideos || [],
-        machineryList: dir.machineryList,
-        machineryImages: dir.machineryImages || [],
-        qualityStandards: dir.qualityStandards,
-        enableInquiryForm: dir.enableInquiryForm,
-        googleMapUrl: dir.googleMapUrl,
+        productSupplies: normalized.productSupplies,
+        videoGallery: normalized.videoGallery,
+        productGallery: normalized.productGallery,
+        companyGallery: normalized.companyGallery,
+        factoryGallery: normalized.factoryGallery,
+        productCatalogues: normalized.productCatalogues,
+        companyBrochure: normalized.companyBrochure,
+        certifications: normalized.certifications,
+        brandsRepresented: normalized.brandsRepresented,
+        industriesServed: normalized.industriesServed,
+        exportMarkets: normalized.exportMarkets,
+        manufacturingCapabilities: normalized.manufacturingCapabilities,
+        manufacturingCapabilityImages: normalized.manufacturingCapabilityImages || [],
+        manufacturingCapabilityVideos: normalized.manufacturingCapabilityVideos || [],
+        machineryList: normalized.machineryList,
+        machineryImages: normalized.machineryImages || [],
+        qualityStandards: normalized.qualityStandards,
+        enableInquiryForm: normalized.enableInquiryForm,
+        googleMapUrl: normalized.googleMapUrl,
       };
     });
 
@@ -397,18 +423,49 @@ export const getMyDirectories = async (req, res) => {
   }
 };
 
+// controllers/supplierDirectoryController.js
+
+// controllers/supplierDirectoryController.js
+
 export const updateDirectory = async (req, res) => {
   try {
     const user = req.user;
     const directoryId = Number(req.params.id);
 
+    console.log("=== UPDATE DIRECTORY ===");
+    console.log("User:", user.id, user.role);
+    console.log("Directory ID:", directoryId);
+
     const directory = await prisma.supplierDirectory.findUnique({
       where: { id: directoryId },
     });
 
-    if (!directory) return res.status(404).json({ error: "Directory not found" });
-    if (directory.submittedById !== user.id) return res.status(403).json({ error: "Not allowed" });
-    if (!directory.isLiveEditable) return res.status(400).json({ error: "Directory not approved yet" });
+    if (!directory) {
+      console.log("Directory not found");
+      return res.status(404).json({ error: "Directory not found" });
+    }
+
+    console.log("Directory found:", {
+      id: directory.id,
+      submittedById: directory.submittedById,
+      isLiveEditable: directory.isLiveEditable,
+      status: directory.status
+    });
+
+    // Check if user owns this directory
+    if (directory.submittedById !== user.id) {
+      console.log("User does not own this directory:", {
+        submittedById: directory.submittedById,
+        userId: user.id
+      });
+      return res.status(403).json({ error: "Not allowed - You don't own this directory" });
+    }
+
+    // Check if directory is editable
+    if (!directory.isLiveEditable) {
+      console.log("Directory is not live editable");
+      return res.status(400).json({ error: "Directory not approved yet - Please wait for admin approval" });
+    }
 
     const {
       name,
@@ -450,7 +507,11 @@ export const updateDirectory = async (req, res) => {
       slug,
     } = req.body;
 
-    if (slug && slug !== directory.slug) return res.status(400).json({ error: "Slug cannot be changed" });
+    // Optional: Allow only specific fields to be updated
+    // Remove any fields that shouldn't be updated
+    if (slug && slug !== directory.slug) {
+      return res.status(400).json({ error: "Slug cannot be changed" });
+    }
 
     // Get active subscription to check plan
     const activeSubscription = await getActiveSubscription(directory.companyId ?? user.companyId);
@@ -469,49 +530,67 @@ export const updateDirectory = async (req, res) => {
       sanitizedMedia = await assertAndSanitizeSupplierDirectoryMedia(
         directory.companyId ?? user.companyId,
         {
-          coverImages: coverImages,
-          socialLinks,
+          coverImages: coverImages || [],
+          socialLinks: socialLinks || {},
         }
       );
     } catch (err) {
+      console.error("Media sanitization error:", err);
       return res.status(err.status || 403).json({
         error: err.message,
         code: err.code,
       });
     }
 
-    // Check all other profile limits
-    let profileEligibility;
-    try {
-      profileEligibility = await assertCompanyProfileLimits(
-        directory.companyId ?? user.companyId,
-        {
-          description,
-          googleMapUrl,
-          productGallery,
-          companyGallery,
-          factoryGallery,
-          videoGallery,
-          productCatalogues,
-          companyBrochure,
-          certifications,
-          brandsRepresented,
-          industriesServed,
-          exportMarkets,
-          manufacturingCapabilities,
-          manufacturingCapabilityImages,
-          manufacturingCapabilityVideos,
-          machineryList,
-          machineryImages,
-          qualityStandards,
-          coverImages: sanitizedMedia.coverImages,
+    // Validate gallery arrays - support partial updates (only provided fields)
+    let productGalleryValidation = null;
+    let companyGalleryValidation = null;
+    let factoryGalleryValidation = null;
+
+    // Normalize incoming gallery data - FIXED: removed TypeScript syntax
+    function normalizeIncomingGallery(gallery) {
+      if (!Array.isArray(gallery)) return gallery;
+      return gallery.map(function (item) {
+        if (typeof item === 'string') {
+          return { image: item, name: "", description: "" };
         }
-      );
-    } catch (err) {
-      return res.status(err.status || 403).json({
-        error: err.message,
-        code: err.code,
-        eligibility: err.eligibility,
+        return {
+          image: item?.image || "",
+          name: item?.name || "",
+          description: item?.description || ""
+        };
+      });
+    }
+
+    if (productGallery !== undefined) {
+      const normalized = normalizeIncomingGallery(productGallery);
+      productGalleryValidation = validateAndSanitizeGalleryArray(normalized);
+    }
+    if (companyGallery !== undefined) {
+      const normalized = normalizeIncomingGallery(companyGallery);
+      companyGalleryValidation = validateAndSanitizeGalleryArray(normalized);
+    }
+    if (factoryGallery !== undefined) {
+      const normalized = normalizeIncomingGallery(factoryGallery);
+      factoryGalleryValidation = validateAndSanitizeGalleryArray(normalized);
+    }
+
+    // Check gallery validation errors
+    const allErrors = [];
+    if (productGalleryValidation && productGalleryValidation.errors.length > 0) {
+      allErrors.push({ field: 'productGallery', errors: productGalleryValidation.errors });
+    }
+    if (companyGalleryValidation && companyGalleryValidation.errors.length > 0) {
+      allErrors.push({ field: 'companyGallery', errors: companyGalleryValidation.errors });
+    }
+    if (factoryGalleryValidation && factoryGalleryValidation.errors.length > 0) {
+      allErrors.push({ field: 'factoryGallery', errors: factoryGalleryValidation.errors });
+    }
+
+    if (allErrors.length > 0) {
+      return res.status(400).json({
+        error: "Gallery validation failed",
+        details: allErrors,
       });
     }
 
@@ -519,56 +598,121 @@ export const updateDirectory = async (req, res) => {
     const mfgConfig = getManufacturingCapabilitiesConfig(plan);
     const machineryConfig = getMachineryListConfig(plan);
 
-    // Safety: null out features not allowed by package
-    const isFeatureAllowed = (value) => {
-      if (value === null || value === "Unlimited") return true;
-      if (typeof value === 'boolean') return value;
-      if (typeof value === 'string') return value.length > 0 && value !== "false";
-      if (typeof value === 'number') return value > 0;
-      return !!value;
-    };
+    // Build update data - only include fields that are provided
+    const updateData = {};
 
-    const safeGoogleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
-    const safeManufacturingCapabilities = mfgConfig.enabled ? manufacturingCapabilities : null;
-    const safeManufacturingCapabilityImages = mfgConfig.hasImages ? manufacturingCapabilityImages : null;
-    const safeManufacturingCapabilityVideos = mfgConfig.hasVideos ? manufacturingCapabilityVideos : null;
-    const safeMachineryList = machineryConfig.enabled ? machineryList : null;
-    const safeMachineryImages = machineryConfig.hasImages ? machineryImages : null;
-    const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
-    const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
+    // Only add fields if they exist in the request
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (website !== undefined) updateData.website = website;
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (email !== undefined) updateData.email = email;
+    if (tradeNames !== undefined) updateData.tradeNames = tradeNames;
+    if (videoGallery !== undefined) updateData.videoGallery = videoGallery;
+    if (productSupplies !== undefined) updateData.productSupplies = productSupplies;
+    if (productCatalogues !== undefined) updateData.productCatalogues = productCatalogues;
+    if (companyBrochure !== undefined) updateData.companyBrochure = companyBrochure;
+    if (certifications !== undefined) updateData.certifications = certifications;
+    if (brandsRepresented !== undefined) updateData.brandsRepresented = brandsRepresented;
+    if (industriesServed !== undefined) updateData.industriesServed = industriesServed;
+    if (enableInquiryForm !== undefined) updateData.enableInquiryForm = enableInquiryForm;
+
+    // Social links with sanitization
+    if (socialLinks !== undefined) {
+      updateData.socialLinks = sanitizedMedia.socialLinks;
+    }
+
+    // Cover images
+    if (coverImageUrl !== undefined) {
+      updateData.coverImageUrl = sanitizedMedia.coverImages;
+    }
+
+    // Google Map - check if allowed by plan
+    if (googleMapUrl !== undefined) {
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      updateData.googleMapUrl = profileEligibility.googleMap ? googleMapUrl : null;
+    }
+
+    // Export Markets
+    if (exportMarkets !== undefined) {
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      updateData.exportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
+    }
+
+    // Manufacturing Capabilities
+    if (manufacturingCapabilities !== undefined) {
+      updateData.manufacturingCapabilities = mfgConfig.enabled ? manufacturingCapabilities : null;
+    }
+    if (manufacturingCapabilityImages !== undefined) {
+      updateData.manufacturingCapabilityImages = mfgConfig.hasImages ? manufacturingCapabilityImages : null;
+    }
+    if (manufacturingCapabilityVideos !== undefined) {
+      updateData.manufacturingCapabilityVideos = mfgConfig.hasVideos ? manufacturingCapabilityVideos : null;
+    }
+
+    // Machinery List
+    if (machineryList !== undefined) {
+      updateData.machineryList = machineryConfig.enabled ? machineryList : null;
+    }
+    if (machineryImages !== undefined) {
+      updateData.machineryImages = machineryConfig.hasImages ? machineryImages : null;
+    }
+
+    // Quality Standards
+    if (qualityStandards !== undefined) {
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      updateData.qualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
+    }
+
+    // Gallery fields with validation
+    if (productGalleryValidation && productGalleryValidation.data) {
+      // Check limits
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      const productLimit = profileEligibility.productImages;
+      if (productLimit !== null && productGalleryValidation.data.length > productLimit) {
+        return res.status(403).json({
+          error: `Only ${productLimit} product images are allowed on the ${profileEligibility.planLabel} plan.`,
+          code: "PRODUCT_IMAGE_LIMIT_REACHED",
+        });
+      }
+      updateData.productGallery = productGalleryValidation.data;
+    }
+
+    if (companyGalleryValidation && companyGalleryValidation.data) {
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      const galleryLimit = profileEligibility.galleryImages;
+      if (galleryLimit !== null && companyGalleryValidation.data.length > galleryLimit) {
+        return res.status(403).json({
+          error: `Only ${galleryLimit} company gallery images are allowed on the ${profileEligibility.planLabel} plan.`,
+          code: "COMPANY_GALLERY_LIMIT_REACHED",
+        });
+      }
+      updateData.companyGallery = companyGalleryValidation.data;
+    }
+
+    if (factoryGalleryValidation && factoryGalleryValidation.data) {
+      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
+      const factoryLimit = profileEligibility.factoryImages;
+      if (factoryLimit !== null && factoryGalleryValidation.data.length > factoryLimit) {
+        return res.status(403).json({
+          error: `Only ${factoryLimit} factory images are allowed on the ${profileEligibility.planLabel} plan.`,
+          code: "FACTORY_GALLERY_LIMIT_REACHED",
+        });
+      }
+      updateData.factoryGallery = factoryGalleryValidation.data;
+    }
+
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    console.log("Update data:", JSON.stringify(updateData, null, 2));
 
     const updated = await prisma.supplierDirectory.update({
       where: { id: directoryId },
-      data: {
-        name,
-        description,
-        website,
-        logoUrl,
-        coverImageUrl: sanitizedMedia.coverImages,
-        phoneNumber,
-        email,
-        googleMapUrl: safeGoogleMapUrl,
-        tradeNames,
-        socialLinks: sanitizedMedia.socialLinks,
-        videoGallery,
-        productGallery,
-        companyGallery,
-        factoryGallery,
-        productCatalogues,
-        companyBrochure,
-        certifications,
-        brandsRepresented,
-        industriesServed,
-        exportMarkets: safeExportMarkets,
-        manufacturingCapabilities: safeManufacturingCapabilities,
-        manufacturingCapabilityImages: safeManufacturingCapabilityImages,
-        manufacturingCapabilityVideos: safeManufacturingCapabilityVideos,
-        machineryList: safeMachineryList,
-        machineryImages: safeMachineryImages,
-        qualityStandards: safeQualityStandards,
-        enableInquiryForm,
-        productSupplies,
-      },
+      data: updateData,
     });
 
     await prisma.auditLog.create({
@@ -580,10 +724,14 @@ export const updateDirectory = async (req, res) => {
       },
     });
 
-    res.json(updated);
+    // Return normalized data
+    res.json(normalizeGalleryFields(updated));
   } catch (err) {
     console.error("Update directory error:", err);
-    res.status(500).json({ error: "Update failed" });
+    res.status(500).json({
+      error: "Update failed",
+      details: err.message
+    });
   }
 };
 
@@ -678,8 +826,11 @@ export const getSuppliers = async (req, res) => {
       }),
     ]);
 
+    // Normalize gallery fields for each supplier
+    const normalizedSuppliers = suppliers.map(supplier => normalizeGalleryFields(supplier));
+
     res.json({
-      data: suppliers,
+      data: normalizedSuppliers,
       total,
       page: pageNum,
       limit: limitNum,
@@ -730,8 +881,10 @@ export const getSupplierBySlug = async (req, res) => {
       coverImageUrl = [];
     }
 
+    const normalized = normalizeGalleryFields(supplier);
+
     return res.json({
-      ...supplier,
+      ...normalized,
       coverImageUrl,
       googleMapUrl: supplier.googleMapUrl ?? null,
       planTier: activeSubscription.plan,
@@ -798,7 +951,8 @@ export const getAllDirectoriesForAdmin = async (req, res) => {
       },
     });
 
-    res.json(directories);
+    const normalized = directories.map(dir => normalizeGalleryFields(dir));
+    res.json(normalized);
   } catch (err) {
     console.error("Admin fetch directories error:", err);
     res.status(500).json({ error: "Failed to fetch directories" });

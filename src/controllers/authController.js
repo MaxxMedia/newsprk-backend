@@ -5,6 +5,7 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
 import { Resend } from "resend"
+import { getUserPermissionKeys } from "../lib/permissions.js" // ✅ NEW: RBAC helper
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const MAIL_FROM = process.env.MAIL_FROM
@@ -173,6 +174,11 @@ export const login = async (req, res) => {
     if (!user.emailVerified)
       return res.status(403).json({ error: "Verify your email first" })
 
+    // ✅ RBAC: block deactivated sub-admins (or any deactivated account)
+    // from logging in at all, even with the correct password.
+    if (user.isActive === false)
+      return res.status(403).json({ error: "Your account has been deactivated" })
+
     const valid = await bcrypt.compare(password, user.password)
 
     if (!valid) {
@@ -202,8 +208,8 @@ export const login = async (req, res) => {
     // ✅ UPDATE: Set lastLoginAt on successful login
     await prisma.user.update({
       where: { email },
-      data: { 
-        failedLoginAttempts: 0, 
+      data: {
+        failedLoginAttempts: 0,
         lockUntil: null,
         lastLoginAt: new Date(), // ✅ This tracks when user last logged in
         // ❌ DO NOT set isOnboarded here - only set when onboarding is completed
@@ -218,12 +224,19 @@ export const login = async (req, res) => {
       },
     })
 
+    // ✅ RBAC: resolve effective permissions for this user right now.
+    // super_admin/admin get every permission key that exists; sub_admin
+    // gets exactly what's been granted via UserPermission; everyone
+    // else (candidate/recruiter) gets an empty array.
+    const permissions = await getUserPermissionKeys(prisma, user.id, user.role)
+
     const token = jwt.sign(
       {
         id: user.id,
         role: user.role,
         email: user.email,
         companyId: user.companyId,
+        permissions, // ✅ baked into the token for fast client-side checks only
       },
       JWT_SECRET,
       { expiresIn: "7d" }
@@ -254,7 +267,9 @@ export const login = async (req, res) => {
         packageSelected: packageSelected,
         subscriptionPlan: subscriptionPlan,
         lastLoginAt: updatedUser.lastLoginAt, // ✅ Include in response
+        isActive: updatedUser.isActive ?? true, // ✅ NEW
       },
+      permissions, // ✅ NEW: array of permission key strings, e.g. ["users.view", "jobs.view"]
     })
   } catch (error) {
     console.error("Login error:", error)
@@ -277,6 +292,11 @@ export const me = async (req, res) => {
       where: { userId: user.id, status: "PAID" },
     })
 
+    // ✅ RBAC: always resolve fresh from the DB — this is exactly why
+    // /me exists (live refresh without re-login), and permissions are
+    // no different from subscriptionPlan/isOnboarded in that respect.
+    const permissions = await getUserPermissionKeys(prisma, user.id, user.role)
+
     res.json({
       id: user.id,
       email: user.email,
@@ -287,6 +307,8 @@ export const me = async (req, res) => {
       packageSelected: !!packagePurchase,
       subscriptionPlan: user.Company?.subscriptionPlan || "free",
       lastLoginAt: user.lastLoginAt, // ✅ Include in response
+      isActive: user.isActive ?? true, // ✅ NEW
+      permissions, // ✅ NEW
     })
   } catch (err) {
     console.error("Me endpoint error:", err)

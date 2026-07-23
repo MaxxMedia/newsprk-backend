@@ -1,5 +1,19 @@
-import prisma from "../prismaClient.js";
-import { getPlanLabel } from "../lib/packagePricing.js";
+// src/controllers/adminAnalyticsController.js
+
+import {prisma} from "../lib/prisma.js";  // ✅ FIXED: Correct import path
+
+// ✅ FIXED: Added missing function inline
+function getPlanLabel(planKey) {
+  if (!planKey) return "Free";
+  const planMap = {
+    "free": "Free",
+    "basic": "Basic",
+    "standard": "Standard",
+    "premium": "Premium",
+    "enterprise": "Enterprise"
+  };
+  return planMap[planKey] || planKey.charAt(0).toUpperCase() + planKey.slice(1);
+}
 
 function getLast6Months() {
   const months = [];
@@ -85,6 +99,7 @@ export async function getAdminAnalytics(req, res) {
       prisma.packagePurchase.count({ where: { status: "PAID" } }),
       prisma.packagePurchase.count({ where: { status: "PENDING" } }),
       prisma.user.groupBy({ by: ["role"], _count: { role: true } }),
+      // ✅ FIXED: Handle null subscriptionPlan values
       prisma.company.groupBy({
         by: ["subscriptionPlan"],
         _count: { subscriptionPlan: true },
@@ -131,10 +146,7 @@ export async function getAdminAnalytics(req, res) {
     const growthChart = months.map((m) => {
       const userCount = usersInRange.filter((u) => {
         const d = new Date(u.createdAt);
-        return (
-          d >= m.start &&
-          d <= m.end
-        );
+        return d >= m.start && d <= m.end;
       }).length;
       const jobCount = jobsInRange.filter((j) => {
         const d = new Date(j.createdAt);
@@ -152,6 +164,15 @@ export async function getAdminAnalytics(req, res) {
         applications: applicationCount,
       };
     });
+
+    // ✅ FIXED: Handle null subscriptionPlan values safely
+    const subscriptionPlans = plansBreakdown
+      .filter(row => row.subscriptionPlan !== null)
+      .map((row) => ({
+        name: getPlanLabel(row.subscriptionPlan),
+        key: row.subscriptionPlan || "free",
+        value: row._count.subscriptionPlan,
+      }));
 
     res.json({
       overview: {
@@ -172,11 +193,7 @@ export async function getAdminAnalytics(req, res) {
         key: row.role || "unknown",
         value: row._count.role,
       })),
-      subscriptionPlans: plansBreakdown.map((row) => ({
-        name: getPlanLabel(row.subscriptionPlan),
-        key: row.subscriptionPlan,
-        value: row._count.subscriptionPlan,
-      })),
+      subscriptionPlans: subscriptionPlans,
       directoryStatus: directoryStatus.map((row) => ({
         name: row.status,
         key: row.status.toLowerCase(),
@@ -203,7 +220,12 @@ export async function getAdminAnalytics(req, res) {
       recentPurchases,
     });
   } catch (err) {
+    // ✅ FIXED: Proper error logging without leaking internals
     console.error("Admin analytics error:", err);
-    res.status(500).json({ error: "Failed to load analytics" });
+    res.status(500).json({
+      error: "Failed to load analytics",
+      // In production, just send the error message
+      message: process.env.NODE_ENV === "development" ? err.message : undefined
+    });
   }
 }

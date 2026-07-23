@@ -49,8 +49,24 @@ import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
 import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
 import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
 
-// ✅ ADD THIS MISSING IMPORT
 import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
+// ✅ RBAC: sub-admin management routes
+import adminSubAdminRoutes from "./routes/adminSubAdminRoutes.js";
+// ✅ RBAC v2: role management + activity log routes
+import adminRoleRoutes from "./routes/adminRoleRoutes.js";
+import adminActivityRoutes from "./routes/adminActivityRoutes.js";
+// ✅ FIX: this route file existed in the controller but was never
+// wired up anywhere — GET /api/admin/permissions was 404ing because
+// of this missing import + mount, not because of anything in
+// adminSubAdminRoutes.js (despite the old log message claiming so).
+import adminPermissionRoutes from "./routes/adminPermissionRoutes.js";
+
+// ✅ auto-seed Permission table + prisma client for it
+import { prisma } from "./lib/prisma.js";
+import { ensurePermissionsSeeded } from "./lib/permissions.js";
+// ✅ RBAC v2: auto-seed default system Roles (Super Admin, Sub
+// Admin, Moderator, Support Staff) + their default RolePermission sets
+import { ensureRolesSeeded } from "./lib/roles.js";
 
 /* ======================================================
    ✅ FIX: Proper .env loading
@@ -138,25 +154,44 @@ app.use("/api/candidate-languages", candidateLanguageRoutes);
 app.use("/api/candidate-achievements", candidateAchievementRoutes);
 app.use("/api/candidate-interests", candidateInterestRoutes);
 
-// ✅ ADD THIS - Mount the experience routes
 app.use("/api/candidate-experience", candidateExperienceRoutes);
 
 app.use("/api/recruiter", recruiterDashboardRoutes);
+app.use("/api/recruiter", recruiterArticlesRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/suppliers", supplierDirectoryRoutes);
 app.use("/api/suppliers", quoteRoutes);
 
 // ✅ ADMIN ROUTES - ORDER MATTERS!
-// Mount adminPackageRoutes FIRST before other admin routes
 console.log("🔵 Mounting admin package routes...");
 app.use("/api/admin", adminPackageRoutes);
 console.log("✅ Admin package routes mounted at /api/admin");
 
-// Then other admin routes
 app.use("/api/admin", adminDirectoryRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
+
+// ✅ RBAC — sub-admin CRUD
+console.log("🔵 Mounting admin sub-admin (RBAC) routes...");
+app.use("/api/admin", adminSubAdminRoutes);
+console.log("✅ Admin sub-admin routes mounted at /api/admin");
+
+// ✅ RBAC v2 — role CRUD + role permission management
+console.log("🔵 Mounting admin role (RBAC v2) routes...");
+app.use("/api/admin", adminRoleRoutes);
+console.log("✅ Admin role routes mounted at /api/admin");
+
+// ✅ FIX: this was the actually-missing mount — GET /api/admin/permissions
+// (and any future permission-catalogue endpoints) live here.
+console.log("🔵 Mounting admin permission catalogue routes...");
+app.use("/api/admin", adminPermissionRoutes);
+console.log("✅ Admin permission routes mounted at /api/admin");
+
+// ✅ sub-admin activity / tracking dashboard feed
+console.log("🔵 Mounting admin activity routes...");
+app.use("/api/admin", adminActivityRoutes);
+console.log("✅ Admin activity routes mounted at /api/admin");
 
 app.use("/api/banners", bannerRoutes);
 app.use("/api/banners", bannerUploadRoutes);
@@ -177,17 +212,13 @@ app.use("/api/quotes", quoteRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+async function start() {
+  await ensurePermissionsSeeded(prisma);
+  await ensureRolesSeeded(prisma);
 
-console.log("📋 All candidate routes registered:");
-console.log("  - /api/candidate-experience ✅");
-console.log("  - /api/candidate-skills ✅");
-console.log("  - /api/candidate-education ✅");
-console.log("  - /api/candidate-projects ✅");
-console.log("  - /api/candidate-socials ✅");
-console.log("  - /api/candidate-certifications ✅");
-console.log("  - /api/candidate-languages ✅");
-console.log("  - /api/candidate-achievements ✅");
-console.log("  - /api/candidate-interests ✅");
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+  });
+}
+
+start();
