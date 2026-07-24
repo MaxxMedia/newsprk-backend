@@ -48,6 +48,7 @@ import candidateCertificationRoutes from "./routes/candidateCertificationRoutes.
 import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
 import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
 import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
+import connectionRoutes from "./routes/connectionRoutes.js";
 
 import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
 // ✅ RBAC: sub-admin management routes
@@ -190,6 +191,7 @@ app.use("/api/banners", bannerUploadRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api", publicRoutes);
+app.use("/api/connections", connectionRoutes);
 app.use("/api/magazines", magazineRoutes);
 app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);
