@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/authenticate.js";
+import { requireAuth } from "../middleware/auth.js";
 import {
   sendConnectionRequest,
     acceptConnectionRequest,
@@ -17,64 +17,57 @@ import {
 
 const router = express.Router();
 
-router.post("/request", authenticate, sendConnectionRequest);
+router.post("/request", requireAuth, sendConnectionRequest);
+
 router.put(
   "/request/:requestId/accept",
-  authenticate,
+  requireAuth,
   acceptConnectionRequest
 );
 
 router.put(
   "/request/:requestId/reject",
-  authenticate,
+  requireAuth,
   rejectConnectionRequest
 );
 
 router.put(
   "/request/:requestId/cancel",
-  authenticate,
+  requireAuth,
   cancelConnectionRequest
 );
 
-router.get(
-  "/",
-  authenticate,
-  getMyConnections
-);
+router.get("/", requireAuth, getMyConnections);
 
-router.delete(
-  "/:userId",
-  authenticate,
-  removeConnection
-);
+router.delete("/:userId", requireAuth, removeConnection);
 
 router.get(
   "/requests/received",
-  authenticate,
+  requireAuth,
   getReceivedRequests
 );
 
 router.get(
   "/requests/sent",
-  authenticate,
+  requireAuth,
   getSentRequests
 );
 
 router.get(
   "/status/:userId",
-  authenticate,
+  requireAuth,
   getConnectionStatus
 );
 
 router.get(
   "/mutual/:userId",
-  authenticate,
- getMutualConnections
+  requireAuth,
+  getMutualConnections
 );
 
 router.get(
   "/suggestions",
-  authenticate,
+  requireAuth,
   getSuggestedConnections
 );
 
