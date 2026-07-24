@@ -5,6 +5,7 @@ import {
     deleteFile,
     uploadMultipleDocuments
 } from "../controllers/uploadController.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -16,6 +17,8 @@ router.post("/document", uploadDocument);
 
 // ✅ Multiple documents upload
 router.post("/documents", uploadMultipleDocuments);
+
+router.post("/document", requireAuth, ...uploadDocument)
 
 // ✅ Delete file
 router.delete("/", deleteFile);

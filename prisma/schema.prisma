@@ -496,12 +496,37 @@ model Event {
   bannerUrl                     String?
   startDate                     DateTime
   endDate                       DateTime
-  description                   String              @db.Text
+  description                   String              @db.Text   // Full Description
+  shortDescription              String?              @db.Text  // NEW — 250-char summary
+  eventType                     String?              // NEW
+  timings                       String?              // NEW — e.g. "10:00 AM – 06:00 PM"
+  city                          String?              // NEW
+  country                       String?              // NEW
+  highlights                    Json?                // NEW — string[]
+
+  // Organizer info — NEW
+  organizationName              String?
+  organizationWebsite           String?
+  contactPerson                 String?
+  organizerEmail                String?
+  organizerMobile               String?
+  organizerPhone                String?
+  address                       String?              @db.Text
+
+  // Additional — NEW
+  brochureUrl                   String?
+  otherImages                   Json?                // string[]
+  facebookUrl                   String?
+  twitterUrl                    String?
+  linkedinUrl                   String?
+  youtubeUrl                    String?
+
   websiteUrl                    String?
   registerUrl                   String?
   location                      String?
   calendarUrl                   String?
   status                        Event_status        @default(DRAFT)
+  rejectionReason               String?              // NEW
   views                         Int                 @default(0)
   createdById                   Int
   approvedById                  Int?
@@ -514,7 +539,10 @@ model Event {
 
   @@index([approvedById])
   @@index([createdById])
+  @@index([status])
 }
+
+
 
 model EventRegistration {
   id                  Int      @id @default(autoincrement())
@@ -1106,7 +1134,9 @@ enum Magazine_status {
 
 enum Event_status {
   DRAFT
+  PENDING
   PUBLISHED
+  REJECTED
   ARCHIVED
 }
 
@@ -1207,3 +1237,4 @@ enum TeamMemberStatus {
   REJECTED
   FORMER
 }
+
