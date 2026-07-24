@@ -63,14 +63,22 @@ export async function unsaveJob(req, res) {
 
     const jobId = Number(req.params.jobId);
 
-    await prisma.savedJob.delete({
-      where: {
-        jobId_userId: {
-          jobId,
-          userId: req.user.id,
+    try {
+      await prisma.savedJob.delete({
+        where: {
+          jobId_userId: {
+            jobId,
+            userId: req.user.id,
+          },
         },
-      },
-    });
+      });
+    } catch (err) {
+      if (err.code === "P2025") {
+        // Already unsaved (e.g. double-click, stale UI) — not an error
+        return res.json({ success: true, alreadyRemoved: true });
+      }
+      throw err;
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -78,6 +86,7 @@ export async function unsaveJob(req, res) {
     res.status(500).json({ error: "Failed to unsave job" });
   }
 }
+
 
 export async function getSaveStatus(req, res) {
   try {
