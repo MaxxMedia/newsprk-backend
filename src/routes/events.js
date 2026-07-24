@@ -13,6 +13,11 @@ import {
   registerForEvent,
   getEventRegistrations,
   getEventById,
+  createEventEnquiry,
+  getEventEnquiries,
+  getEventEnquiryById,
+  updateEventEnquiryStatus,
+  deleteEventEnquiry,
 } from "../controllers/eventsController.js"
 
 import { requireAuth, requireAdmin } from "../middleware/auth.js"
@@ -40,6 +45,15 @@ router.get("/admin/:id/registrations", requireAuth, requireAdmin, getEventRegist
  * IMPORTANT: This must come BEFORE the public "/:slug" route
  */
 router.get("/id/:id", requireAuth, getEventById)
+
+/**
+ * 🔐 Event Enquiries (Leads)
+ */
+router.post("/:slug/enquire", createEventEnquiry)
+router.get("/:slug/enquiries", requireAuth, getEventEnquiries)
+router.get("/enquiries/:id", requireAuth, getEventEnquiryById)
+router.patch("/enquiries/:id/status", requireAuth, updateEventEnquiryStatus)
+router.delete("/enquiries/:id", requireAuth, deleteEventEnquiry)
 
 /**
  * 🌍 PUBLIC ROUTES (LAST)

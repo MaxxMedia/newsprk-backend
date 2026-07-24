@@ -5,8 +5,8 @@ import slugify from "slugify"
 const prisma = new PrismaClient()
 
 /**
- * Helper: accept a highlights/otherImages array whether it arrives as a
- * real array (JSON body) or, defensively, a JSON string.
+ * Helper: accept a highlights/otherImages/videoGallery array whether it
+ * arrives as a real array (JSON body) or, defensively, a JSON string.
  */
 function parseArrayField(value) {
   if (!value) return []
@@ -21,15 +21,6 @@ function parseArrayField(value) {
 
 /**
  * ✅ RECRUITER or ADMIN: Create Event
- *
- * NOTE: This now expects a plain JSON body. Files (logo, banner, brochure,
- * otherImages) are uploaded separately via /api/upload BEFORE this call —
- * the frontend sends back the resulting URLs as strings, not raw files.
- *
- * - Recruiters: status becomes DRAFT ("Save as Draft") or PENDING
- *   ("Submit Event for Review") — never published directly.
- * - Admins: same draft/pending choice, but can also pass
- *   action: "publish" to publish immediately, skipping review.
  */
 export const createEvent = async (req, res) => {
   try {
@@ -64,6 +55,7 @@ export const createEvent = async (req, res) => {
       address,
       brochureUrl,
       otherImages,
+      videoGallery,
       facebookUrl,
       twitterUrl,
       linkedinUrl,
@@ -71,7 +63,6 @@ export const createEvent = async (req, res) => {
       action,          // "draft" | "submit" | "publish" (admin only)
     } = req.body
 
-    // Required-field validation matching the form's red-asterisk fields
     const required = {
       title, eventType, startDate, endDate, timings,
       venue, city, country, shortDescription, description,
@@ -97,8 +88,8 @@ export const createEvent = async (req, res) => {
     }
 
     const otherImagesArr = parseArrayField(otherImages).filter(Boolean)
+    const videoGalleryArr = parseArrayField(videoGallery).filter(Boolean) // ✅ FIX — was missing, caused ReferenceError
 
-    // ===== Status logic =====
     let status = "DRAFT"
     if (action === "submit") status = "PENDING"
     if (action === "publish" && req.user.role === "admin") status = "PUBLISHED"
@@ -136,6 +127,7 @@ export const createEvent = async (req, res) => {
         address,
         brochureUrl: brochureUrl || null,
         otherImages: otherImagesArr,
+        videoGallery: videoGalleryArr,
         facebookUrl: facebookUrl || null,
         twitterUrl: twitterUrl || null,
         linkedinUrl: linkedinUrl || null,
@@ -157,8 +149,6 @@ export const createEvent = async (req, res) => {
 
 /**
  * ✅ Get single event by ID (for editing)
- * - Admin: can view any event
- * - Recruiter: can only view their own events
  */
 export const getEventById = async (req, res) => {
   try {
@@ -177,7 +167,6 @@ export const getEventById = async (req, res) => {
       })
     }
 
-    // Check permissions
     const isAdmin = userRole === "admin"
     const isOwner = event.createdById === userId
 
@@ -188,7 +177,6 @@ export const getEventById = async (req, res) => {
       })
     }
 
-    // Convert DB fields to frontend field names
     const frontendEvent = {
       id: event.id,
       title: event.title,
@@ -214,6 +202,7 @@ export const getEventById = async (req, res) => {
       address: event.address || "",
       brochureUrl: event.brochureUrl || "",
       otherImages: event.otherImages || [],
+      videoGallery: event.videoGallery || [], // ✅ FIX — was missing, edit form never saw existing videos
       facebookUrl: event.facebookUrl || "",
       twitterUrl: event.twitterUrl || "",
       linkedinUrl: event.linkedinUrl || "",
@@ -353,7 +342,7 @@ export const getEventBySlug = async (req, res) => {
  */
 export const getAllEventsAdmin = async (req, res) => {
   try {
-    const { status } = req.query // optional ?status=PENDING filter
+    const { status } = req.query
 
     const events = await prisma.event.findMany({
       where: status ? { status } : undefined,
@@ -393,7 +382,7 @@ export const updateEvent = async (req, res) => {
       shortDescription, description, highlights,
       organizationName, contactPerson, email, mobileNumber, phoneNumber,
       organizationWebsite, address, brochureUrl, otherImages,
-      facebookUrl, twitterUrl, linkedinUrl, youtubeUrl,
+      videoGallery, facebookUrl, twitterUrl, linkedinUrl, youtubeUrl,
       action,
     } = req.body
 
@@ -425,9 +414,9 @@ export const updateEvent = async (req, res) => {
       ...(endDate && { endDate: new Date(endDate) }),
       ...(highlights && { highlights: parseArrayField(highlights).filter(h => h && h.trim()) }),
       ...(otherImages && { otherImages: parseArrayField(otherImages).filter(Boolean) }),
+      ...(videoGallery && { videoGallery: parseArrayField(videoGallery).filter(Boolean) }),
     }
 
-    // Editing a rejected event and resubmitting moves it back to PENDING
     if (existing.status === "REJECTED" && action === "submit") {
       data.status = "PENDING"
       data.rejectionReason = null
@@ -554,5 +543,336 @@ export const getEventRegistrations = async (req, res) => {
   } catch (error) {
     console.error("❌ Get Registrations Error:", error)
     res.status(500).json({ success: false, message: "Failed to fetch registrations" })
+  }
+}
+
+/**
+ * ✅ Create Event Enquiry (Public)
+ * Anyone can enquire about a published event
+ */
+export const createEventEnquiry = async (req, res) => {
+  try {
+    const { slug } = req.params
+    const { name, email, mobile, message } = req.body
+
+    // Validate required fields
+    if (!name || !email || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and message are required fields"
+      })
+    }
+
+    // Find the event
+    const event = await prisma.event.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        status: true
+      }
+    })
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      })
+    }
+
+    // Check if event is published
+    if (event.status !== "PUBLISHED") {
+      return res.status(403).json({
+        success: false,
+        message: "This event is not accepting enquiries"
+      })
+    }
+
+    // Create the enquiry
+    const enquiry = await prisma.eventEnquiry.create({
+      data: {
+        eventId: event.id,
+        name,
+        email,
+        mobile: mobile || null,
+        message,
+        status: "NEW",
+      }
+    })
+
+    res.status(201).json({
+      success: true,
+      message: "Enquiry submitted successfully",
+      data: enquiry
+    })
+
+  } catch (error) {
+    console.error("Error creating event enquiry:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit enquiry",
+      error: error.message
+    })
+  }
+}
+
+/**
+ * ✅ Get all enquiries for an event
+ * Recruiter: can only see enquiries for their own events
+ * Admin: can see enquiries for all events
+ */
+export const getEventEnquiries = async (req, res) => {
+  try {
+    const { slug } = req.params
+    const userRole = req.user.role
+    const userId = req.user.id
+
+    // Find the event
+    const event = await prisma.event.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        createdById: true,
+        title: true,
+        slug: true,
+      }
+    })
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      })
+    }
+
+    // Check permissions
+    const isAdmin = userRole === "admin"
+    const isOwner = event.createdById === userId
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to view enquiries for this event"
+      })
+    }
+
+    const enquiries = await prisma.eventEnquiry.findMany({
+      where: { eventId: event.id },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    res.status(200).json({
+      success: true,
+      count: enquiries.length,
+      data: enquiries,
+      event: {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+      }
+    })
+
+  } catch (error) {
+    console.error("Error fetching event enquiries:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch enquiries",
+      error: error.message
+    })
+  }
+}
+
+/**
+ * ✅ Get single enquiry by ID
+ */
+export const getEventEnquiryById = async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.id
+    const userRole = req.user.role
+
+    const enquiry = await prisma.eventEnquiry.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            createdById: true,
+          }
+        }
+      }
+    })
+
+    if (!enquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found"
+      })
+    }
+
+    // Check permissions
+    const isAdmin = userRole === "admin"
+    const isOwner = enquiry.Event.createdById === userId
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to view this enquiry"
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      data: enquiry
+    })
+
+  } catch (error) {
+    console.error("Error fetching enquiry:", error)
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch enquiry",
+      error: error.message
+    })
+  }
+}
+
+/**
+ * ✅ Update enquiry status
+ */
+export const updateEventEnquiryStatus = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status } = req.body
+    const userId = req.user.id
+    const userRole = req.user.role
+
+    const validStatuses = ['NEW', 'IN_PROGRESS', 'RESPONDED', 'RESOLVED', 'ARCHIVED']
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      })
+    }
+
+    const enquiry = await prisma.eventEnquiry.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        Event: {
+          select: {
+            createdById: true,
+          }
+        }
+      }
+    })
+
+    if (!enquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found"
+      })
+    }
+
+    // Check permissions
+    const isAdmin = userRole === "admin"
+    const isOwner = enquiry.Event.createdById === userId
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to update this enquiry"
+      })
+    }
+
+    const updated = await prisma.eventEnquiry.update({
+      where: { id: parseInt(id) },
+      data: { status }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Enquiry status updated successfully",
+      data: updated
+    })
+
+  } catch (error) {
+    console.error("Error updating enquiry status:", error)
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found"
+      })
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to update enquiry status",
+      error: error.message
+    })
+  }
+}
+
+/**
+ * ✅ Delete enquiry
+ */
+export const deleteEventEnquiry = async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.id
+    const userRole = req.user.role
+
+    const enquiry = await prisma.eventEnquiry.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        Event: {
+          select: {
+            createdById: true,
+          }
+        }
+      }
+    })
+
+    if (!enquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found"
+      })
+    }
+
+    // Check permissions
+    const isAdmin = userRole === "admin"
+    const isOwner = enquiry.Event.createdById === userId
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to delete this enquiry"
+      })
+    }
+
+    await prisma.eventEnquiry.delete({
+      where: { id: parseInt(id) }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Enquiry deleted successfully"
+    })
+
+  } catch (error) {
+    console.error("Error deleting enquiry:", error)
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: "Enquiry not found"
+      })
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete enquiry",
+      error: error.message
+    })
   }
 }

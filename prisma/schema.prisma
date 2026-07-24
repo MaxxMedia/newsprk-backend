@@ -516,6 +516,8 @@ model Event {
   // Additional — NEW
   brochureUrl                   String?
   otherImages                   Json?                // string[]
+  videoGallery                  Json?
+  
   facebookUrl                   String?
   twitterUrl                    String?
   linkedinUrl                   String?
@@ -530,18 +532,32 @@ model Event {
   views                         Int                 @default(0)
   createdById                   Int
   approvedById                  Int?
+  
   createdAt                     DateTime            @default(now())
   updatedAt                     DateTime
   publishedAt                   DateTime?
   User_Event_approvedByIdToUser User?               @relation("Event_approvedByIdToUser", fields: [approvedById], references: [id])
   User_Event_createdByIdToUser  User                @relation("Event_createdByIdToUser", fields: [createdById], references: [id])
   EventRegistration             EventRegistration[]
+  EventEnquiry                  EventEnquiry[]   
 
   @@index([approvedById])
   @@index([createdById])
   @@index([status])
 }
+model EventEnquiry {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  name      String
+  email     String
+  mobile    String?
+  message   String   @db.Text
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+  Event     Event    @relation(fields: [eventId], references: [id])
 
+  @@index([eventId])
+}
 
 
 model EventRegistration {
@@ -1087,6 +1103,7 @@ model UserPermission {
   @@index([permissionId])
   @@index([grantedById])
 }
+
 
 enum AdvertisementBanner_placement {
   HOME_TOP
