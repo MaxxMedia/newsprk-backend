@@ -553,33 +553,173 @@ model Industry {
 }
 
 model Job {
-  id             Int              @id @default(autoincrement())
-  title          String
-  slug           String           @unique
-  description    String           @db.Text
-  employmentType String
-  experience     String?
-  salaryRange    String?
-  location       String
-  isRemote       Boolean          @default(false) 
-  isActive       Boolean          @default(true)
-  views          Int              @default(0)
-  isFeatured     Boolean          @default(false)   
-  featuredAt     DateTime?                           
-  companyId      Int?
-  postedById     Int
-  createdAt      DateTime         @default(now())
-  applyUrl       String?
-  isExternal     Boolean          @default(false)
-  linkedinUrl    String?
-  companyName    String?
-  Company        Company?         @relation(fields: [companyId], references: [id])
-  User           User             @relation(fields: [postedById], references: [id])
-  JobApplication JobApplication[]
-  SavedJob       SavedJob[]
+  id                     Int       @id @default(autoincrement())
+
+  // ===========================
+  // Basic Information
+  // ===========================
+  title                  String
+  slug                   String    @unique
+  description            String    @db.Text
+  responsibilities       String?   @db.Text
+  requirements           String?   @db.Text
+  aboutCompany           String?   @db.Text
+
+  // ===========================
+  // Company
+  // ===========================
+  companyId              Int?
+  companyName            String?
+  companyWebsite         String?
+  companySize            String?
+  industry               String?
+  department             String?
+  reportsTo              String?
+
+  Company                Company?  @relation(fields: [companyId], references: [id])
+
+  // ===========================
+  // Employment
+  // ===========================
+  employmentType         String
+  workplaceType          String?
+  jobFunction            String?
+  seniorityLevel         String?
+  employmentMode         String?
+  shift                  String?
+
+  // ===========================
+  // Experience & Education
+  // ===========================
+  experience             String?
+  minExperience          Int?
+  maxExperience          Int?
+  education              String?
+  noticePeriod           String?
+
+  // ===========================
+  // Location
+  // ===========================
+  location               String
+  country                String?
+  state                  String?
+  city                   String?
+  zipCode                String?
+
+  isRemote               Boolean   @default(false)
+  isHybrid               Boolean   @default(false)
+
+  // ===========================
+  // Salary
+  // ===========================
+  salaryMin              Int?
+  salaryMax              Int?
+  salaryCurrency         String?   @default("INR")
+  salaryPeriod           String?
+  showSalary             Boolean   @default(true)
+
+  // ===========================
+  // Hiring
+  // ===========================
+  openings               Int       @default(1)
+  applicationDeadline    DateTime?
+  expectedJoiningDate    DateTime?
+  publishedAt            DateTime?
+  expiresAt              DateTime?
+
+  // ===========================
+  // Skills & Benefits
+  // ===========================
+  skills                 Json?
+  preferredSkills        Json?
+  benefits               Json?
+  languages              Json?
+
+  // ===========================
+  // Recruiter
+  // ===========================
+  recruiterName          String?
+  recruiterEmail         String?
+  recruiterPhone         String?
+
+  // ===========================
+  // External Application
+  // ===========================
+  applyUrl               String?
+  linkedinUrl            String?
+  isExternal             Boolean   @default(false)
+
+  // ===========================
+  // Extras
+  // ===========================
+  referralBonus          Int?
+  travelRequired         Boolean   @default(false)
+  relocationSupport      Boolean   @default(false)
+  visaSponsorship        Boolean   @default(false)
+
+  // ===========================
+  // Application Settings
+  // ===========================
+  requireResume          Boolean   @default(true)
+  requireCoverLetter     Boolean   @default(false)
+  requirePortfolio       Boolean   @default(false)
+  requireLinkedin        Boolean   @default(false)
+  allowEasyApply         Boolean   @default(true)
+
+  // ===========================
+  // SEO
+  // ===========================
+  metaTitle              String?
+  metaDescription        String?
+  keywords               Json?
+
+  // ===========================
+  // Status
+  // ===========================
+  isActive               Boolean   @default(true)
+  isFeatured             Boolean   @default(false)
+  featuredAt             DateTime?
+
+  // ===========================
+  // Analytics
+  // ===========================
+  views                  Int       @default(0)
+  applicationsCount      Int       @default(0)
+  savedCount             Int       @default(0)
+  shareCount             Int       @default(0)
+  clickCount             Int       @default(0)
+
+  // ===========================
+  // Ownership
+  // ===========================
+  postedById             Int
+  createdAt              DateTime  @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  
+  User                   User              @relation(fields: [postedById], references: [id])
+
+  JobApplication         JobApplication[]
+  SavedJob               SavedJob[]
 
   @@index([companyId])
   @@index([postedById])
+
+  @@index([employmentType])
+  @@index([workplaceType])
+  @@index([location])
+  @@index([city])
+  @@index([state])
+  @@index([country])
+
+  @@index([industry])
+  @@index([department])
+  @@index([seniorityLevel])
+
+  @@index([isActive])
+  @@index([isFeatured])
+
+  @@index([applicationDeadline])
+  @@index([publishedAt])
 }
 
 model SavedJob {

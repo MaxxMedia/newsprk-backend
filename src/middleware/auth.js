@@ -1,29 +1,28 @@
 import jwt from "jsonwebtoken"
 import { prisma } from "../lib/prisma.js"
 
-const JWT_SECRET = process.env.JWT_SECRET || "changeme"
-
 /*
-  ✅ ROOT-CAUSE FIX
+  ✅ ROOT-CAUSE FIX (part 1 of 2 — see server.js / loadEnv.js for part 2)
 
-  Previously req.user.companyId (and role) came straight from the JWT
-  payload, which is baked in at login time and never changes for the
-  life of the token (up to 7 days). In this app's flow — Signup → OTP →
-  Package Selection → Payment → Onboarding → Dashboard — login happens
-  BEFORE the Company is created during onboarding. That means every
-  request made after payment (feature limits, directory creation,
-  eligibility checks, dashboard data) was reading companyId: null from
-  the stale token, which made getActiveSubscription() and every limit
-  check silently fall back to "free" — no matter what plan was actually
-  purchased — until the user logged out and back in.
+  JWT_SECRET used to be read ONCE at module load time into a top-level
+  const:
 
-  Fix: only trust the JWT for the user's identity (id). Re-fetch
-  companyId, role, and isOnboarded from the database on every
-  authenticated request. This is one extra indexed lookup per request
-  (cheap) and permanently closes this class of bug everywhere
-  req.user is used — payments, articles, team limits, supplier
-  directories, jobs, etc. — not just in one controller.
+      const JWT_SECRET = process.env.JWT_SECRET || "changeme"
+
+  Because dotenv.config() in server.js ran AFTER this file was imported
+  (ES module imports execute before other top-level code, regardless of
+  where dotenv.config() appears in the file), process.env.JWT_SECRET
+  was still undefined when this line ran — so JWT_SECRET got
+  permanently locked to the fallback string "changeme" for the life of
+  the process. Meanwhile tokens were being signed with the real secret
+  from .env (read live inside the login handler), so every verification
+  failed with a signature mismatch -> 401 on every request.
+
+  Fix: read process.env.JWT_SECRET fresh, inside the function, on every
+  request — never cache it in a module-level const. Combined with
+  loading .env first in server.js, this is now correct either way.
 */
+
 export async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization
@@ -36,13 +35,14 @@ export async function requireAuth(req, res, next) {
       return res.status(401).json({ error: "Invalid auth format" })
     }
 
-    const payload = jwt.verify(token, JWT_SECRET)
+    const secret = process.env.JWT_SECRET || "changeme" // ✅ read live, not cached
+    const payload = jwt.verify(token, secret)
 
     if (!payload?.id) {
       return res.status(401).json({ error: "Invalid token payload" })
     }
 
-    // ✅ Fresh lookup — never trust companyId/role/isOnboarded from the
+    // Fresh lookup — never trust companyId/role/isOnboarded from the
     // token itself, since those can change after the token was issued.
     const dbUser = await prisma.user.findUnique({
       where: { id: payload.id },

@@ -1,6 +1,6 @@
+import "./loadEnv.js"; // ✅ MUST be the very first import — loads .env
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -68,16 +68,8 @@ import { ensurePermissionsSeeded } from "./lib/permissions.js";
 // Admin, Moderator, Support Staff) + their default RolePermission sets
 import { ensureRolesSeeded } from "./lib/roles.js";
 
-/* ======================================================
-   ✅ FIX: Proper .env loading
-====================================================== */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-dotenv.config({
-  path: path.resolve(__dirname, "../.env"),
-});
 
 /* ======================================================
    🚀 APP INIT
