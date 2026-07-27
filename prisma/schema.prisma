@@ -29,7 +29,7 @@ model Post {
   slug                         String      @unique
   badge                        String?
   excerpt                      String?
-  content                      String      @db.Text
+  content                      String
   imageUrl                     String?
   facebookUrl                  String?
   linkedinUrl                  String?
@@ -76,103 +76,136 @@ model Comment {
 }
 
 model User {
-  id                  Int       @id @default(autoincrement())
-  email               String    @unique
-  password            String
-  role                String    @default("candidate")
-  emailVerified       Boolean   @default(false)
-  otpHash             String?
-  otpExpiry           DateTime?
-  resetOtpHash        String?
-  resetOtpExpiry      DateTime?
-  failedLoginAttempts Int       @default(0)
-  lockUntil           DateTime?
-  createdAt           DateTime  @default(now())
-  username            String    @unique
-  fullName            String?
-  headline            String?
-  about               String?   @db.Text
-  location            String?
-  avatarUrl           String?
-  websiteUrl          String?
-  isOnboarded         Boolean   @default(false)
-  companyId           Int?
-  packageSelected     Boolean   @default(false)
-  emailSentForBulkImport Boolean @default(false) 
-  lastLoginAt            DateTime?
-
-  // ✅ RBAC: account can be deactivated without deleting it (used for sub-admins)
-  isActive            Boolean   @default(true)
-  roleId Int?
-
-  roleTemplate Role? @relation(fields: [roleId], references: [id])
-
-  skills CandidateSkill[]
-
-  experiences CandidateExperience[]
-
-  education CandidateEducation[]
-
-  projects CandidateProject[]
-
-  certifications CandidateCertification[]
-
-  languages CandidateLanguage[]
-
-  socials CandidateSocial[]
-
-  interests CandidateInterest[]
-
-  achievements CandidateAchievement[]
-
-
-  AdvertisementBanner AdvertisementBanner[]
-  CompanyFollower     CompanyFollower[]
-
-  Event_Event_approvedByIdToUser Event[] @relation("Event_approvedByIdToUser")
-  Event_Event_createdByIdToUser  Event[] @relation("Event_createdByIdToUser")
-
-  Job            Job[]
-  JobApplication JobApplication[]
-  SavedJob       SavedJob[]
-  JobAlert       JobAlert[]
-
-  Magazine Magazine[]
-
-  NewsletterSubscriber NewsletterSubscriber[]
-  NewsletterCampaign   NewsletterCampaign[]
-  NewsletterTemplate   NewsletterTemplate[]
+  id                                                      Int                      @id @default(autoincrement())
+  email                                                   String                   @unique
+  mobile                                                  String?                  @unique
+  password                                                String
+  role                                                    String                   @default("candidate")
+  emailVerified                                           Boolean                  @default(false)
+  mobileVerified                                          Boolean                  @default(false)
+  otpHash                                                 String?
+  otpExpiry                                               DateTime?
+  mobileOtpHash                                           String?
+  mobileOtpExpiry                                         DateTime?
+  resetOtpHash                                            String?
+  resetOtpExpiry                                          DateTime?
+  failedLoginAttempts                                     Int                      @default(0)
+  lockUntil                                               DateTime?
+  createdAt                                               DateTime                 @default(now())
+  username                                                String                   @unique
+  fullName                                                String?
+  headline                                                String?
+  about                                                   String?
+  location                                                String?
+  avatarUrl                                               String?
+  websiteUrl                                              String?
+  isOnboarded                                             Boolean                  @default(false)
+  companyId                                               Int?
+  packageSelected                                         Boolean                  @default(false)
+  emailSentForBulkImport                                  Boolean                  @default(false)
+  lastLoginAt                                             DateTime?
+  isActive                                                Boolean                  @default(true)
+  roleId                                                  Int?
   
+  // Relations
+  AdvertisementBanner                                     AdvertisementBanner[]
+  achievements                                            CandidateAchievement[]
+  certifications                                          CandidateCertification[]
+  education                                               CandidateEducation[]
+  experiences                                             CandidateExperience[]
+  interests                                               CandidateInterest[]
+  languages                                               CandidateLanguage[]
+  projects                                                CandidateProject[]
+  skills                                                  CandidateSkill[]
+  socials                                                 CandidateSocial[]
+  CompanyFollower                                         CompanyFollower[]
+  approvedTeamMembers                                     CompanyTeamMember[]      @relation("TeamMemberApprovedBy")
+  teamMemberships                                         CompanyTeamMember[]      @relation("TeamMemberUser")
+  Event_Event_approvedByIdToUser                          Event[]                  @relation("Event_approvedByIdToUser")
+  Event_Event_createdByIdToUser                           Event[]                  @relation("Event_createdByIdToUser")
+  Job                                                     Job[]
+  JobAlert                                                JobAlert[]
+  JobApplication                                          JobApplication[]
+  Magazine                                                Magazine[]
+  NewsletterCampaign                                      NewsletterCampaign[]
+  NewsletterSubscriber                                    NewsletterSubscriber[]
+  NewsletterTemplate                                      NewsletterTemplate[]
+  PackagePurchase                                         PackagePurchase[]
+  Post_Post_approvedByIdToUser                            Post[]                   @relation("Post_approvedByIdToUser")
+  Post_Post_createdByIdToUser                             Post[]                   @relation("Post_createdByIdToUser")
+  SavedJob                                                SavedJob[]
+  SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[]      @relation("SupplierDirectory_approvedByIdToUser")
+  SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[]      @relation("SupplierDirectory_submittedByIdToUser")
+  Company                                                 Company?                 @relation(fields: [companyId], references: [id])
+  roleTemplate                                            Role?                    @relation(fields: [roleId], references: [id])
+  grantedPermissions                                      UserPermission[]         @relation("PermissionGrantedBy")
+  userPermissions                                         UserPermission[]         @relation("UserPermissions")
+  resume                                                  CandidateResume?
+  
+  // Connection Relations
+  receivedConnectionRequests                              ConnectionRequest[]      @relation("ConnectionRequestReceiver")
+  sentConnectionRequests                                  ConnectionRequest[]      @relation("ConnectionRequestSender")
+  connections                                             UserConnection[]         @relation("UserConnections")
+  connectedTo                                             UserConnection[]         @relation("ConnectedUsers")
 
-  Post_Post_approvedByIdToUser Post[] @relation("Post_approvedByIdToUser")
-  Post_Post_createdByIdToUser  Post[] @relation("Post_createdByIdToUser")
-
-  SupplierDirectory_SupplierDirectory_approvedByIdToUser  SupplierDirectory[] @relation("SupplierDirectory_approvedByIdToUser")
-  SupplierDirectory_SupplierDirectory_submittedByIdToUser SupplierDirectory[] @relation("SupplierDirectory_submittedByIdToUser")
-
-  Company Company? @relation(fields: [companyId], references: [id])
-
-  PackagePurchase PackagePurchase[]
-
-  teamMemberships     CompanyTeamMember[] @relation("TeamMemberUser")
-  approvedTeamMembers CompanyTeamMember[] @relation("TeamMemberApprovedBy")
-
-  // ✅ RBAC: permissions this user has been granted (relevant for role = "sub_admin"),
-  // and permissions this user has granted to others (relevant for role = "super_admin"/"admin")
-  userPermissions     UserPermission[] @relation("UserPermissions")
-  grantedPermissions  UserPermission[] @relation("PermissionGrantedBy")
+  industryTalksCreated  IndustryTalk[] @relation("IndustryTalkCreatedBy")
+  industryTalksApproved IndustryTalk[] @relation("IndustryTalkApprovedBy")
 
   @@index([companyId])
 }
 
-model CandidateSkill {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  name        String
-  level       String?
-  createdAt   DateTime @default(now())
+model CandidateResume {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  fileName   String
+  fileUrl    String
+  fileSize   Int?
+  mimeType   String?
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model ConnectionRequest {
+  id          Int      @id @default(autoincrement())
+  senderId    Int
+  receiverId  Int
+  status      ConnectionRequestStatus @default(PENDING)
+  message     String?
+  acceptedAt  DateTime?
+  respondedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sender      User     @relation("ConnectionRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("ConnectionRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model UserConnection {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  connectionId Int
+  createdAt    DateTime @default(now())
+  user         User     @relation("UserConnections", fields: [userId], references: [id], onDelete: Cascade)
+  connection   User     @relation("ConnectedUsers", fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectionId])
+  @@index([userId])
+  @@index([connectionId])
+}
+
+model CandidateSkill {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  name      String
+  level     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -180,168 +213,107 @@ model CandidateSkill {
 model CandidateExperience {
   id               Int       @id @default(autoincrement())
   userId           Int
-
   companyId        Int?
   companyName      String
-
   designation      String
-
   employmentType   String?
-
   location         String?
-
   startDate        DateTime
-
   endDate          DateTime?
-
-  currentlyWorking Boolean @default(false)
-
-  description      String? @db.Text
-
-  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-
-  company Company? @relation(fields:[companyId],references:[id])
+  currentlyWorking Boolean   @default(false)
+  description      String?
+  company          Company?  @relation(fields: [companyId], references: [id])
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-
   @@index([companyId])
 }
 
 model CandidateEducation {
-
-  id Int @id @default(autoincrement())
-
-  userId Int
-
-  institution String
-
-  degree String
-
+  id           Int     @id @default(autoincrement())
+  userId       Int
+  institution  String
+  degree       String
   fieldOfStudy String?
-
-  startYear Int?
-
-  endYear Int?
-
-  grade String?
-
-  description String? @db.Text
-
-  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  startYear    Int?
+  endYear      Int?
+  grade        String?
+  description  String?
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model CandidateProject {
-
-  id Int @id @default(autoincrement())
-
-  userId Int
-
-  title String
-
-  role String?
-
-  description String? @db.Text
-
-  imageUrl String?
-
-  websiteUrl String?
-
-  githubUrl String?
-
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  title        String
+  role         String?
+  description  String?
+  imageUrl     String?
+  websiteUrl   String?
+  githubUrl    String?
   technologies Json?
-
-  startDate DateTime?
-
-  endDate DateTime?
-
-  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  startDate    DateTime?
+  endDate      DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model CandidateCertification {
-
-  id Int @id @default(autoincrement())
-
-  userId Int
-
-  title String
-
-  organization String?
-
-  issueDate DateTime?
-
-  expiryDate DateTime?
-
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  title         String
+  organization  String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
   credentialUrl String?
-
-  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
-model CandidateLanguage{
+model CandidateLanguage {
+  id          Int    @id @default(autoincrement())
+  userId      Int
+  language    String
+  proficiency String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-id Int @id @default(autoincrement())
-
-userId Int
-
-language String
-
-proficiency String
-
-user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-
-@@index([userId])
+  @@index([userId])
 }
 
-model CandidateSocial{
+model CandidateSocial {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  platform String
+  url      String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-id Int @id @default(autoincrement())
-
-userId Int
-
-platform String
-
-url String
-
-user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-
-@@index([userId])
+  @@index([userId])
 }
 
-model CandidateInterest{
+model CandidateInterest {
+  id     Int     @id @default(autoincrement())
+  userId Int
+  title  String
+  type   String?
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-id Int @id @default(autoincrement())
-
-userId Int
-
-title String
-
-type String?
-
-user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-
-@@index([userId])
+  @@index([userId])
 }
 
-model CandidateAchievement{
+model CandidateAchievement {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  title           String
+  organization    String?
+  description     String?
+  achievementDate DateTime?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-id Int @id @default(autoincrement())
-
-userId Int
-
-title String
-
-description String?
-
-achievementDate DateTime?
-
-user User @relation(fields:[userId],references:[id],onDelete:Cascade)
-
-@@index([userId])
+  @@index([userId])
 }
 
 model AdvertisementBanner {
@@ -388,20 +360,19 @@ model Company {
   createdAt             DateTime               @default(now())
   industryId            Int?
   address               String?
-  Industry              Industry?              @relation(fields: [industryId], references: [id])
-  CompanyFollower       CompanyFollower[]
-  Job                   Job[]
-  Post                  Post[]
-  SupplierDirectory     SupplierDirectory[]
-  candidateExperiences CandidateExperience[]
-
-  User                  User[]
-  PackagePurchase       PackagePurchase[]
   subscriptionPlan      String                 @default("free")
   subscriptionExpiresAt DateTime?
-  NewsletterSubscriber  NewsletterSubscriber[]
-  teamMembers           CompanyTeamMember[]
   jobPostingCredits     Int                    @default(0)
+  candidateExperiences  CandidateExperience[]
+  Industry              Industry?              @relation(fields: [industryId], references: [id])
+  CompanyFollower       CompanyFollower[]
+  teamMembers           CompanyTeamMember[]
+  Job                   Job[]
+  NewsletterSubscriber  NewsletterSubscriber[]
+  PackagePurchase       PackagePurchase[]
+  Post                  Post[]
+  SupplierDirectory     SupplierDirectory[]
+  User                  User[]
 
   @@index([industryId])
 }
@@ -421,9 +392,9 @@ model CompanyTeamMember {
   rejectionReason String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  approvedBy      User?            @relation("TeamMemberApprovedBy", fields: [approvedById], references: [id])
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user            User             @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  approvedBy      User?            @relation("TeamMemberApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([companyId, userId])
   @@index([companyId])
@@ -448,8 +419,8 @@ model PackagePurchase {
   expiresAt         DateTime?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
-  User              User                   @relation(fields: [userId], references: [id])
   Company           Company?               @relation(fields: [companyId], references: [id])
+  User              User                   @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([companyId])
@@ -476,7 +447,7 @@ model CoverStory {
   shortDescription String?
   keyCategories    Json?
   imageBrief       String?
-  fullDescription  String          @db.Text
+  fullDescription  String
   badge            String?
   coverImageUrl    String?
   slugImageUrls    Json?
@@ -488,6 +459,134 @@ model CoverStory {
   @@index([authorId])
 }
 
+model IndustryTalk {
+  id Int @id @default(autoincrement())
+
+  title String
+  slug  String @unique
+
+  interviewType String?
+  categoryId Int?
+  industryId Int?
+
+  status Event_status @default(DRAFT)
+
+  featured Boolean @default(false)
+  trending Boolean @default(false)
+  homepage Boolean @default(false)
+
+  bannerImage String?
+
+  videoType String?
+  videoUrl String?
+  uploadedVideo String?
+  thumbnailUrl String?
+  duration Int?
+
+  guestName String
+  designation String?
+  companyName String?
+  companyLogo String?
+  website String?
+  linkedinUrl String?
+  profileImage String?
+  shortBio String? @db.Text
+
+  introduction String? @db.Text
+
+  seoTitle String?
+  seoDescription String? @db.Text
+  seoKeywords Json?
+
+  relatedInterviews Json?
+
+  views Int @default(0)
+  shares Int @default(0)
+
+  createdById Int
+  approvedById Int?
+
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User @relation("IndustryTalkCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("IndustryTalkApprovedBy", fields: [approvedById], references: [id])
+
+  questions IndustryTalkQuestion[]
+  quotes IndustryTalkQuote[]
+  gallery IndustryTalkGallery[]
+  documents IndustryTalkDocument[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([createdById])
+  @@index([approvedById])
+}
+
+model IndustryTalkQuestion {
+  id Int @id @default(autoincrement())
+
+  industryTalkId Int
+
+  question String
+  answer String @db.Text
+
+  videoTimestamp String?
+  highlightQuote String?
+
+  displayOrder Int @default(0)
+
+  industryTalk IndustryTalk @relation(fields: [industryTalkId], references: [id], onDelete: Cascade)
+
+  @@index([industryTalkId])
+}
+
+model IndustryTalkQuote {
+  id Int @id @default(autoincrement())
+
+  industryTalkId Int
+
+  quote String
+
+  displayOrder Int @default(0)
+
+  industryTalk IndustryTalk @relation(fields: [industryTalkId], references: [id], onDelete: Cascade)
+
+  @@index([industryTalkId])
+}
+
+model IndustryTalkGallery {
+  id Int @id @default(autoincrement())
+
+  industryTalkId Int
+
+  imageUrl String
+  caption String?
+
+  displayOrder Int @default(0)
+
+  industryTalk IndustryTalk @relation(fields: [industryTalkId], references: [id], onDelete: Cascade)
+
+  @@index([industryTalkId])
+}
+
+model IndustryTalkDocument {
+  id Int @id @default(autoincrement())
+
+  industryTalkId Int
+
+  title String
+  fileUrl String
+  fileSize String?
+
+  displayOrder Int @default(0)
+
+  industryTalk IndustryTalk @relation(fields: [industryTalkId], references: [id], onDelete: Cascade)
+
+  @@index([industryTalkId])
+}
+
 model Event {
   id                            Int                 @id @default(autoincrement())
   title                         String
@@ -496,7 +595,7 @@ model Event {
   bannerUrl                     String?
   startDate                     DateTime
   endDate                       DateTime
-  description                   String              @db.Text
+  description                   String
   websiteUrl                    String?
   registerUrl                   String?
   location                      String?
@@ -508,12 +607,35 @@ model Event {
   createdAt                     DateTime            @default(now())
   updatedAt                     DateTime
   publishedAt                   DateTime?
+  address                       String?
+  brochureUrl                   String?
+  city                          String?
+  contactPerson                 String?
+  country                       String?
+  eventType                     String?
+  facebookUrl                   String?
+  highlights                    Json?
+  linkedinUrl                   String?
+  organizationName              String?
+  organizerEmail                String?
+  organizerMobile               String?
+  organizerPhone                String?
+  otherImages                   Json?
+  rejectionReason               String?
+  shortDescription              String?
+  timings                       String?
+  twitterUrl                    String?
+  youtubeUrl                    String?
+  organizationWebsite           String?
+  videoGallery                  Json?
   User_Event_approvedByIdToUser User?               @relation("Event_approvedByIdToUser", fields: [approvedById], references: [id])
   User_Event_createdByIdToUser  User                @relation("Event_createdByIdToUser", fields: [createdById], references: [id])
+  EventEnquiry                  EventEnquiry[]
   EventRegistration             EventRegistration[]
 
   @@index([approvedById])
   @@index([createdById])
+  @@index([status])
 }
 
 model EventRegistration {
@@ -531,10 +653,24 @@ model EventRegistration {
   attendeeType        String?
   ticketType          String?
   interests           Json?
-  specialRequirements String?  @db.Text
+  specialRequirements String?
   status              String   @default("REGISTERED")
   createdAt           DateTime @default(now())
   Event               Event    @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
+}
+
+model EventEnquiry {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  name      String
+  email     String
+  mobile    String?
+  message   String
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+  Event     Event    @relation(fields: [eventId], references: [id])
 
   @@index([eventId])
 }
@@ -553,33 +689,101 @@ model Industry {
 }
 
 model Job {
-  id             Int              @id @default(autoincrement())
-  title          String
-  slug           String           @unique
-  description    String           @db.Text
-  employmentType String
-  experience     String?
-  salaryRange    String?
-  location       String
-  isRemote       Boolean          @default(false) 
-  isActive       Boolean          @default(true)
-  views          Int              @default(0)
-  isFeatured     Boolean          @default(false)   
-  featuredAt     DateTime?                           
-  companyId      Int?
-  postedById     Int
-  createdAt      DateTime         @default(now())
-  applyUrl       String?
-  isExternal     Boolean          @default(false)
-  linkedinUrl    String?
-  companyName    String?
-  Company        Company?         @relation(fields: [companyId], references: [id])
-  User           User             @relation(fields: [postedById], references: [id])
-  JobApplication JobApplication[]
-  SavedJob       SavedJob[]
+  id                  Int              @id @default(autoincrement())
+  title               String
+  slug                String           @unique
+  description         String
+  employmentType      String
+  experience          String?
+  location            String
+  isRemote            Boolean          @default(false)
+  isActive            Boolean          @default(true)
+  views               Int              @default(0)
+  companyId           Int?
+  postedById          Int
+  createdAt           DateTime         @default(now())
+  applyUrl            String?
+  isExternal          Boolean          @default(false)
+  linkedinUrl         String?
+  companyName         String?
+  featuredAt          DateTime?
+  isFeatured          Boolean          @default(false)
+  aboutCompany        String?
+  allowEasyApply      Boolean          @default(true)
+  applicationDeadline DateTime?
+  applicationsCount   Int              @default(0)
+  benefits            Json?
+  city                String?
+  clickCount          Int              @default(0)
+  companySize         String?
+  companyWebsite      String?
+  country             String?
+  department          String?
+  education           String?
+  employmentMode      String?
+  expectedJoiningDate DateTime?
+  expiresAt           DateTime?
+  industry            String?
+  isHybrid            Boolean          @default(false)
+  jobFunction         String?
+  keywords            Json?
+  languages           Json?
+  maxExperience       Int?
+  metaDescription     String?
+  metaTitle           String?
+  minExperience       Int?
+  noticePeriod        String?
+  openings            Int              @default(1)
+  preferredSkills     Json?
+  publishedAt         DateTime?
+  recruiterEmail      String?
+  recruiterName       String?
+  recruiterPhone      String?
+  referralBonus       Int?
+  relocationSupport   Boolean          @default(false)
+  reportsTo           String?
+  requireCoverLetter  Boolean          @default(false)
+  requireLinkedin     Boolean          @default(false)
+  requirePortfolio    Boolean          @default(false)
+  requireResume       Boolean          @default(true)
+  requirements        String?
+  responsibilities    String?
+  salaryCurrency      String?          @default("INR")
+  salaryMax           Int?
+  salaryMin           Int?
+  salaryPeriod        String?
+  savedCount          Int              @default(0)
+  seniorityLevel      String?
+  shareCount          Int              @default(0)
+  shift               String?
+  showSalary          Boolean          @default(true)
+  skills              Json?
+  state               String?
+  travelRequired      Boolean          @default(false)
+  updatedAt           DateTime         @default(now())
+  visaSponsorship     Boolean          @default(false)
+  workplaceType       String?
+  zipCode             String?
+  Company             Company?         @relation(fields: [companyId], references: [id])
+  User                User             @relation(fields: [postedById], references: [id])
+  JobApplication      JobApplication[]
+  SavedJob            SavedJob[]
 
   @@index([companyId])
   @@index([postedById])
+  @@index([applicationDeadline])
+  @@index([city])
+  @@index([country])
+  @@index([department])
+  @@index([employmentType])
+  @@index([industry])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([location])
+  @@index([publishedAt])
+  @@index([seniorityLevel])
+  @@index([state])
+  @@index([workplaceType])
 }
 
 model SavedJob {
@@ -629,7 +833,7 @@ model Magazine {
   id                   Int                    @id @default(autoincrement())
   title                String
   slug                 String                 @unique
-  description          String?                @db.Text
+  description          String?
   coverImageUrl        String?
   pdfUrl               String
   flipbookPages        Json?
@@ -684,10 +888,10 @@ model SupplierDirectory {
   phoneNumber                                String?
   email                                      String?
   website                                    String?
-  googleMapUrl                               String?                  @db.Text
+  googleMapUrl                               String?
   logoUrl                                    String?
   coverImageUrl                              Json?
-  description                                String                   @db.Text
+  description                                String
   tradeNames                                 Json?
   socialLinks                                Json?
   videoGallery                               Json?
@@ -701,9 +905,9 @@ model SupplierDirectory {
   brandsRepresented                          Json?
   industriesServed                           Json?
   exportMarkets                              Json?
-  manufacturingCapabilities                  String?                  @db.Text
-  machineryList                              String?                  @db.Text
-  qualityStandards                           String?                  @db.Text
+  manufacturingCapabilities                  String?
+  machineryList                              String?
+  qualityStandards                           String?
   enableInquiryForm                          Boolean                  @default(true)
   status                                     SupplierDirectory_status @default(PENDING)
   isLiveEditable                             Boolean                  @default(false)
@@ -714,13 +918,12 @@ model SupplierDirectory {
   createdAt                                  DateTime                 @default(now())
   approvedAt                                 DateTime?
   isFeatured                                 Boolean                  @default(false)
+  machineryImages                            Json?
+  manufacturingCapabilityImages              Json?
+  manufacturingCapabilityVideos              Json?
   User_SupplierDirectory_approvedByIdToUser  User?                    @relation("SupplierDirectory_approvedByIdToUser", fields: [approvedById], references: [id])
   Company                                    Company?                 @relation(fields: [companyId], references: [id])
   User_SupplierDirectory_submittedByIdToUser User                     @relation("SupplierDirectory_submittedByIdToUser", fields: [submittedById], references: [id])
-  
-  manufacturingCapabilityImages              Json?                    // NEW: Array of image URLs
-  manufacturingCapabilityVideos              Json?                    // NEW: Array of video URLs
-  machineryImages                            Json?                    // NEW: Array of image URLs
 
   @@index([approvedById])
   @@index([companyId])
@@ -743,9 +946,9 @@ model NewsletterSubscriber {
   status              NewsletterStatus           @default(ACTIVE)
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
-  User                User?                      @relation(fields: [userId], references: [id])
-  Company             Company?                   @relation(fields: [companyId], references: [id])
   NewsletterRecipient NewsletterRecipient[]
+  Company             Company?                   @relation(fields: [companyId], references: [id])
+  User                User?                      @relation(fields: [userId], references: [id])
 
   @@index([email])
   @@index([phoneNumber])
@@ -757,7 +960,7 @@ model NewsletterCampaign {
   id                  Int                   @id @default(autoincrement())
   title               String
   subject             String
-  content             String                @db.Text
+  content             String
   coverImage          String?
   emailEnabled        Boolean               @default(true)
   whatsappEnabled     Boolean               @default(false)
@@ -797,6 +1000,7 @@ model NewsletterRecipient {
   @@index([campaignId])
   @@index([subscriberId])
 }
+
 model Lead {
   id          Int         @id @default(autoincrement())
   source      Lead_source
@@ -809,12 +1013,12 @@ model Lead {
   phoneNumber String?
   website     String?
   companyName String?
-  message     String      @db.Text
+  message     String
   hasPackage  Boolean     @default(false)
   planName    String?
   status      LeadStatus  @default(NEW)
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  updatedAt   DateTime    @updatedAt  // ✅ Fix: Change @updatedA to @updatedAt
 
   @@index([contactId])
   @@index([supplierId])
@@ -823,49 +1027,48 @@ model Lead {
   @@index([status])
   @@index([source])
 }
+
 model Package {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String
   type          PackageType
   price         Int
   billingCycle  BillingCycle
   description   String?
   badge         String?
-  displayOrder  Int      @default(0)
-  isHighlighted Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  metadata      Json?    // For additional data like durationDays, features, etc.
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  displayOrder  Int          @default(0)
+  isHighlighted Boolean      @default(false)
+  isActive      Boolean      @default(true)
+  metadata      Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   deletedAt     DateTime?
 
   @@index([type])
   @@index([isActive])
   @@index([displayOrder])
 }
+
 model Role {
-  id          Int      @id @default(autoincrement())
-  name        String
-  slug        String   @unique
-  description String?
-  sortOrder   Int      @default(100)
-  isSystem    Boolean  @default(false)
-  isActive    Boolean  @default(true)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  users User[]
+  id              Int              @id @default(autoincrement())
+  name            String
+  slug            String           @unique
+  description     String?
+  sortOrder       Int              @default(100)
+  isSystem        Boolean          @default(false)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   rolePermissions RolePermission[]
+  users           User[]
 }
-model RolePermission {
-  id           Int @id @default(autoincrement())
 
+model RolePermission {
+  id           Int        @id @default(autoincrement())
   roleId       Int
   permissionId Int
-
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
   @@index([roleId])
@@ -876,49 +1079,54 @@ model NewsletterTemplate {
   id          Int      @id @default(autoincrement())
   name        String
   subject     String
-  content     String   @db.Text
+  content     String
   createdById Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   User        User     @relation(fields: [createdById], references: [id])
 }
 
-// =====================================================================
-// ✅ RBAC ADDITIONS (Permission / UserPermission) — everything above
-// this line is unchanged from the original schema.
-// =====================================================================
-
 model Permission {
-
-  id              Int @id @default(autoincrement())
-  key             String @unique
+  id              Int              @id @default(autoincrement())
+  key             String           @unique
   label           String?
   module          String?
-  createdAt       DateTime @default(now())
-
-  userPermissions UserPermission[]
+  createdAt       DateTime         @default(now())
   rolePermissions RolePermission[]
+  userPermissions UserPermission[]
 
   @@index([module])
 }
 
 model UserPermission {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   userId       Int
   permissionId Int
   grantedById  Int?
-  granted      Boolean  @default(true) 
-  createdAt    DateTime @default(now())
-
-  user       User       @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  grantedBy  User?      @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  granted      Boolean    @default(true)
+  grantedBy    User?      @relation("PermissionGrantedBy", fields: [grantedById], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         User       @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId])
   @@index([userId])
   @@index([permissionId])
   @@index([grantedById])
 }
+
+model ContactMessage {
+  id          Int      @id @default(autoincrement())
+  fullName    String
+  email       String
+  phoneNumber String?
+  website     String?
+  message     String
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+}
+
+// ============ ENUMS ============
 
 enum AdvertisementBanner_placement {
   HOME_TOP
@@ -968,6 +1176,8 @@ enum Event_status {
   DRAFT
   PUBLISHED
   ARCHIVED
+  PENDING
+  REJECTED
 }
 
 enum SupplierDirectory_status {
@@ -1038,17 +1248,6 @@ enum DeliveryStatus {
   CLICKED
 }
 
-model ContactMessage {
-  id          Int      @id @default(autoincrement())
-  fullName    String
-  email       String
-  phoneNumber String?
-  website     String?
-  message     String   @db.Text
-  status      String   @default("NEW")
-  createdAt   DateTime @default(now())
-}
-
 enum Lead_source {
   CONTACT
   QUOTE
@@ -1066,4 +1265,11 @@ enum TeamMemberStatus {
   ACTIVE
   REJECTED
   FORMER
+}
+
+enum ConnectionRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
 }

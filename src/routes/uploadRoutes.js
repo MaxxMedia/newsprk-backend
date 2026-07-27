@@ -3,8 +3,11 @@ import {
     uploadImage,
     uploadDocument,
     deleteFile,
-    uploadMultipleDocuments
+    uploadMultipleDocuments,
+    uploadIndustryTalk
 } from "../controllers/uploadController.js";
+import { uploadIndustryTalkFiles } from "../middleware/uploadIndustryTalk.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -17,7 +20,16 @@ router.post("/document", uploadDocument);
 // ✅ Multiple documents upload
 router.post("/documents", uploadMultipleDocuments);
 
+router.post("/document", requireAuth, ...uploadDocument)
+
 // ✅ Delete file
 router.delete("/", deleteFile);
+
+router.post(
+  "/industry-talk",
+  requireAuth,
+  uploadIndustryTalkFiles,
+  uploadIndustryTalk
+);
 
 export default router;

@@ -1,6 +1,6 @@
+import "./loadEnv.js"; // ✅ MUST be the very first import — loads .env
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -48,6 +48,7 @@ import candidateCertificationRoutes from "./routes/candidateCertificationRoutes.
 import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
 import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
 import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
+import connectionRoutes from "./routes/connectionRoutes.js";
 
 import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
 // ✅ RBAC: sub-admin management routes
@@ -60,6 +61,7 @@ import adminActivityRoutes from "./routes/adminActivityRoutes.js";
 // of this missing import + mount, not because of anything in
 // adminSubAdminRoutes.js (despite the old log message claiming so).
 import adminPermissionRoutes from "./routes/adminPermissionRoutes.js";
+import industryTalkRoutes from "./routes/industryTalkRoutes.js";
 
 // ✅ auto-seed Permission table + prisma client for it
 import { prisma } from "./lib/prisma.js";
@@ -69,16 +71,8 @@ import { ensurePermissionsSeeded } from "./lib/permissions.js";
 import { ensureRolesSeeded } from "./lib/roles.js";
 
 
-/* ======================================================
-   ✅ FIX: Proper .env loading
-====================================================== */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-dotenv.config({
-  path: path.resolve(__dirname, "../.env"),
-});
 
 /* ======================================================
    🚀 APP INIT
@@ -90,7 +84,14 @@ const app = express();
    🧰 Middlewares
 ========================== */
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+); 
 app.use(express.json());
 app.use("/api/contact", contactRoutes);
 
@@ -172,6 +173,7 @@ app.use("/api/admin", adminDirectoryRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
+app.use("/api/industry-talks", industryTalkRoutes);
 
 // ✅ RBAC — sub-admin CRUD
 console.log("🔵 Mounting admin sub-admin (RBAC) routes...");
@@ -199,6 +201,7 @@ app.use("/api/banners", bannerUploadRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api", publicRoutes);
+app.use("/api/connections", connectionRoutes);
 app.use("/api/magazines", magazineRoutes);
 app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);

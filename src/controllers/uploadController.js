@@ -277,3 +277,234 @@ export const uploadMultipleDocuments = [
     }
   },
 ];
+// ----------------------------
+// ✅ NEW: Generic Cloudinary upload helper (image or raw/document)
+// Reusable from any controller — not tied to a specific route/field name.
+// ----------------------------
+export async function uploadBufferToCloudinary(file, { folder, resourceType = "image" }) {
+  return new Promise((resolve, reject) => {
+    const originalName = file.originalname.split(".")[0];
+    const extension = file.originalname.split(".").pop();
+
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: resourceType, // "image" | "raw" | "auto"
+        public_id: `${originalName}-${Date.now()}`,
+        ...(resourceType !== "image" && { format: extension }),
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+
+    stream.end(file.buffer);
+  });
+}
+
+export async function uploadEventImageToCloudinary(file) {
+  return uploadBufferToCloudinary(file, {
+    folder: "mould-tech/events/images",
+    resourceType: "image",
+  });
+}
+
+export async function uploadEventDocumentToCloudinary(file) {
+  return uploadBufferToCloudinary(file, {
+    folder: "mould-tech/events/documents",
+    resourceType: "auto",
+  });
+}
+
+// ==========================================
+// Industry Talk Upload Helpers
+// ==========================================
+
+export async function uploadIndustryTalkImageToCloudinary(file) {
+  return uploadBufferToCloudinary(file, {
+    folder: "mould-tech/industry-talks/images",
+    resourceType: "image",
+  });
+}
+
+export async function uploadIndustryTalkVideoToCloudinary(file) {
+  return uploadBufferToCloudinary(file, {
+    folder: "mould-tech/industry-talks/videos",
+    resourceType: "video",
+  });
+}
+
+export async function uploadIndustryTalkDocumentToCloudinary(file) {
+  return uploadBufferToCloudinary(file, {
+    folder: "mould-tech/industry-talks/documents",
+    resourceType: "auto",
+  });
+}
+
+
+
+// ----------------------------
+// ✅ NEW: Multer instance for the Add Event form
+// Your existing `upload` instance rejects everything except PDFs (it was
+// built for resumes), so it can't be reused for logo/banner/otherImages
+// (images) + brochure (PDF/doc) in the same .fields() call. This instance
+// checks allowed mimetypes per-fieldname instead of one blanket rule.
+// ----------------------------
+const EVENT_IMAGE_FIELDS = ["logo", "banner", "otherImages"];
+const EVENT_DOCUMENT_FIELDS = ["brochure"];
+
+export const uploadEventFiles = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+  },
+  fileFilter: (req, file, cb) => {
+    if (EVENT_IMAGE_FIELDS.includes(file.fieldname)) {
+      if (file.mimetype.startsWith("image/")) {
+        return cb(null, true);
+      }
+      return cb(new Error(`${file.fieldname} must be an image file (PNG/JPG/WEBP).`));
+    }
+
+    if (EVENT_DOCUMENT_FIELDS.includes(file.fieldname)) {
+      const allowedDocTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (allowedDocTypes.includes(file.mimetype)) {
+        return cb(null, true);
+      }
+      return cb(new Error(`${file.fieldname} must be a PDF or Word document.`));
+    }
+
+    cb(new Error(`Unexpected file field: ${file.fieldname}`));
+  },
+}).fields([
+  { name: "logo", maxCount: 1 },
+  { name: "banner", maxCount: 1 },
+  { name: "brochure", maxCount: 1 },
+  { name: "otherImages", maxCount: 10 },
+]);
+
+export const uploadIndustryTalk = async (req, res) => {
+  try {
+    const response = {};
+
+    if (req.files?.banner?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.banner[0]);
+      response.bannerImage = result.secure_url;
+    }
+
+    if (req.files?.companyLogo?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.companyLogo[0]);
+      response.companyLogo = result.secure_url;
+    }
+
+    if (req.files?.profileImage?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.profileImage[0]);
+      response.profileImage = result.secure_url;
+    }
+
+    if (req.files?.thumbnail?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.thumbnail[0]);
+      response.thumbnailUrl = result.secure_url;
+    }
+
+    if (req.files?.video?.length) {
+      const result = await uploadIndustryTalkVideoToCloudinary(req.files.video[0]);
+      response.uploadedVideo = result.secure_url;
+    }
+
+    res.json({
+      success: true,
+      data: response,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+export const uploadIndustryTalk = async (req, res) => {
+  try {
+    const response = {};
+
+    // Banner
+    if (req.files?.banner?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.banner[0]);
+      response.bannerImage = result.secure_url;
+    }
+
+    // Company Logo
+    if (req.files?.companyLogo?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.companyLogo[0]);
+      response.companyLogo = result.secure_url;
+    }
+
+    // Profile Image
+    if (req.files?.profileImage?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.profileImage[0]);
+      response.profileImage = result.secure_url;
+    }
+
+    // Thumbnail
+    if (req.files?.thumbnail?.length) {
+      const result = await uploadIndustryTalkImageToCloudinary(req.files.thumbnail[0]);
+      response.thumbnailUrl = result.secure_url;
+    }
+
+    // Video
+    if (req.files?.video?.length) {
+      const result = await uploadIndustryTalkVideoToCloudinary(req.files.video[0]);
+      response.uploadedVideo = result.secure_url;
+    }
+
+    // Gallery
+    if (req.files?.gallery?.length) {
+      response.gallery = [];
+
+      for (const file of req.files.gallery) {
+        const result = await uploadIndustryTalkImageToCloudinary(file);
+
+        response.gallery.push({
+          imageUrl: result.secure_url,
+        });
+      }
+    }
+
+    // Documents
+    if (req.files?.documents?.length) {
+      response.documents = [];
+
+      for (const file of req.files.documents) {
+        const result = await uploadIndustryTalkDocumentToCloudinary(file);
+
+        response.documents.push({
+          title: file.originalname,
+          fileUrl: result.secure_url,
+          fileSize: file.size,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: response,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};

@@ -102,26 +102,118 @@ export async function createJob(req, res) {
 
     const job = await prisma.job.create({
       data: {
+        // Basic
         title: req.body.title,
         slug: req.body.slug,
         description: req.body.description,
-        employmentType: req.body.employmentType,
-        experience: req.body.experience,
-        salaryRange: req.body.salaryRange,
-        location: req.body.location,
-        isRemote: req.body.isRemote ?? false,
+        responsibilities: req.body.responsibilities,
+        requirements: req.body.requirements,
+        aboutCompany: req.body.aboutCompany,
 
+        // Company
+        companyId,
         companyName,
+        companyWebsite: req.body.companyWebsite,
+        companySize: req.body.companySize,
+        industry: req.body.industry,
+        department: req.body.department,
+        reportsTo: req.body.reportsTo,
+
+        // Employment
+        employmentType: req.body.employmentType,
+        workplaceType: req.body.workplaceType,
+        jobFunction: req.body.jobFunction,
+        seniorityLevel: req.body.seniorityLevel,
+        employmentMode: req.body.employmentMode,
+        shift: req.body.shift,
+
+        // Experience
+        experience: req.body.experience,
+        minExperience: req.body.minExperience
+          ? Number(req.body.minExperience)
+          : null,
+        maxExperience: req.body.maxExperience
+          ? Number(req.body.maxExperience)
+          : null,
+        education: req.body.education,
+        noticePeriod: req.body.noticePeriod,
+
+        // Location
+        location: req.body.location,
+        country: req.body.country,
+        state: req.body.state,
+        city: req.body.city,
+        zipCode: req.body.zipCode,
+
+        isRemote: req.body.isRemote ?? false,
+        isHybrid: req.body.isHybrid ?? false,
+
+        // Salary
+        salaryMin: req.body.salaryMin
+          ? Number(req.body.salaryMin)
+          : null,
+        salaryMax: req.body.salaryMax
+          ? Number(req.body.salaryMax)
+          : null,
+        salaryCurrency: req.body.salaryCurrency || "INR",
+        salaryPeriod: req.body.salaryPeriod,
+        showSalary: req.body.showSalary ?? true,
+
+        // Hiring
+        openings: req.body.openings
+          ? Number(req.body.openings)
+          : 1,
+
+        applicationDeadline: req.body.applicationDeadline
+          ? new Date(req.body.applicationDeadline)
+          : null,
+
+        expectedJoiningDate: req.body.expectedJoiningDate
+          ? new Date(req.body.expectedJoiningDate)
+          : null,
+
+        // JSON fields
+        skills: req.body.skills ?? [],
+        preferredSkills: req.body.preferredSkills ?? [],
+        benefits: req.body.benefits ?? [],
+        languages: req.body.languages ?? [],
+
+        // Recruiter
+        recruiterName: req.body.recruiterName,
+        recruiterEmail: req.body.recruiterEmail,
+        recruiterPhone: req.body.recruiterPhone,
+
+        // Extras
+        referralBonus: req.body.referralBonus
+          ? Number(req.body.referralBonus)
+          : null,
+
+        travelRequired: req.body.travelRequired ?? false,
+        relocationSupport: req.body.relocationSupport ?? false,
+        visaSponsorship: req.body.visaSponsorship ?? false,
+
+        // Apply
         applyUrl: req.body.applyUrl,
         linkedinUrl: req.body.linkedinUrl,
         isExternal,
 
-        companyId,
-        postedById: req.user.id,
+        // Settings
+        requireResume: req.body.requireResume ?? true,
+        requireCoverLetter: req.body.requireCoverLetter ?? false,
+        requirePortfolio: req.body.requirePortfolio ?? false,
+        requireLinkedin: req.body.requireLinkedin ?? false,
+        allowEasyApply: req.body.allowEasyApply ?? true,
 
+        // SEO
+        metaTitle: req.body.metaTitle,
+        metaDescription: req.body.metaDescription,
+        keywords: req.body.keywords ?? [],
+
+        // Status
+        postedById: req.user.id,
         isFeatured,
         featuredAt: isFeatured ? new Date() : null,
-      },
+      }
     })
 
     if (companyId) {
@@ -397,7 +489,10 @@ export async function updateJob(req, res) {
       },
       include: {
         Company: {
-          select: { subscriptionPlan: true, subscriptionExpiresAt: true },
+          select: {
+            subscriptionPlan: true,
+            subscriptionExpiresAt: true,
+          },
         },
       },
     });
@@ -407,34 +502,170 @@ export async function updateJob(req, res) {
     }
 
     const data = {
+      // ===========================
+      // Basic
+      // ===========================
       title: req.body.title,
+      slug: req.body.slug,
       description: req.body.description,
+      responsibilities: req.body.responsibilities,
+      requirements: req.body.requirements,
+      aboutCompany: req.body.aboutCompany,
+
+      // ===========================
+      // Company
+      // ===========================
+      companyWebsite: req.body.companyWebsite,
+      companySize: req.body.companySize,
+      industry: req.body.industry,
+      department: req.body.department,
+      reportsTo: req.body.reportsTo,
+
+      // ===========================
+      // Employment
+      // ===========================
       employmentType: req.body.employmentType,
+      workplaceType: req.body.workplaceType,
+      jobFunction: req.body.jobFunction,
+      seniorityLevel: req.body.seniorityLevel,
+      employmentMode: req.body.employmentMode,
+      shift: req.body.shift,
+
+      // ===========================
+      // Experience
+      // ===========================
       experience: req.body.experience,
-      salaryRange: req.body.salaryRange,
+      minExperience: req.body.minExperience
+        ? Number(req.body.minExperience)
+        : null,
+      maxExperience: req.body.maxExperience
+        ? Number(req.body.maxExperience)
+        : null,
+      education: req.body.education,
+      noticePeriod: req.body.noticePeriod,
+
+      // ===========================
+      // Location
+      // ===========================
       location: req.body.location,
-      isRemote: req.body.isRemote,
+      country: req.body.country,
+      state: req.body.state,
+      city: req.body.city,
+      zipCode: req.body.zipCode,
+
+      isRemote: req.body.isRemote ?? false,
+      isHybrid: req.body.isHybrid ?? false,
+
+      // ===========================
+      // Salary
+      // ===========================
+      salaryMin: req.body.salaryMin
+        ? Number(req.body.salaryMin)
+        : null,
+
+      salaryMax: req.body.salaryMax
+        ? Number(req.body.salaryMax)
+        : null,
+
+      salaryCurrency: req.body.salaryCurrency || "INR",
+      salaryPeriod: req.body.salaryPeriod,
+      showSalary: req.body.showSalary ?? true,
+
+      // ===========================
+      // Hiring
+      // ===========================
+      openings: req.body.openings
+        ? Number(req.body.openings)
+        : 1,
+
+      applicationDeadline: req.body.applicationDeadline
+        ? new Date(req.body.applicationDeadline)
+        : null,
+
+      expectedJoiningDate: req.body.expectedJoiningDate
+        ? new Date(req.body.expectedJoiningDate)
+        : null,
+
+      // ===========================
+      // Skills
+      // ===========================
+      skills: req.body.skills ?? [],
+      preferredSkills: req.body.preferredSkills ?? [],
+      benefits: req.body.benefits ?? [],
+      languages: req.body.languages ?? [],
+
+      // ===========================
+      // Recruiter
+      // ===========================
+      recruiterName: req.body.recruiterName,
+      recruiterEmail: req.body.recruiterEmail,
+      recruiterPhone: req.body.recruiterPhone,
+
+      // ===========================
+      // Apply
+      // ===========================
+      applyUrl: req.body.applyUrl,
+      linkedinUrl: req.body.linkedinUrl,
+
+      // ===========================
+      // Extras
+      // ===========================
+      referralBonus: req.body.referralBonus
+        ? Number(req.body.referralBonus)
+        : null,
+
+      travelRequired: req.body.travelRequired ?? false,
+      relocationSupport: req.body.relocationSupport ?? false,
+      visaSponsorship: req.body.visaSponsorship ?? false,
+
+      // ===========================
+      // Application Settings
+      // ===========================
+      requireResume: req.body.requireResume ?? true,
+      requireCoverLetter: req.body.requireCoverLetter ?? false,
+      requirePortfolio: req.body.requirePortfolio ?? false,
+      requireLinkedin: req.body.requireLinkedin ?? false,
+      allowEasyApply: req.body.allowEasyApply ?? true,
+
+      // ===========================
+      // SEO
+      // ===========================
+      metaTitle: req.body.metaTitle,
+      metaDescription: req.body.metaDescription,
+      keywords: req.body.keywords ?? [],
     };
 
-    // Only touch isFeatured if the request explicitly includes it —
-    // this way a plain "edit job details" save doesn't accidentally
-    // reset featured status.
+    // ===========================
+    // Featured Job Logic
+    // ===========================
     if (typeof req.body.isFeatured === "boolean") {
       if (req.body.isFeatured) {
-        const FEATURED_ELIGIBLE_PLANS = ["professional", "enterprise"];
-        const plan = (job.Company?.subscriptionPlan || "free").toLowerCase();
-        const isEligiblePlan = FEATURED_ELIGIBLE_PLANS.includes(plan);
+        const FEATURED_ELIGIBLE_PLANS = [
+          "professional",
+          "enterprise",
+        ];
+
+        const plan = (
+          job.Company?.subscriptionPlan || "free"
+        ).toLowerCase();
+
+        const isEligiblePlan =
+          FEATURED_ELIGIBLE_PLANS.includes(plan);
+
         const isPlanActive =
           !job.Company?.subscriptionExpiresAt ||
-          new Date(job.Company.subscriptionExpiresAt) > new Date();
+          new Date(job.Company.subscriptionExpiresAt) >
+          new Date();
 
         if (!isEligiblePlan || !isPlanActive) {
           return res.status(403).json({
-            error: "Featured jobs are only available on Professional and Enterprise plans",
+            error:
+              "Featured jobs are only available on Professional and Enterprise plans",
             code: "PLAN_NOT_ELIGIBLE",
             currentPlan: plan,
           });
         }
+
         data.isFeatured = true;
         data.featuredAt = new Date();
       } else {
@@ -444,14 +675,18 @@ export async function updateJob(req, res) {
     }
 
     const updatedJob = await prisma.job.update({
-      where: { id: Number(req.params.id) },
+      where: {
+        id: Number(req.params.id),
+      },
       data,
     });
 
     res.json(updatedJob);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update job" });
+    console.error("UPDATE JOB ERROR:", err);
+    res.status(500).json({
+      error: err.message || "Failed to update job",
+    });
   }
 }
 
