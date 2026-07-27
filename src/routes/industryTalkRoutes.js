@@ -2,7 +2,7 @@ import express from "express";
 
 import { requireAuth } from "../middleware/auth.js";
 import { uploadIndustryTalkFiles } from "../middleware/uploadIndustryTalk.js";
-import { validateIndustryTalk } from "../validators/industryTalkValidator.js";
+import { validateIndustryTalk } from "../../validators/industryTalkValidator.js";
 
 import {
   createIndustryTalk,
@@ -80,5 +80,7 @@ router.patch(
   requireAuth,
   saveDraftIndustryTalk
 );
+
+
 
 export default router;

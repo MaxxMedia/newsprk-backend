@@ -1,4 +1,4 @@
-import prisma from "../config/prisma.js";
+import prisma from "../prismaClient.js";
 import slugify from "slugify";
 
 export async function createIndustryTalk(data) {

@@ -388,49 +388,7 @@ export const uploadEventFiles = multer({
   { name: "otherImages", maxCount: 10 },
 ]);
 
-export const uploadIndustryTalk = async (req, res) => {
-  try {
-    const response = {};
 
-    if (req.files?.banner?.length) {
-      const result = await uploadIndustryTalkImageToCloudinary(req.files.banner[0]);
-      response.bannerImage = result.secure_url;
-    }
-
-    if (req.files?.companyLogo?.length) {
-      const result = await uploadIndustryTalkImageToCloudinary(req.files.companyLogo[0]);
-      response.companyLogo = result.secure_url;
-    }
-
-    if (req.files?.profileImage?.length) {
-      const result = await uploadIndustryTalkImageToCloudinary(req.files.profileImage[0]);
-      response.profileImage = result.secure_url;
-    }
-
-    if (req.files?.thumbnail?.length) {
-      const result = await uploadIndustryTalkImageToCloudinary(req.files.thumbnail[0]);
-      response.thumbnailUrl = result.secure_url;
-    }
-
-    if (req.files?.video?.length) {
-      const result = await uploadIndustryTalkVideoToCloudinary(req.files.video[0]);
-      response.uploadedVideo = result.secure_url;
-    }
-
-    res.json({
-      success: true,
-      data: response,
-    });
-
-  } catch (err) {
-    console.error(err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-};
 
 export const uploadIndustryTalk = async (req, res) => {
   try {
