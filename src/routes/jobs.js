@@ -12,6 +12,7 @@ import {
   getJobById,
   updateJob,
   getPostingEligibility,
+  getApplyStatus
 } from "../controllers/jobsController.js"
 import {
   getMySavedJobs,
@@ -91,6 +92,7 @@ router.put(
 
 router.get("/saved/me", requireAuth, getMySavedJobs)
 router.get("/:jobId/save-status", requireAuth, getSaveStatus)
+router.get("/:jobId/apply-status", requireAuth, getApplyStatus)
 router.post("/:jobId/save", requireAuth, saveJob)
 router.delete("/:jobId/save", requireAuth, unsaveJob)
 

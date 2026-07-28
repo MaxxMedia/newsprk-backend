@@ -1,4 +1,10 @@
 import prisma from "../prismaClient.js";
+// ✅ ADDED: this was the missing piece — uploadController.js already had
+// uploadResumeToCloudinary() defined, it was just never imported/called
+// here. Without it, req.file.path (multer memoryStorage has no .path)
+// was being saved straight into fileUrl, so resumes never actually made
+// it to Cloudinary and fileUrl was always null/undefined in the DB.
+import { uploadResumeToCloudinary } from "./uploadController.js";
 
 export const uploadResume = async (req, res) => {
   try {
@@ -9,11 +15,33 @@ export const uploadResume = async (req, res) => {
       });
     }
 
+    // ✅ ADDED: actually push the in-memory buffer to Cloudinary and get
+    // back a real, permanent, public URL (secure_url).
+    let uploadResult;
+    try {
+      uploadResult = await uploadResumeToCloudinary(req.file);
+    } catch (uploadErr) {
+      console.error("Cloudinary resume upload failed:", uploadErr);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload resume file to storage.",
+      });
+    }
+
     const existingResume = await prisma.candidateResume.findUnique({
       where: {
         userId: req.user.id,
       },
     });
+
+    // ✅ CHANGED: fileUrl now comes from Cloudinary's secure_url,
+    // not req.file.path (which never existed with memoryStorage).
+    const payload = {
+      fileName: req.file.originalname,
+      fileUrl: uploadResult.secure_url,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+    };
 
     let resume;
 
@@ -22,21 +50,13 @@ export const uploadResume = async (req, res) => {
         where: {
           userId: req.user.id,
         },
-        data: {
-          fileName: req.file.originalname,
-          fileUrl: req.file.path,
-          fileSize: req.file.size,
-          mimeType: req.file.mimetype,
-        },
+        data: payload,
       });
     } else {
       resume = await prisma.candidateResume.create({
         data: {
           userId: req.user.id,
-          fileName: req.file.originalname,
-          fileUrl: req.file.path,
-          fileSize: req.file.size,
-          mimeType: req.file.mimetype,
+          ...payload,
         },
       });
     }
@@ -108,7 +128,6 @@ export const deleteResume = async (req, res) => {
     });
   }
 };
-
 
 export const getCandidateResume = async (req, res) => {
   try {

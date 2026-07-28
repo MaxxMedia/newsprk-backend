@@ -49,6 +49,10 @@ import candidateLanguageRoutes from "./routes/candidateLanguageRoutes.js";
 import candidateAchievementRoutes from "./routes/candidateAchievementRoutes.js";
 import candidateInterestRoutes from "./routes/candidateInterestRoutes.js";
 import connectionRoutes from "./routes/connectionRoutes.js";
+// ✅ ADDED: was missing from this file entirely — GET /api/candidate-resume/me
+// and POST /api/candidate-resume/upload were 404ing because the router was
+// never imported or mounted, not because of anything inside the route file.
+import candidateResumeRoutes from "./routes/candidateResumeRoutes.js";
 
 import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
 // ✅ RBAC: sub-admin management routes
@@ -81,17 +85,43 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 /* ==========================
-   🧰 Middlewares
+   🌍 CORS — allow both local dev and the production frontend
+   ==========================
+   Previously this was hardcoded to only `http://localhost:3000`, which is
+   why every request from https://www.toolingtrends.com was being blocked
+   by the browser with a CORS error. Using a whitelist + origin function
+   instead so both environments (and the apex/www variants) work, and so
+   adding more allowed origins later is a one-line change.
 ========================== */
 
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-); 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://www.toolingtrends.com",
+  "https://toolingtrends.com",
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow server-to-server / curl / Postman calls that send no Origin header
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`❌ Blocked by CORS: ${origin}`);
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight (OPTIONS) requests for every route.
+// Some proxies / hosting setups (Render, Railway, etc.) need this to be
+// spelled out rather than relying on cors() alone to short-circuit OPTIONS.
+app.options("/{*splat}", cors(corsOptions));
 app.use(express.json());
 app.use("/api/contact", contactRoutes);
 
@@ -155,6 +185,9 @@ app.use("/api/candidate-certifications", candidateCertificationRoutes);
 app.use("/api/candidate-languages", candidateLanguageRoutes);
 app.use("/api/candidate-achievements", candidateAchievementRoutes);
 app.use("/api/candidate-interests", candidateInterestRoutes);
+// ✅ ADDED: matches the /api/candidate-resume/me + /upload + /delete calls
+// coming from lib/api/candidate/resume.ts on the frontend.
+app.use("/api/candidate-resume", candidateResumeRoutes);
 
 app.use("/api/candidate-experience", candidateExperienceRoutes);
 

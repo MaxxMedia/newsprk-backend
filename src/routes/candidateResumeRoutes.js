@@ -1,11 +1,11 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { upload } from "../middleware/upload.js"; // your multer/cloudinary middleware
-
+import { upload } from "../controllers/uploadController.js";
 import {
   uploadResume,
   getMyResume,
   deleteResume,
+  getCandidateResume
 } from "../controllers/candidateResumeController.js";
 
 const router = express.Router();
@@ -29,10 +29,6 @@ router.delete(
   deleteResume
 );
 
-router.get(
-  "/:userId",
-  requireAuth,
-  getCandidateResume
-);
+router.get("/:userId", requireAuth, getCandidateResume);
 
 export default router;

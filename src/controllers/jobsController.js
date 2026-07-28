@@ -881,3 +881,35 @@ export async function incrementJobView(req, res) {
     });
   }
 }
+
+
+export async function getApplyStatus(req, res) {
+  try {
+    if (req.user.role !== "candidate") {
+      return res.status(403).json({
+        error: "Only candidates allowed",
+      });
+    }
+
+    const jobId = Number(req.params.jobId);
+
+    const application = await prisma.jobApplication.findUnique({
+      where: {
+        jobId_userId: {
+          jobId,
+          userId: req.user.id,
+        },
+      },
+    });
+
+    return res.json({
+      hasApplied: !!application,
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Failed to check application status",
+    });
+  }
+}
