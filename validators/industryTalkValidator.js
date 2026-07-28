@@ -1,5 +1,21 @@
 import { body, validationResult } from "express-validator";
 
+// Parses a JSON-stringified array (as sent via multipart/form-data)
+// into a real array before validation runs. If the value is already
+// an array (e.g. JSON request body), it's left untouched.
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : value; // let isArray() fail it below if not actually an array
+    } catch {
+      return value; // invalid JSON string, let isArray() fail it below
+    }
+  }
+  return value;
+}
+
 export const validateIndustryTalk = [
   body("title")
     .trim()
@@ -64,19 +80,27 @@ export const validateIndustryTalk = [
 
   body("questions")
     .optional()
-    .isArray(),
+    .customSanitizer(parseJsonArray)
+    .isArray()
+    .withMessage("Questions must be an array"),
 
   body("quotes")
     .optional()
-    .isArray(),
+    .customSanitizer(parseJsonArray)
+    .isArray()
+    .withMessage("Quotes must be an array"),
 
   body("gallery")
     .optional()
-    .isArray(),
+    .customSanitizer(parseJsonArray)
+    .isArray()
+    .withMessage("Gallery must be an array"),
 
   body("documents")
     .optional()
-    .isArray(),
+    .customSanitizer(parseJsonArray)
+    .isArray()
+    .withMessage("Documents must be an array"),
 
   (req, res, next) => {
     const errors = validationResult(req);

@@ -1,5 +1,6 @@
 // src/controllers/postsController.js
 import prisma from "../prismaClient.js";
+import * as industryTalkService from "../services/industryTalkService.js";
 
 /**
  * GET /api/posts
@@ -83,6 +84,68 @@ export const getPostById = async (req, res) => {
   }
 };
 
+// Strips HTML tags AND decodes the common entities that survive the
+// strip (the frontend renders excerpt/bio as plain text, not via
+// dangerouslySetInnerHTML, so raw "&nbsp;"/"<p>" must not leak through).
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>?/gm, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ---------------------------------------------------------------
+// Reshape a Prisma IndustryTalk record into the same shape the
+// frontend's PostDetailsPage expects from a Post (title, slug,
+// excerpt, content, imageUrl, author{}, category{}, youtubeUrl,
+// views, shares, qa[]).
+// ---------------------------------------------------------------
+function industryTalkToPostShape(talk) {
+  const plainIntro = stripHtml(talk.introduction);
+
+  return {
+    id: talk.id,
+    title: talk.title,
+    slug: talk.slug,
+    excerpt: plainIntro ? plainIntro.slice(0, 220) : null,
+    content: talk.introduction || null,
+    imageUrl: talk.bannerImage || talk.thumbnailUrl || null,
+    publishedAt: talk.publishedAt,
+    views: talk.views,
+    shares: talk.shares,
+    youtubeUrl: talk.videoType === "youtube" ? talk.videoUrl : null,
+    videoCaption: null,
+    readTime: null,
+    author: {
+      id: talk.id,
+      name: talk.guestName,
+      bio: stripHtml(talk.shortBio) || null,
+      avatarUrl: talk.profileImage || null,
+      role: talk.designation || null,
+      company: talk.companyName || null,
+      profileUrl: talk.website || null,
+    },
+    category: {
+      id: 0,
+      name: "Industry Talks",
+      slug: "industry-talks",
+    },
+    qa: Array.isArray(talk.questions)
+      ? talk.questions.map((q) => ({
+          question: stripHtml(q.question),
+          answer: stripHtml(q.answer),
+        }))
+      : [],
+  };
+}
+
 // GET /api/posts/slug/:slug
 export const getPostBySlug = async (req, res) => {
   try {
@@ -91,8 +154,14 @@ export const getPostBySlug = async (req, res) => {
       where: { slug },
       include: { author: true, category: true, comments: true },
     });
-    if (!post) return res.status(404).json({ error: "Post not found" });
-    res.json(post);
+
+    if (post) return res.json(post);
+
+    // Fallback: not a regular Post, check IndustryTalk by the same slug
+    const talk = await industryTalkService.getIndustryTalkBySlug(slug);
+    if (talk) return res.json(industryTalkToPostShape(talk));
+
+    return res.status(404).json({ error: "Post not found" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

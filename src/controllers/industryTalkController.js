@@ -1,12 +1,67 @@
 import * as industryTalkService from "../services/industryTalkService.js";
 
 // ================================
+// Helpers
+// ================================
+
+// multipart/form-data delivers every field as a string. Prisma needs
+// real types (Int, Boolean) for the corresponding schema fields, so
+// coerce them here before they reach the service/Prisma layer.
+function normalizeIndustryTalkBody(body) {
+  const normalized = { ...body };
+
+  // Int fields — empty string / undefined -> null, otherwise parseInt
+  for (const field of ["industryId", "categoryId"]) {
+    if (normalized[field] === "" || normalized[field] === undefined) {
+      normalized[field] = null;
+    } else if (typeof normalized[field] === "string") {
+      const parsed = parseInt(normalized[field], 10);
+      normalized[field] = Number.isNaN(parsed) ? null : parsed;
+    }
+  }
+
+  // Boolean fields — "true"/"false" strings -> real booleans
+  for (const field of ["featured", "trending", "homepage", "autoplay", "showControls"]) {
+    if (typeof normalized[field] === "string") {
+      normalized[field] = normalized[field] === "true";
+    }
+  }
+
+  // duration comes from the frontend as "mm:ss" (e.g. "18:45").
+  // Prisma's `duration` column is Int (seconds) — convert here.
+  if (typeof normalized.duration === "string") {
+    normalized.duration = parseDurationToSeconds(normalized.duration);
+  }
+
+  return normalized;
+}
+
+// "18:45" -> 1125 (seconds). "1:02:30" -> 3750. "" or malformed -> null.
+function parseDurationToSeconds(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(":").map((p) => parseInt(p, 10));
+  if (parts.some((n) => Number.isNaN(n))) return null;
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    return minutes * 60 + seconds;
+  }
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = parts;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  return null;
+}
+
+// ================================
 // Create Industry Talk
 // ================================
 export const createIndustryTalk = async (req, res) => {
   try {
     const talk = await industryTalkService.createIndustryTalk({
-      ...req.body,
+      ...normalizeIndustryTalkBody(req.body),
       createdById: req.user.id,
     });
 
@@ -34,7 +89,7 @@ export const updateIndustryTalk = async (req, res) => {
 
     const talk = await industryTalkService.updateIndustryTalk(
       id,
-      req.body
+      normalizeIndustryTalkBody(req.body)
     );
 
     return res.json({
