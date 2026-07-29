@@ -123,6 +123,17 @@ function industryTalkToPostShape(talk) {
     youtubeUrl: talk.videoType === "youtube" ? talk.videoUrl : null,
     videoCaption: null,
     readTime: null,
+
+    companyId: talk.companyId || null,
+    Company: talk.Company || null,
+    companyName: talk.companyName || null,
+    companyLogo: talk.companyLogo || null,
+    companyProfileUrl: talk.website || null,
+    guestName: talk.guestName,
+    guestPhoto: talk.profileImage || null,
+    designation: talk.designation || null,
+    shortBio: stripHtml(talk.shortBio) || null,
+
     author: {
       id: talk.id,
       name: talk.guestName,

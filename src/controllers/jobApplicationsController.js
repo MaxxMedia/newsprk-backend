@@ -2,55 +2,38 @@ import { prisma } from "../lib/prisma.js";
 import { uploadResumeToCloudinary } from "./uploadController.js";
 
 
-/**
- * Candidate applies for job
- */
 export async function applyJob(req, res) {
   try {
     if (req.user.role !== "candidate") {
-      return res.status(403).json({
-        error: "Only candidates can apply",
-      });
+      return res.status(403).json({ error: "Only candidates can apply" });
     }
 
     const job = await prisma.job.findUnique({
-      where: {
-        id: Number(req.body.jobId),
-      },
-      select: {
-        id: true,
-        isExternal: true,
-        isActive: true,
-      },
+      where: { id: Number(req.body.jobId) },
+      select: { id: true, isExternal: true, isActive: true },
     });
 
-    if (!job) {
-      return res.status(404).json({
-        error: "Job not found",
-      });
-    }
-
-    if (!job.isActive) {
-      return res.status(400).json({
-        error: "Job is not active",
-      });
-    }
-
-    if (job.isExternal) {
-      return res.status(400).json({
-        error: "Please apply through the external website",
-      });
-    }
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (!job.isActive) return res.status(400).json({ error: "Job is not active" });
+    if (job.isExternal) return res.status(400).json({ error: "Please apply through the external website" });
 
     let resumeUrl = null;
 
-   if (req.file) {
-  const uploaded = await uploadResumeToCloudinary(req.file);
-  resumeUrl = uploaded.secure_url;
-}
+    if (req.file) {
+      // A fresh file was uploaded with this application
+      const uploaded = await uploadResumeToCloudinary(req.file);
+      resumeUrl = uploaded.secure_url;
+    } else if (req.body.resumeUrl) {
+      // ✅ NEW: reuse the candidate's already-stored resume (Easy Apply flow)
+      resumeUrl = req.body.resumeUrl;
+    }
 
-// console.log("Resume URL:", resumeUrl);
-
+    if (!resumeUrl) {
+      return res.status(400).json({
+        error: "Please upload a resume in your profile before applying.",
+        code: "RESUME_REQUIRED",
+      });
+    }
 
     const application = await prisma.jobApplication.create({
       data: {
@@ -64,16 +47,10 @@ export async function applyJob(req, res) {
     res.json(application);
   } catch (err) {
     if (err.code === "P2002") {
-      return res.status(400).json({
-        error: "Already applied for this job",
-      });
+      return res.status(400).json({ error: "Already applied for this job" });
     }
-
     console.error(err);
-
-    res.status(500).json({
-      error: "Job application failed",
-    });
+    res.status(500).json({ error: "Job application failed" });
   }
 }
 

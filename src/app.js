@@ -102,19 +102,16 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin(origin, callback) {
-    // Allow server-to-server / curl / Postman calls that send no Origin header
     if (!origin) return callback(null, true);
-
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
     console.warn(`❌ Blocked by CORS: ${origin}`);
     return callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control"],   // ✅ added Cache-Control
 };
 
 app.use(cors(corsOptions));
@@ -247,7 +244,7 @@ app.use("/api/quotes", quoteRoutes);
    🚀 Start Server
 ========================== */
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 async function start() {
   await ensurePermissionsSeeded(prisma);

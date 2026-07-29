@@ -373,6 +373,7 @@ model Company {
   Post                  Post[]
   SupplierDirectory     SupplierDirectory[]
   User                  User[]
+  industryTalks IndustryTalk[]
 
   @@index([industryId])
 }
@@ -482,6 +483,7 @@ model IndustryTalk {
   uploadedVideo String?
   thumbnailUrl String?
   duration Int?
+  
 
   guestName String
   designation String?
@@ -509,6 +511,11 @@ model IndustryTalk {
   publishedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  companyId Int?
+
+  Company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
 
   createdBy User @relation("IndustryTalkCreatedBy", fields: [createdById], references: [id])
   approvedBy User? @relation("IndustryTalkApprovedBy", fields: [approvedById], references: [id])

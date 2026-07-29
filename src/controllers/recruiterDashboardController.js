@@ -23,7 +23,7 @@ export async function getRecruiterDashboard(req, res) {
     // Applications count ✅ CORRECT MODEL
     const applicationsCount = await prisma.jobApplication.count({
       where: {
-        job: {
+        Job: {
           postedById: recruiterId,
         },
       },
