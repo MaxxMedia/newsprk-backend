@@ -145,8 +145,8 @@ export const updateIndustryTalk = async (req, res) => {
     const talk = await industryTalkService.updateIndustryTalk(
 
       Number(id),
-
-      normalizeIndustryTalkBody(req.body)
+      normalizeIndustryTalkBody(req.body),
+      req.body
     );
 
     return res.json({
@@ -217,7 +217,6 @@ export const getIndustryTalks = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
     // Validate pagination params
     if (page < 1 || limit < 1) {
       return res.status(400).json({
