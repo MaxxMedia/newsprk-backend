@@ -145,6 +145,7 @@ export const updateIndustryTalk = async (req, res) => {
     const talk = await industryTalkService.updateIndustryTalk(
 
       Number(id),
+
       normalizeIndustryTalkBody(req.body)
     );
 
