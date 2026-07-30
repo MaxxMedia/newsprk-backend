@@ -161,7 +161,7 @@ app.use("/api/companies", companiesRoutes);          // /api/companies/:slug (MU
 app.use("/api/posts", postsRoutes);
 app.use("/api/authors", authorsRoutes);
 app.use("/api/categories", categoriesRoutes);
-app.use("/api/comments", commentsRoutes);
+app.use("/api/posts", commentsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/jobs", jobsRoutes);

@@ -66,13 +66,16 @@ model Post {
 model Comment {
   id        Int      @id @default(autoincrement())
   postId    Int
-  name      String
-  email     String?
+  userId    Int
   content   String
   createdAt DateTime @default(now())
-  post      Post     @relation(fields: [postId], references: [id])
+  updatedAt DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([postId])
+  @@index([userId])
 }
 
 model User {
@@ -130,6 +133,7 @@ model User {
   NewsletterCampaign                                      NewsletterCampaign[]
   NewsletterSubscriber                                    NewsletterSubscriber[]
   NewsletterTemplate                                      NewsletterTemplate[]
+  comments                                                Comment[]
   PackagePurchase                                         PackagePurchase[]
   Post_Post_approvedByIdToUser                            Post[]                   @relation("Post_approvedByIdToUser")
   Post_Post_createdByIdToUser                             Post[]                   @relation("Post_createdByIdToUser")
