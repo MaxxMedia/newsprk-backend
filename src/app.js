@@ -53,6 +53,8 @@ import connectionRoutes from "./routes/connectionRoutes.js";
 // and POST /api/candidate-resume/upload were 404ing because the router was
 // never imported or mounted, not because of anything inside the route file.
 import candidateResumeRoutes from "./routes/candidateResumeRoutes.js";
+import companyConnectionRoutes from "./routes/companyConnectionRoutes.js";
+
 
 import candidateExperienceRoutes from "./routes/candidateExperienceRoutes.js";
 // ✅ RBAC: sub-admin management routes
@@ -238,6 +240,7 @@ app.use("/api", adminIndustriesRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/quotes", quoteRoutes);
+app.use("/api/companies", companyConnectionRoutes);
 
 /* ==========================
    🚀 Start Server

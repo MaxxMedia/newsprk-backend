@@ -1,3 +1,5 @@
+// controllers/industryTalkController.js
+
 import * as industryTalkService from "../services/industryTalkService.js";
 
 // ================================
@@ -293,10 +295,10 @@ export const getIndustryTalkById = async (req, res) => {
     const { id } = req.params;
 
     // Validate ID is a number
-    if (isNaN(id)) {
+    if (!id || isNaN(Number(id))) {
       return res.status(400).json({
         success: false,
-        message: "Invalid ID format. Expected a number.",
+        message: "Invalid ID format. Expected a valid number.",
       });
     }
 
@@ -345,9 +347,6 @@ export const getIndustryTalkBySlug = async (req, res) => {
         message: "Industry Talk not found.",
       });
     }
-
-    // Increment views when fetched (optional - uncomment if needed)
-    // await industryTalkService.incrementViews(talk.id);
 
     return res.json({
       success: true,
@@ -441,14 +440,26 @@ export const saveDraftIndustryTalk = async (req, res) => {
 };
 
 // ================================
-// Increment Views
+// Increment Views by ID
 // ================================
 export const incrementIndustryTalkView = async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log("📊 Increment view for talk ID:", id);
+
+    // Validate ID is a number
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format. Expected a valid number.",
+      });
+    }
+
+    const talkId = Number(id);
+
     // Check if talk exists
-    const existingTalk = await industryTalkService.getIndustryTalkById(Number(id));
+    const existingTalk = await industryTalkService.getIndustryTalkById(talkId);
     if (!existingTalk) {
       return res.status(404).json({
         success: false,
@@ -456,7 +467,7 @@ export const incrementIndustryTalkView = async (req, res) => {
       });
     }
 
-    const updatedTalk = await industryTalkService.incrementViews(Number(id));
+    const updatedTalk = await industryTalkService.incrementViews(talkId);
 
     return res.json({
       success: true,
@@ -466,7 +477,51 @@ export const incrementIndustryTalkView = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Increment Industry Talk View:", error);
+    console.error("❌ Increment Industry Talk View Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to increment view count.",
+    });
+  }
+};
+
+// ================================
+// Increment Views by Slug (NEW)
+// ================================
+export const incrementIndustryTalkViewBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    console.log("📊 Increment view by slug:", slug);
+
+    if (!slug) {
+      return res.status(400).json({
+        success: false,
+        message: "Slug is required.",
+      });
+    }
+
+    // Find the talk by slug
+    const existingTalk = await industryTalkService.getIndustryTalkBySlug(slug);
+    if (!existingTalk) {
+      return res.status(404).json({
+        success: false,
+        message: "Industry Talk not found.",
+      });
+    }
+
+    const updatedTalk = await industryTalkService.incrementViews(existingTalk.id);
+
+    return res.json({
+      success: true,
+      message: "View count incremented.",
+      data: {
+        views: updatedTalk.views,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Increment Industry Talk View By Slug Error:", error);
 
     return res.status(500).json({
       success: false,
@@ -482,8 +537,20 @@ export const incrementIndustryTalkShare = async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log("📊 Increment share for talk ID:", id);
+
+    // Validate ID is a number
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format. Expected a valid number.",
+      });
+    }
+
+    const talkId = Number(id);
+
     // Check if talk exists
-    const existingTalk = await industryTalkService.getIndustryTalkById(Number(id));
+    const existingTalk = await industryTalkService.getIndustryTalkById(talkId);
     if (!existingTalk) {
       return res.status(404).json({
         success: false,
@@ -491,7 +558,7 @@ export const incrementIndustryTalkShare = async (req, res) => {
       });
     }
 
-    const updatedTalk = await industryTalkService.incrementShares(Number(id));
+    const updatedTalk = await industryTalkService.incrementShares(talkId);
 
     return res.json({
       success: true,
@@ -501,7 +568,7 @@ export const incrementIndustryTalkShare = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Increment Industry Talk Share:", error);
+    console.error("❌ Increment Industry Talk Share Error:", error);
 
     return res.status(500).json({
       success: false,

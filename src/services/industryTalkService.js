@@ -1,3 +1,5 @@
+// services/industryTalkService.js
+
 import prisma from "../prismaClient.js";
 import slugify from "slugify";
 
@@ -222,14 +224,16 @@ export async function deleteIndustryTalk(id) {
   });
 }
 
-// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
+// ✅ FIXED: Use 'industry' (lowercase) - matches Prisma schema
 export async function getIndustryTalkById(id) {
+  console.log("🔍 Fetching industry talk by ID:", id);
+  
   return prisma.industryTalk.findUnique({
     where: {
       id: Number(id),
     },
     include: {
-      industry: true, // ✅ Changed to lowercase
+      industry: true, // ✅ lowercase - matches Prisma schema
       Company: {
         include: {
           SupplierDirectory: {
@@ -272,7 +276,7 @@ export async function getIndustryTalkById(id) {
   });
 }
 
-// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
+// ✅ FIXED: Use 'industry' (lowercase) - matches Prisma schema
 export const getIndustryTalks = async ({ page, limit, search, status }) => {
   const skip = (page - 1) * limit;
   
@@ -292,7 +296,7 @@ export const getIndustryTalks = async ({ page, limit, search, status }) => {
     prisma.industryTalk.findMany({
       where,
       include: {
-        industry: { // ✅ Changed to lowercase
+        industry: { // ✅ lowercase - matches Prisma schema
           select: {
             id: true,
             name: true,
@@ -333,12 +337,14 @@ export const getIndustryTalks = async ({ page, limit, search, status }) => {
   };
 };
 
-// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
+// ✅ FIXED: Use 'industry' (lowercase) - matches Prisma schema
 export const getIndustryTalkBySlug = async (slug) => {
+  console.log("🔍 Fetching industry talk by slug:", slug);
+  
   return prisma.industryTalk.findUnique({
     where: { slug },
     include: {
-      industry: true, // ✅ Changed to lowercase
+      industry: true, // ✅ lowercase - matches Prisma schema
       Company: {
         include: {
           SupplierDirectory: {
@@ -392,7 +398,22 @@ export async function saveDraft(id) {
   });
 }
 
+export async function publishIndustryTalk(id, approvedById) {
+  return prisma.industryTalk.update({
+    where: {
+      id: Number(id),
+    },
+    data: {
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      approvedById: approvedById,
+    },
+  });
+}
+
 export async function incrementViews(id) {
+  console.log("📊 Incrementing views for talk ID:", id);
+  
   return prisma.industryTalk.update({
     where: {
       id: Number(id),
@@ -406,6 +427,8 @@ export async function incrementViews(id) {
 }
 
 export async function incrementShares(id) {
+  console.log("📊 Incrementing shares for talk ID:", id);
+  
   return prisma.industryTalk.update({
     where: {
       id: Number(id),

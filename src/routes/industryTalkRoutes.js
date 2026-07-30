@@ -1,3 +1,5 @@
+// routes/industryTalks.js
+
 import express from "express";
 
 import { requireAuth } from "../middleware/auth.js";
@@ -14,6 +16,7 @@ import {
   publishIndustryTalk,
   saveDraftIndustryTalk,
   incrementIndustryTalkView,
+  incrementIndustryTalkViewBySlug, // 👈 ADD THIS
   incrementIndustryTalkShare,
 } from "../controllers/industryTalkController.js";
 
@@ -26,16 +29,20 @@ const router = express.Router();
 // Get all Industry Talks
 router.get("/", getIndustryTalks);
 
-// Get by slug
+// IMPORTANT: Slug route MUST come BEFORE the ID route
+// Get by slug (more specific first)
 router.get("/slug/:slug", getIndustryTalkBySlug);
 
-// Get by ID
+// 👇 ADD THIS - Increment Views by slug (for frontend)
+router.post("/slug/:slug/view", incrementIndustryTalkViewBySlug);
+
+// Get by ID (less specific, should come after slug)
 router.get("/:id", getIndustryTalkById);
 
-// Increment Views
+// Increment Views (POST routes) - by ID
 router.post("/:id/view", incrementIndustryTalkView);
 
-// Increment Shares
+// Increment Shares (POST routes)
 router.post("/:id/share", incrementIndustryTalkShare);
 
 // ==========================
@@ -80,7 +87,5 @@ router.patch(
   requireAuth,
   saveDraftIndustryTalk
 );
-
-
 
 export default router;

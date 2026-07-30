@@ -392,6 +392,67 @@ export const getMutualConnections = async ({
     .map((c) => c.connection);
 };
 
+export const connectToCompany = async ({ userId, companyId }) => {
+  if (!companyId) {
+    throw new Error("Company not found.");
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+  });
+
+  if (!company) {
+    throw new Error("Company not found.");
+  }
+
+  const existing = await prisma.companyFollower.findFirst({
+    where: { userId, companyId },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return await prisma.companyFollower.create({
+    data: { userId, companyId },
+  });
+};
+
+export const disconnectFromCompany = async ({ userId, companyId }) => {
+  await prisma.companyFollower.deleteMany({
+    where: { userId, companyId },
+  });
+  return true;
+};
+
+export const getCompanyConnectionStatus = async ({ userId, companyId }) => {
+  const existing = await prisma.companyFollower.findFirst({
+    where: { userId, companyId },
+  });
+  return { connected: Boolean(existing) };
+};
+
+export const getMyCompanyConnections = async (userId) => {
+  const follows = await prisma.companyFollower.findMany({
+    where: { userId },
+    include: {
+      Company: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          tagline: true,
+          location: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return follows.map((f) => f.Company).filter(Boolean);
+};
+
 export const getSuggestedConnections = async (userId) => {
   const connections = await prisma.userConnection.findMany({
     where: { userId },

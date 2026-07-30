@@ -3,6 +3,7 @@
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
 import { getActiveSubscription } from "./packagePurchases.js";
+import { countGalleryItems } from "./galleryUtils.js";
 
 /*
   ✅ FIXED: Explicit plan lookup - NEVER use ?? with null values
