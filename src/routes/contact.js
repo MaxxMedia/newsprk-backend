@@ -1,66 +1,56 @@
-// backend/routes/events.js
-import express from "express"
+import express from 'express';
 import {
-  createEvent,
-  publishEvent,
-  rejectEvent,
-  getUpcomingEvents,
-  getEventBySlug,
-  getAllEventsAdmin,
-  getMyEvents,
-  updateEvent,
-  incrementEventView,
-  registerForEvent,
-  getEventRegistrations,
-  getEventById,
-  createEventEnquiry,
-  getEventEnquiries,
-  getEventEnquiryById,
-  updateEventEnquiryStatus,
-  deleteEventEnquiry,
-} from "../controllers/eventsController.js"
+  createContact,
+  getAllContacts,
+  getContactById,
+  updateContactStatus,
+  deleteContact
+} from '../controllers/contactController.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+const router = express.Router();
 
-const router = express.Router()
+// ============================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================
 
 /**
- * 🔐 RECRUITER or ADMIN — create / manage own events
- * (must come before the public "/:slug" catch-all)
+ * @route   POST /api/contact
+ * @desc    Submit a contact message (Public)
+ * @access  Public
  */
-router.post("/", requireAuth, createEvent)
-router.get("/mine", requireAuth, getMyEvents)
-router.put("/:id", requireAuth, updateEvent)
+router.post('/', createContact);
+
+// ============================================
+// ADMIN ROUTES (Authentication required)
+// ============================================
 
 /**
- * 🔐 ADMIN ONLY — review queue & moderation
+ * @route   GET /api/contact
+ * @desc    Get all contact messages (Admin only)
+ * @access  Private - Admin only
  */
-router.get("/admin/all", requireAuth, requireAdmin, getAllEventsAdmin)
-router.put("/publish/:id", requireAuth, requireAdmin, publishEvent)
-router.put("/reject/:id", requireAuth, requireAdmin, rejectEvent)
-router.get("/admin/:id/registrations", requireAuth, requireAdmin, getEventRegistrations)
+router.get('/', requireAuth, requireAdmin, getAllContacts);
 
 /**
- * 🔐 Get single event by ID (for editing)
- * IMPORTANT: This must come BEFORE the public "/:slug" route
+ * @route   GET /api/contact/:id
+ * @desc    Get a single contact message by ID (Admin only)
+ * @access  Private - Admin only
  */
-router.get("/id/:id", requireAuth, getEventById)
+router.get('/:id', requireAuth, requireAdmin, getContactById);
 
 /**
- * 🔐 Event Enquiries (Leads)
+ * @route   PATCH /api/contact/:id/status
+ * @desc    Update contact message status (Admin only)
+ * @access  Private - Admin only
  */
-router.post("/:slug/enquire", createEventEnquiry)
-router.get("/:slug/enquiries", requireAuth, getEventEnquiries)
-router.get("/enquiries/:id", requireAuth, getEventEnquiryById)
-router.patch("/enquiries/:id/status", requireAuth, updateEventEnquiryStatus)
-router.delete("/enquiries/:id", requireAuth, deleteEventEnquiry)
+router.patch('/:id/status', requireAuth, requireAdmin, updateContactStatus);
 
 /**
- * 🌍 PUBLIC ROUTES (LAST)
+ * @route   DELETE /api/contact/:id
+ * @desc    Delete a contact message (Admin only)
+ * @access  Private - Admin only
  */
-router.post("/:slug/register", registerForEvent)
-router.post("/:slug/view", incrementEventView)
-router.get("/", getUpcomingEvents)
-router.get("/:slug", getEventBySlug)
+router.delete('/:id', requireAuth, requireAdmin, deleteContact);
 
-export default router
+export default router;

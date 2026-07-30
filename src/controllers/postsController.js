@@ -109,6 +109,9 @@ function stripHtml(html) {
 // ---------------------------------------------------------------
 function industryTalkToPostShape(talk) {
   const plainIntro = stripHtml(talk.introduction);
+  const keywords = talk.seoKeywords && typeof talk.seoKeywords === "object" ? talk.seoKeywords : {};
+  const rTime = talk.readingTime || keywords.readingTime;
+  const compUrl = talk.companyProfileUrl || keywords.companyProfileUrl || talk.website || null;
 
   return {
     id: talk.id,
@@ -117,18 +120,17 @@ function industryTalkToPostShape(talk) {
     excerpt: plainIntro ? plainIntro.slice(0, 220) : null,
     content: talk.introduction || null,
     imageUrl: talk.bannerImage || talk.thumbnailUrl || null,
-    publishedAt: talk.publishedAt,
+    publishedAt: talk.publishedAt || keywords.interviewDate || talk.createdAt,
     views: talk.views,
     shares: talk.shares,
     youtubeUrl: talk.videoType === "youtube" ? talk.videoUrl : null,
     videoCaption: null,
-    readTime: null,
-
+    readTime: rTime ? `${rTime} min read` : null,
     companyId: talk.companyId || null,
     Company: talk.Company || null,
     companyName: talk.companyName || null,
     companyLogo: talk.companyLogo || null,
-    companyProfileUrl: talk.website || null,
+    companyProfileUrl: compUrl,
     guestName: talk.guestName,
     guestPhoto: talk.profileImage || null,
     designation: talk.designation || null,
@@ -141,7 +143,7 @@ function industryTalkToPostShape(talk) {
       avatarUrl: talk.profileImage || null,
       role: talk.designation || null,
       company: talk.companyName || null,
-      profileUrl: talk.website || null,
+      profileUrl: compUrl,
     },
     category: {
       id: 0,
@@ -150,8 +152,8 @@ function industryTalkToPostShape(talk) {
     },
     qa: Array.isArray(talk.questions)
       ? talk.questions.map((q) => ({
-          question: stripHtml(q.question),
-          answer: stripHtml(q.answer),
+          question: q.question,
+          answer: q.answer || "",
         }))
       : [],
   };

@@ -26,8 +26,20 @@ function formatTalkResponse(talk) {
   if (Array.isArray(talk)) {
     return talk.map(formatTalkResponse);
   }
+
+  const keywords = talk.seoKeywords && typeof talk.seoKeywords === "object" ? talk.seoKeywords : {};
+
   return {
     ...talk,
+    interviewDate:
+      talk.interviewDate ||
+      keywords.interviewDate ||
+      (talk.publishedAt ? new Date(talk.publishedAt).toISOString().slice(0, 10) : null),
+    readingTime: talk.readingTime || keywords.readingTime || null,
+    tags: talk.tags || keywords.tags || [],
+    companyProfileUrl: talk.companyProfileUrl || keywords.companyProfileUrl || talk.website || null,
+    autoplay: talk.autoplay ?? keywords.autoplay ?? false,
+    showControls: talk.showControls ?? keywords.showControls ?? true,
     shortBio: cleanText(talk.shortBio, true),
     introduction: talk.introduction ? talk.introduction.replace(/&nbsp;/g, " ") : talk.introduction,
   };
@@ -62,6 +74,32 @@ function normalizeIndustryTalkBody(body) {
   // Prisma's duration column is Int (seconds) — convert here.
   if (typeof normalized.duration === "string") {
     normalized.duration = parseDurationToSeconds(normalized.duration);
+  }
+
+  // Handle tags: string array, JSON string, or single string (e.g. tags[])
+  let rawTags = normalized.tags || normalized["tags[]"];
+  if (typeof rawTags === "string") {
+    try {
+      const parsed = JSON.parse(rawTags);
+      rawTags = Array.isArray(parsed) ? parsed : [rawTags];
+    } catch {
+      rawTags = [rawTags];
+    }
+  } else if (!Array.isArray(rawTags)) {
+    rawTags = rawTags ? [String(rawTags)] : [];
+  }
+  normalized.tags = rawTags.filter(Boolean);
+
+  // Handle questions: JSON string or array of Q&A objects
+  if (typeof normalized.questions === "string") {
+    try {
+      normalized.questions = JSON.parse(normalized.questions);
+    } catch {
+      normalized.questions = [];
+    }
+  }
+  if (!Array.isArray(normalized.questions)) {
+    normalized.questions = [];
   }
 
   return normalized;

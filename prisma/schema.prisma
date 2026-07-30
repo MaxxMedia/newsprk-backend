@@ -513,6 +513,9 @@ model IndustryTalk {
   updatedAt DateTime @updatedAt
   companyId Int?
 
+  industry Industry? @relation(fields: [industryId], references: [id])
+
+
   Company Company? @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
@@ -689,6 +692,7 @@ model Industry {
   parentId       Int?
   createdAt      DateTime   @default(now())
   Company        Company[]
+  IndustryTalk   IndustryTalk[]
   Industry       Industry?  @relation("IndustryToIndustry", fields: [parentId], references: [id])
   other_Industry Industry[] @relation("IndustryToIndustry")
 

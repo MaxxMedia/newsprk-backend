@@ -18,150 +18,218 @@ export async function createIndustryTalk(data) {
     slug = `${slug}-${Date.now()}`;
   }
 
-  // ✅ Validate company if companyId is provided
-  if (data.companyId) {
+  let resolvedCompanyId = data.companyId || null;
+  if (resolvedCompanyId) {
     const company = await prisma.company.findUnique({
-      where: {
-        id: data.companyId, // Now using string (UUID)
-      },
+      where: { id: Number(resolvedCompanyId) },
     });
-
     if (!company) {
       throw new Error("Company not found");
     }
+  } else if (data.companyProfileUrl || data.companyName) {
+    const companySlug = data.companyProfileUrl
+      ? data.companyProfileUrl
+          .replace(/^https?:\/\/[^\/]+/, "")
+          .replace(/^\/(?:suppliers|company)\//, "")
+          .replace(/\/$/, "")
+          .trim()
+      : null;
+
+    const comp = await prisma.company.findFirst({
+      where: {
+        OR: [
+          ...(companySlug ? [{ slug: companySlug }] : []),
+          ...(data.companyName ? [{ name: { equals: data.companyName, mode: "insensitive" } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (comp) resolvedCompanyId = comp.id;
   }
+
+  const publishedAt = data.interviewDate
+    ? new Date(data.interviewDate)
+    : data.status === "PUBLISHED"
+    ? new Date()
+    : null;
+
+  const seoKeywordsObj = {
+    interviewDate: data.interviewDate || null,
+    readingTime: data.readingTime || null,
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    companyProfileUrl: data.companyProfileUrl || null,
+    autoplay: data.autoplay ?? false,
+    showControls: data.showControls ?? true,
+    ...(typeof data.seoKeywords === "object" && data.seoKeywords ? data.seoKeywords : {}),
+  };
 
   return prisma.industryTalk.create({
     data: {
       title: data.title,
       slug,
 
-      interviewType: data.interviewType,
-      categoryId: data.categoryId,
-      industryId: data.industryId,
+      interviewType: data.interviewType || null,
+      categoryId: data.categoryId || null,
+      industryId: data.industryId || null,
 
-      bannerImage: data.bannerImage,
+      bannerImage: data.bannerImage || null,
 
-      videoType: data.videoType,
-      videoUrl: data.videoUrl,
-      uploadedVideo: data.uploadedVideo,
-      thumbnailUrl: data.thumbnailUrl,
-      duration: data.duration,
+      videoType: data.videoType || null,
+      videoUrl: data.videoUrl || null,
+      uploadedVideo: data.uploadedVideo || null,
+      thumbnailUrl: data.thumbnailUrl || null,
+      duration: data.duration || null,
 
       guestName: data.guestName,
-      designation: data.designation,
-      companyName: data.companyName,
-      
-      // ✅ Convert companyId to string (for UUID) or null
-      companyId: data.companyId || null,
-      
-      companyLogo: data.companyLogo,
-      website: data.website,
-      linkedinUrl: data.linkedinUrl,
-      profileImage: data.profileImage,
-      shortBio: data.shortBio,
+      designation: data.designation || null,
+      companyName: data.companyName || null,
+      companyId: resolvedCompanyId,
+      companyLogo: data.companyLogo || null,
+      website: data.website || data.companyProfileUrl || null,
+      linkedinUrl: data.linkedinUrl || null,
+      profileImage: data.profileImage || null,
+      shortBio: data.shortBio || null,
 
-      introduction: data.introduction,
+      introduction: data.introduction || null,
 
-      seoTitle: data.seoTitle,
-      seoDescription: data.seoDescription,
-      seoKeywords: data.seoKeywords,
+      seoTitle: data.seoTitle || null,
+      seoDescription: data.seoDescription || null,
+      seoKeywords: seoKeywordsObj,
 
-      relatedInterviews: data.relatedInterviews,
+      relatedInterviews: data.relatedInterviews || null,
 
       featured: data.featured ?? false,
       trending: data.trending ?? false,
       homepage: data.homepage ?? false,
 
       status: data.status ?? "DRAFT",
+      publishedAt,
 
-      createdById: data.createdById,
+      createdById: Number(data.createdById) || 1,
+
+      questions:
+        Array.isArray(data.questions) && data.questions.length > 0
+          ? {
+              create: data.questions.map((q, idx) => ({
+                question: q.question || "",
+                answer: q.answer || "",
+                videoTimestamp: q.videoTimestamp || null,
+                highlightQuote: q.highlightQuote || null,
+                displayOrder: q.displayOrder != null ? Number(q.displayOrder) : idx + 1,
+              })),
+            }
+          : undefined,
     },
   });
 }
 
 export async function updateIndustryTalk(id, data) {
-  // ✅ Validate company if companyId is provided
-  if (data.companyId) {
-    const company = await prisma.company.findUnique({
-      where: {
-        id: data.companyId,
-      },
-    });
+  const {
+    questions,
+    interviewDate,
+    readingTime,
+    tags,
+    companyProfileUrl,
+    autoplay,
+    showControls,
+    ...updateData
+  } = data;
 
+  let resolvedCompanyId = updateData.companyId || null;
+  if (resolvedCompanyId) {
+    const company = await prisma.company.findUnique({
+      where: { id: Number(resolvedCompanyId) },
+    });
     if (!company) {
       throw new Error("Company not found");
     }
+  } else if (companyProfileUrl || updateData.companyName) {
+    const companySlug = companyProfileUrl
+      ? companyProfileUrl
+          .replace(/^https?:\/\/[^\/]+/, "")
+          .replace(/^\/(?:suppliers|company)\//, "")
+          .replace(/\/$/, "")
+          .trim()
+      : null;
+
+    const comp = await prisma.company.findFirst({
+      where: {
+        OR: [
+          ...(companySlug ? [{ slug: companySlug }] : []),
+          ...(updateData.companyName ? [{ name: { equals: updateData.companyName, mode: "insensitive" } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (comp) resolvedCompanyId = comp.id;
   }
 
-  return prisma.industryTalk.update({
+  const seoKeywordsObj = {
+    interviewDate: interviewDate || null,
+    readingTime: readingTime || null,
+    tags: Array.isArray(tags) ? tags : [],
+    companyProfileUrl: companyProfileUrl || null,
+    autoplay: autoplay ?? false,
+    showControls: showControls ?? true,
+    ...(typeof updateData.seoKeywords === "object" && updateData.seoKeywords ? updateData.seoKeywords : {}),
+  };
+
+  const updatedTalk = await prisma.industryTalk.update({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
 
     data: {
-      ...data,
-      // ✅ Ensure companyId is properly set
-      companyId: data.companyId || null,
+      ...updateData,
+      companyId: resolvedCompanyId,
+      website: updateData.website || companyProfileUrl || undefined,
+      seoKeywords: seoKeywordsObj,
+      publishedAt: interviewDate
+        ? new Date(interviewDate)
+        : updateData.status === "PUBLISHED"
+        ? new Date()
+        : undefined,
     },
   });
+
+  if (Array.isArray(questions)) {
+    await prisma.industryTalkQuestion.deleteMany({
+      where: { industryTalkId: Number(id) },
+    });
+
+    if (questions.length > 0) {
+      await prisma.industryTalkQuestion.createMany({
+        data: questions.map((q, idx) => ({
+          industryTalkId: Number(id),
+          question: q.question || "",
+          answer: q.answer || "",
+          videoTimestamp: q.videoTimestamp || null,
+          highlightQuote: q.highlightQuote || null,
+          displayOrder: q.displayOrder != null ? Number(q.displayOrder) : idx + 1,
+        })),
+      });
+    }
+  }
+
+  return updatedTalk;
 }
 
 export async function deleteIndustryTalk(id) {
   return prisma.industryTalk.delete({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
   });
 }
 
+// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
 export async function getIndustryTalkById(id) {
   return prisma.industryTalk.findUnique({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
-
     include: {
-      questions: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      quotes: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      gallery: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      documents: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      createdBy: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-        },
-      },
-
-      approvedBy: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-        },
-      },
-
+      industry: true, // ✅ Changed to lowercase
       Company: {
         include: {
           SupplierDirectory: {
@@ -174,41 +242,6 @@ export async function getIndustryTalkById(id) {
           },
         },
       },
-    },
-  });
-}
-
-export async function getIndustryTalkBySlug(slug) {
-  return prisma.industryTalk.findUnique({
-    where: {
-      slug,
-    },
-
-    include: {
-      questions: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      quotes: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      gallery: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
-      documents: {
-        orderBy: {
-          displayOrder: "asc",
-        },
-      },
-
       createdBy: {
         select: {
           id: true,
@@ -216,7 +249,6 @@ export async function getIndustryTalkBySlug(slug) {
           email: true,
         },
       },
-
       approvedBy: {
         select: {
           id: true,
@@ -224,79 +256,49 @@ export async function getIndustryTalkBySlug(slug) {
           email: true,
         },
       },
-
-      Company: {
-        include: {
-          SupplierDirectory: {
-            select: {
-              id: true,
-              slug: true,
-              name: true,
-              logoUrl: true,
-            },
-          },
-        },
+      questions: {
+        orderBy: { displayOrder: "asc" },
+      },
+      quotes: {
+        orderBy: { displayOrder: "asc" },
+      },
+      gallery: {
+        orderBy: { displayOrder: "asc" },
+      },
+      documents: {
+        orderBy: { displayOrder: "asc" },
       },
     },
   });
 }
 
-export async function getIndustryTalks({
-  page = 1,
-  limit = 10,
-  search,
-  status,
-}) {
+// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
+export const getIndustryTalks = async ({ page, limit, search, status }) => {
   const skip = (page - 1) * limit;
-  const take = Number(limit);
-
+  
   const where = {};
-
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { guestName: { contains: search, mode: "insensitive" } },
+      { companyName: { contains: search, mode: "insensitive" } },
+    ];
+  }
   if (status) {
     where.status = status;
   }
 
-  if (search) {
-    where.OR = [
-      {
-        title: {
-          contains: search,
-          mode: "insensitive",
-        },
-      },
-      {
-        guestName: {
-          contains: search,
-          mode: "insensitive",
-        },
-      },
-      {
-        companyName: {
-          contains: search,
-          mode: "insensitive",
-        },
-      },
-      // ✅ Search by related company name too
-      {
-        Company: {
-          is: {
-            name: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
-        },
-      },
-    ];
-  }
-
-  const [items, total] = await Promise.all([
+  const [data, total] = await Promise.all([
     prisma.industryTalk.findMany({
       where,
-      skip,
-      take,
-
       include: {
+        industry: { // ✅ Changed to lowercase
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         Company: {
           select: {
             id: true,
@@ -305,46 +307,85 @@ export async function getIndustryTalks({
             logoUrl: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
       },
-
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     }),
-
-    prisma.industryTalk.count({
-      where,
-    }),
+    prisma.industryTalk.count({ where }),
   ]);
 
   return {
-    items,
-    total,
-    page: Number(page),
-    totalPages: Math.ceil(total / limit),
-  };
-}
-
-export async function publishIndustryTalk(id, approvedById) {
-  return prisma.industryTalk.update({
-    where: {
-      id, // Now using string (UUID)
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
     },
+  };
+};
 
-    data: {
-      status: "PUBLISHED",
-      approvedById,
-      publishedAt: new Date(),
+// ✅ Fixed: Use lowercase 'industry' instead of 'Industry'
+export const getIndustryTalkBySlug = async (slug) => {
+  return prisma.industryTalk.findUnique({
+    where: { slug },
+    include: {
+      industry: true, // ✅ Changed to lowercase
+      Company: {
+        include: {
+          SupplierDirectory: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
+        },
+      },
+      createdBy: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      approvedBy: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      questions: {
+        orderBy: { displayOrder: "asc" },
+      },
+      quotes: {
+        orderBy: { displayOrder: "asc" },
+      },
+      gallery: {
+        orderBy: { displayOrder: "asc" },
+      },
+      documents: {
+        orderBy: { displayOrder: "asc" },
+      },
     },
   });
-}
+};
 
 export async function saveDraft(id) {
   return prisma.industryTalk.update({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
-
     data: {
       status: "DRAFT",
     },
@@ -354,9 +395,8 @@ export async function saveDraft(id) {
 export async function incrementViews(id) {
   return prisma.industryTalk.update({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
-
     data: {
       views: {
         increment: 1,
@@ -368,9 +408,8 @@ export async function incrementViews(id) {
 export async function incrementShares(id) {
   return prisma.industryTalk.update({
     where: {
-      id, // Now using string (UUID)
+      id: Number(id),
     },
-
     data: {
       shares: {
         increment: 1,
