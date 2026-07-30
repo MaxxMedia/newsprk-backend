@@ -1,9 +1,11 @@
 import express from "express";
-import { getAuthors, createAuthor } from "../controllers/authorsController.js";
+import { getAuthors, createAuthor, updateAuthor, deleteAuthor } from "../controllers/authorsController.js";
 
 const router = express.Router();
 
 router.get("/", getAuthors);
-router.post("/", createAuthor); // ✅ Add POST route
+router.post("/", createAuthor);
+router.put("/:id", updateAuthor);
+router.delete("/:id", deleteAuthor);
 
 export default router;

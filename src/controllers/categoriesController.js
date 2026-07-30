@@ -28,3 +28,43 @@ export const createCategory = async (req, res) => {
     res.status(500).json({ error: "Failed to create category" });
   }
 };
+
+export const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug } = req.body;
+
+    if (!name || !slug) {
+      return res.status(400).json({ error: "Name and slug are required" });
+    }
+
+    const category = await prisma.category.update({
+      where: { id: Number(id) },
+      data: { name, slug },
+    });
+
+    res.json(category);
+  } catch (err) {
+    console.error("Error updating category:", err);
+    res.status(500).json({ error: err.message || "Failed to update category" });
+  }
+};
+
+export const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.category.delete({
+      where: { id: Number(id) },
+    });
+
+    res.json({ message: "Category deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting category:", err);
+    if (err.code === "P2003") {
+      return res.status(400).json({ error: "Cannot delete category linked to existing posts" });
+    }
+    res.status(500).json({ error: err.message || "Failed to delete category" });
+  }
+};
+

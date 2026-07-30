@@ -328,34 +328,50 @@ export const incrementPostView = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const post = await prisma.post.update({
-      where: { slug },
-      data: { views: { increment: 1 } },
-      select: { views: true },
-    });
-
-    res.json({ success: true, views: post.views });
+    try {
+      const post = await prisma.post.update({
+        where: { slug },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+      return res.json({ success: true, views: post.views });
+    } catch (postErr) {
+      const talk = await prisma.industryTalk.update({
+        where: { slug },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+      return res.json({ success: true, views: talk.views });
+    }
   } catch (err) {
     console.error("View increment error:", err);
-    res.status(404).json({ success: false, message: "Post not found" });
+    res.status(404).json({ success: false, message: "Post or Talk not found" });
   }
 };
 
-
 export const incrementPostShare = async (req, res) => {
   try {
-    const { slug } = req.params
+    const { slug } = req.params;
 
-    await prisma.post.update({
-      where: { slug },
-      data: {
-        shares: { increment: 1 },
-      },
-    })
-
-    res.json({ success: true })
+    try {
+      await prisma.post.update({
+        where: { slug },
+        data: {
+          shares: { increment: 1 },
+        },
+      });
+      return res.json({ success: true });
+    } catch (postErr) {
+      await prisma.industryTalk.update({
+        where: { slug },
+        data: {
+          shares: { increment: 1 },
+        },
+      });
+      return res.json({ success: true });
+    }
   } catch (err) {
-    console.error("Share increment error:", err)
-    res.status(500).json({ error: "Failed to increment share" })
+    console.error("Share increment error:", err);
+    res.status(500).json({ error: "Failed to increment share" });
   }
-}
+};
