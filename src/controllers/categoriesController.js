@@ -28,6 +28,30 @@ export const createCategory = async (req, res) => {
   }
 };
 
+export const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+
+    const category = await prisma.category.update({
+      where: { id: Number(id) },
+      data: {
+        name,
+        ...(slug ? { slug } : {}),
+      },
+    });
+
+    res.json(category);
+  } catch (err) {
+    console.error("Error updating category:", err);
+    res.status(500).json({ error: err.message || "Failed to update category" });
+  }
+};
+
 export const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;

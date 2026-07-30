@@ -17,9 +17,24 @@ export const getAllPosts = async (req, res) => {
     const q = req.query.q || "";
     const category = req.query.category || null;
     const author = req.query.author ? Number(req.query.author) : null;
+    const isAdmin = req.query.admin === "true";
+    const statusParam = req.query.status || null; // "published" | "draft"
+
+    let publishCondition = {};
+    if (isAdmin) {
+      if (statusParam === "published") {
+        publishCondition = { publishedAt: { not: null } };
+      } else if (statusParam === "draft") {
+        publishCondition = { publishedAt: null };
+      }
+    } else {
+      // Public request: ONLY return published posts
+      publishCondition = { publishedAt: { not: null, lte: new Date() } };
+    }
 
     const where = {
       AND: [
+        publishCondition,
         q
           ? {
               OR: [
@@ -32,7 +47,15 @@ export const getAllPosts = async (req, res) => {
         category
           ? {
               category: {
-                is: { slug: category },
+                is: {
+                  OR: [
+                    { slug: { equals: category, mode: "insensitive" } },
+                    { slug: { equals: category.replace(/-/g, ""), mode: "insensitive" } },
+                    { slug: { equals: category.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase(), mode: "insensitive" } },
+                    { slug: { equals: category.replace(/[^a-zA-Z0-9]/g, "-"), mode: "insensitive" } },
+                    { name: { contains: category.replace(/[-_&]/g, " ").trim(), mode: "insensitive" } },
+                  ],
+                },
               },
             }
           : {},
@@ -46,7 +69,7 @@ export const getAllPosts = async (req, res) => {
       prisma.post.findMany({
         where,
         include: { author: true, category: true },
-        orderBy: { publishedAt: "desc" },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -292,14 +315,25 @@ export const createPost = async (req, res) => {
 export const updatePost = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const data = req.body;
+    const data = { ...req.body };
 
     if (data.authorId) data.authorId = Number(data.authorId);
     if (data.categoryId) data.categoryId = Number(data.categoryId);
 
+    if (data.isPublished !== undefined) {
+      if (data.isPublished) {
+        data.publishedAt = new Date();
+        data.status = "APPROVED";
+      } else {
+        data.publishedAt = null;
+        data.status = "PENDING";
+      }
+      delete data.isPublished;
+    }
+
     const updated = await prisma.post.update({
       where: { id },
-      data, // ✅ includes facebookUrl, twitterUrl, etc automatically
+      data,
       include: { author: true, category: true },
     });
 
