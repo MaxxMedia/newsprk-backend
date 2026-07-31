@@ -21,6 +21,11 @@ function parseArrayField(value) {
 
 /**
  * ✅ RECRUITER or ADMIN: Create Event
+ *
+ * ✅ FIX (no more admin approval step): when an ADMIN submits an event,
+ * it now goes straight to PUBLISHED — there's no reason for an admin to
+ * approve their own submission. Recruiter submissions still go to
+ * PENDING and require an admin to publish them, unchanged.
  */
 export const createEvent = async (req, res) => {
   try {
@@ -60,7 +65,7 @@ export const createEvent = async (req, res) => {
       twitterUrl,
       linkedinUrl,
       youtubeUrl,
-      action,          // "draft" | "submit" | "publish" (admin only)
+      action,          // "draft" | "submit" | "publish" (publish is admin-only, kept for backward compatibility)
     } = req.body
 
     const required = {
@@ -88,11 +93,17 @@ export const createEvent = async (req, res) => {
     }
 
     const otherImagesArr = parseArrayField(otherImages).filter(Boolean)
-    const videoGalleryArr = parseArrayField(videoGallery).filter(Boolean) // ✅ FIX — was missing, caused ReferenceError
+    const videoGalleryArr = parseArrayField(videoGallery).filter(Boolean)
 
+    // ✅ FIX: admins no longer go through PENDING — "submit" publishes
+    // directly for them. Recruiters keep the existing review flow.
     let status = "DRAFT"
-    if (action === "submit") status = "PENDING"
-    if (action === "publish" && req.user.role === "admin") status = "PUBLISHED"
+    if (action === "submit") {
+      status = req.user.role === "admin" ? "PUBLISHED" : "PENDING"
+    }
+    if (action === "publish" && req.user.role === "admin") {
+      status = "PUBLISHED"
+    }
 
     const baseSlug = slugify(title, { lower: true })
     let slug = baseSlug
@@ -202,7 +213,7 @@ export const getEventById = async (req, res) => {
       address: event.address || "",
       brochureUrl: event.brochureUrl || "",
       otherImages: event.otherImages || [],
-      videoGallery: event.videoGallery || [], // ✅ FIX — was missing, edit form never saw existing videos
+      videoGallery: event.videoGallery || [],
       facebookUrl: event.facebookUrl || "",
       twitterUrl: event.twitterUrl || "",
       linkedinUrl: event.linkedinUrl || "",
@@ -249,6 +260,8 @@ export const getMyEvents = async (req, res) => {
 
 /**
  * ✅ ADMIN: Publish (approve) a PENDING event
+ * Kept for the existing recruiter-submission review queue and for
+ * publishing an admin's own saved drafts from the events list page.
  */
 export const publishEvent = async (req, res) => {
   try {
@@ -363,6 +376,15 @@ export const getAllEventsAdmin = async (req, res) => {
 
 /**
  * ✅ Owner (recruiter) or Admin: Update Event
+ *
+ * ✅ FIX (bug): the old status-transition logic only moved an event out
+ * of DRAFT when it had previously been REJECTED. Editing a plain DRAFT
+ * and clicking "Submit" silently did nothing to `status` — it stayed
+ * DRAFT forever, which is why updates looked like they "weren't working".
+ *
+ * ✅ FIX (no more admin approval step): admins submitting an edit now
+ * publish directly, same as createEvent. Recruiters still go to PENDING
+ * on submit, from any prior status.
  */
 export const updateEvent = async (req, res) => {
   try {
@@ -417,10 +439,20 @@ export const updateEvent = async (req, res) => {
       ...(videoGallery && { videoGallery: parseArrayField(videoGallery).filter(Boolean) }),
     }
 
-    if (existing.status === "REJECTED" && action === "submit") {
-      data.status = "PENDING"
-      data.rejectionReason = null
+    // ✅ FIX: status now transitions on ANY "submit" action, regardless
+    // of the event's current status — not just when it was REJECTED.
+    if (action === "submit") {
+      if (req.user.role === "admin") {
+        data.status = "PUBLISHED"
+        data.publishedAt = new Date()
+        data.approvedById = req.user.id
+        data.rejectionReason = null
+      } else {
+        data.status = "PENDING"
+        data.rejectionReason = null
+      }
     }
+
     if (action === "publish" && req.user.role === "admin") {
       data.status = "PUBLISHED"
       data.publishedAt = new Date()
