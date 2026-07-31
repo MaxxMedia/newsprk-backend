@@ -386,6 +386,17 @@ export const updatePost = async (req, res) => {
       delete data.isPublished;
     }
 
+    if (data.isPublished !== undefined) {
+      if (data.isPublished) {
+        data.publishedAt = new Date();
+        data.status = "APPROVED";
+      } else {
+        data.publishedAt = null;
+        data.status = "PENDING";
+      }
+      delete data.isPublished;
+    }
+
     const updated = await prisma.post.update({
       where: { id },
       data: updateData,
