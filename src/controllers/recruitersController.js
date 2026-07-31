@@ -1,5 +1,3 @@
-
-
 import { prisma } from "../lib/prisma.js"
 import slugify from "slugify"
 import { getPlanLabel } from "../lib/packagePricing.js"
@@ -13,6 +11,12 @@ import {
 } from "../lib/packageContentLimits.js";
 import { dedupeCompanyPurchases, buildSubscriptionDisplay, syncCompanySubscription } from "../lib/packagePurchases.js"
 import { buildRecruiterAnalytics } from "../lib/recruiterAnalytics.js"
+// ✅ FIX: recruiter articles are tagged with real topic slugs
+// ("machine", "cuttingtools", "factory-automation", etc.), never with a
+// literal "articles" slug — see lib/topics.js. The pending-articles query
+// in buildRecentActivity used to filter on `category: { slug: "articles" }`,
+// which could never match a real recruiter article.
+import { ARTICLE_TOPIC_SLUGS } from "../lib/topics.js"
 
 
 // ================= PUBLIC RECRUITER PROFILE =================
@@ -23,26 +27,26 @@ export async function getRecruiterProfile(req, res) {
     const recruiter = await prisma.user.findUnique({
       where: { username },
       select: {
-  id: true,
-  username: true,
-  fullName: true,
-  headline: true,
-  about: true,
-  location: true,
-  avatarUrl: true,
-  websiteUrl: true,
-  role: true,
-  createdAt: true,
-  Company: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      logoUrl: true,
-      isVerified: true,
-    },
-  },
-}
+        id: true,
+        username: true,
+        fullName: true,
+        headline: true,
+        about: true,
+        location: true,
+        avatarUrl: true,
+        websiteUrl: true,
+        role: true,
+        createdAt: true,
+        Company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            isVerified: true,
+          },
+        },
+      }
     })
 
     if (!recruiter) {
@@ -79,22 +83,22 @@ export async function getMyRecruiterProfile(req, res) {
         role: true,
         createdAt: true,
         Company: {
-  select: {
-    id: true,
-    name: true,
-    slug: true,
-    tagline: true,
-    description: true,
-    industryId: true,
-    location: true,
-    address: true,
-    companySize: true,
-    website: true,
-    logoUrl: true,
-    coverImageUrl: true,
-    isVerified: true,
-  },
-}
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tagline: true,
+            description: true,
+            industryId: true,
+            location: true,
+            address: true,
+            companySize: true,
+            website: true,
+            logoUrl: true,
+            coverImageUrl: true,
+            isVerified: true,
+          },
+        }
       },
     })
 
@@ -248,11 +252,13 @@ async function buildRecentActivity(recruiterId, applicationsCount) {
     })
   }
 
+  // ✅ FIX: match on the real topic slugs instead of the nonexistent
+  // "articles" category, otherwise this always returns an empty list.
   const pendingArticles = await prisma.post.findMany({
     where: {
       createdById: recruiterId,
       status: "PENDING",
-      category: { slug: "articles" },
+      category: { slug: { in: ARTICLE_TOPIC_SLUGS } },
     },
     orderBy: { createdAt: "desc" },
     take: 3,
@@ -348,9 +354,6 @@ export async function getRecruiterDashboard(req, res) {
 
     const articles = await prisma.post.findMany({
       where: {
-        category: {
-          slug: "articles",
-        },
         ...(recruiter?.companyId
           ? { companyId: recruiter.companyId }
           : { createdById: recruiterId }),
@@ -536,27 +539,27 @@ export async function updateRecruiterProfile(req, res) {
 
     if (companyId) {
 
-  await assertCompanyProfileLimits(companyId, {
-    companyDescription,
-    companyCoverImageUrl,
-  });
+      await assertCompanyProfileLimits(companyId, {
+        companyDescription,
+        companyCoverImageUrl,
+      });
 
-  await prisma.company.update({
-    where: { id: companyId },
-    data: {
-      ...(companyName && { name: companyName }),
-      ...(companyTagline && { tagline: companyTagline }),
-      ...(companyDescription && { description: companyDescription }),
-      ...(companyIndustryId && { industryId: Number(companyIndustryId) }),
-      ...(companyLocation && { location: companyLocation }),
-      ...(companyAddress && { address: companyAddress }),
-      ...(companySize && { companySize }),
-      ...(companyWebsite && { website: companyWebsite }),
-      ...(companyLogoUrl && { logoUrl: companyLogoUrl }),
-      ...(companyCoverImageUrl && { coverImageUrl: companyCoverImageUrl }),
-    },
-  });
-} else if (companyName?.trim()) {
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          ...(companyName && { name: companyName }),
+          ...(companyTagline && { tagline: companyTagline }),
+          ...(companyDescription && { description: companyDescription }),
+          ...(companyIndustryId && { industryId: Number(companyIndustryId) }),
+          ...(companyLocation && { location: companyLocation }),
+          ...(companyAddress && { address: companyAddress }),
+          ...(companySize && { companySize }),
+          ...(companyWebsite && { website: companyWebsite }),
+          ...(companyLogoUrl && { logoUrl: companyLogoUrl }),
+          ...(companyCoverImageUrl && { coverImageUrl: companyCoverImageUrl }),
+        },
+      });
+    } else if (companyName?.trim()) {
       const baseSlug = slugify(companyName, {
         lower: true,
         strict: true,
@@ -632,19 +635,19 @@ export async function updateRecruiterProfile(req, res) {
     res.json(updatedRecruiter)
 
   } catch (err) {
-  console.error("Update recruiter profile error:", err);
+    console.error("Update recruiter profile error:", err);
 
-  if (err.status) {
-    return res.status(err.status).json({
-      error: err.message,
-      code: err.code,
+    if (err.status) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to update profile",
     });
   }
-
-  res.status(500).json({
-    error: "Failed to update profile",
-  });
-}
 }
 
 export async function getRecruitersByCompany(req, res) {

@@ -46,6 +46,24 @@ function normalizeGalleryFields(directory) {
   };
 }
 
+// ✅ FIX: gallery limits should degrade gracefully like exportMarkets,
+// manufacturingCapabilities, and qualityStandards already do elsewhere in
+// this file — not hard-block the whole directory submission. Free plan
+// has galleryImages: 0 and factoryImages: 0, so previously ANY company
+// or factory photo (even one the recruiter didn't realize was gated)
+// caused assertCompanyProfileLimits to throw and the entire directory
+// creation to fail with a confusing "validation error".
+//
+// This trims each gallery array down to what the plan actually allows
+// (0 items on Free) before the limits are asserted, so a Free-plan
+// recruiter can still submit a directory — just without those photos —
+// instead of being blocked outright.
+function truncateGalleryToLimit(data, limit) {
+  if (!Array.isArray(data)) return data;
+  if (limit === null || limit === undefined) return data; // unlimited
+  return data.slice(0, limit);
+}
+
 export const createDirectory = async (req, res) => {
   try {
     const user = req.user;
@@ -164,15 +182,35 @@ export const createDirectory = async (req, res) => {
       });
     }
 
-    // Check all other profile limits
+    // ✅ FIX: look up plan limits up front and trim each gallery to what
+    // the plan actually allows (e.g. 0 on Free) instead of letting
+    // assertCompanyProfileLimits hard-reject the whole submission below.
+    const planPreview = await getCompanyProfileEligibility(user.companyId);
+
+    const truncatedProductGallery = truncateGalleryToLimit(
+      productGalleryValidation.data,
+      planPreview.productImages
+    );
+    const truncatedCompanyGallery = truncateGalleryToLimit(
+      companyGalleryValidation.data,
+      planPreview.galleryImages
+    );
+    const truncatedFactoryGallery = truncateGalleryToLimit(
+      factoryGalleryValidation.data,
+      planPreview.factoryImages
+    );
+
+    // Check all other profile limits (description length, google map,
+    // cover banner). Gallery counts can no longer trip this because
+    // they've already been trimmed to the plan's allowance above.
     let profileEligibility;
     try {
       profileEligibility = await assertCompanyProfileLimits(user.companyId, {
         description,
         googleMapUrl,
-        productGallery: productGalleryValidation.data,
-        companyGallery: companyGalleryValidation.data,
-        factoryGallery: factoryGalleryValidation.data,
+        productGallery: truncatedProductGallery,
+        companyGallery: truncatedCompanyGallery,
+        factoryGallery: truncatedFactoryGallery,
         videoGallery,
         productCatalogues,
         companyBrochure,
@@ -221,7 +259,7 @@ export const createDirectory = async (req, res) => {
       },
     });
 
-    // Create directory with validated gallery data
+    // Create directory with validated (and plan-truncated) gallery data
     const directory = await prisma.supplierDirectory.create({
       data: {
         name,
@@ -235,9 +273,9 @@ export const createDirectory = async (req, res) => {
         googleMapUrl: safeGoogleMapUrl,
         tradeNames,
         videoGallery,
-        productGallery: productGalleryValidation.data,
-        companyGallery: companyGalleryValidation.data,
-        factoryGallery: factoryGalleryValidation.data,
+        productGallery: truncatedProductGallery,
+        companyGallery: truncatedCompanyGallery,
+        factoryGallery: truncatedFactoryGallery,
         productCatalogues,
         companyBrochure,
         certifications,
@@ -665,42 +703,33 @@ export const updateDirectory = async (req, res) => {
       updateData.qualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
     }
 
-    // Gallery fields with validation
+    // ✅ FIX: gallery fields now truncate to the plan's limit instead of
+    // hard-rejecting the entire update when a Free/Basic-plan recruiter
+    // sends more company/factory/product images than their plan allows.
+    // (Previously this returned a 403 and blocked saving anything else
+    // in the same request.)
     if (productGalleryValidation && productGalleryValidation.data) {
-      // Check limits
       const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      const productLimit = profileEligibility.productImages;
-      if (productLimit !== null && productGalleryValidation.data.length > productLimit) {
-        return res.status(403).json({
-          error: `Only ${productLimit} product images are allowed on the ${profileEligibility.planLabel} plan.`,
-          code: "PRODUCT_IMAGE_LIMIT_REACHED",
-        });
-      }
-      updateData.productGallery = productGalleryValidation.data;
+      updateData.productGallery = truncateGalleryToLimit(
+        productGalleryValidation.data,
+        profileEligibility.productImages
+      );
     }
 
     if (companyGalleryValidation && companyGalleryValidation.data) {
       const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      const galleryLimit = profileEligibility.galleryImages;
-      if (galleryLimit !== null && companyGalleryValidation.data.length > galleryLimit) {
-        return res.status(403).json({
-          error: `Only ${galleryLimit} company gallery images are allowed on the ${profileEligibility.planLabel} plan.`,
-          code: "COMPANY_GALLERY_LIMIT_REACHED",
-        });
-      }
-      updateData.companyGallery = companyGalleryValidation.data;
+      updateData.companyGallery = truncateGalleryToLimit(
+        companyGalleryValidation.data,
+        profileEligibility.galleryImages
+      );
     }
 
     if (factoryGalleryValidation && factoryGalleryValidation.data) {
       const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      const factoryLimit = profileEligibility.factoryImages;
-      if (factoryLimit !== null && factoryGalleryValidation.data.length > factoryLimit) {
-        return res.status(403).json({
-          error: `Only ${factoryLimit} factory images are allowed on the ${profileEligibility.planLabel} plan.`,
-          code: "FACTORY_GALLERY_LIMIT_REACHED",
-        });
-      }
-      updateData.factoryGallery = factoryGalleryValidation.data;
+      updateData.factoryGallery = truncateGalleryToLimit(
+        factoryGalleryValidation.data,
+        profileEligibility.factoryImages
+      );
     }
 
     // Check if there's anything to update

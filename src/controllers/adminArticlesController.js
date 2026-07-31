@@ -1,5 +1,12 @@
 import prisma from "../prismaClient.js"
 import { getArticlePostingEligibility } from "../lib/packageContentLimits.js"
+// ✅ FIX: recruiter articles are tagged with real topic slugs
+// ("machine", "cuttingtools", "factory-automation", etc.), never with a
+// literal "articles" slug — see lib/topics.js. Both queries below used to
+// filter on `category: { slug: "articles" }`, which could never match a
+// single article a recruiter actually created, so nothing ever showed up
+// in the admin pending/approved queues.
+import { ARTICLE_TOPIC_SLUGS } from "../lib/topics.js"
 
 /**
  * GET all pending recruiter articles
@@ -10,7 +17,7 @@ export const getPendingArticles = async (req, res) => {
       where: {
         status: "PENDING",
         category: {
-          slug: "articles",
+          slug: { in: ARTICLE_TOPIC_SLUGS },
         },
       },
       orderBy: {
@@ -42,9 +49,9 @@ export const getPendingArticles = async (req, res) => {
           ...article,
           Company: article.Company
             ? {
-                ...article.Company,
-                eligibility,
-              }
+              ...article.Company,
+              eligibility,
+            }
             : null,
         }
       })
@@ -68,7 +75,7 @@ export const getAdminApprovedArticles = async (req, res) => {
       where: {
         status: "APPROVED",
         category: {
-          slug: "articles",
+          slug: { in: ARTICLE_TOPIC_SLUGS },
         },
       },
       orderBy: {
@@ -100,9 +107,9 @@ export const getAdminApprovedArticles = async (req, res) => {
           ...article,
           Company: article.Company
             ? {
-                ...article.Company,
-                eligibility,
-              }
+              ...article.Company,
+              eligibility,
+            }
             : null,
         }
       })
@@ -124,6 +131,10 @@ export const approveArticle = async (req, res) => {
   try {
     const adminId = req.user.id || req.user.userId
     const postId = Number(req.params.id)
+
+    if (!req.params.id || !Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ error: "Invalid article id" })
+    }
 
     const existingPost = await prisma.post.findUnique({
       where: { id: postId },
@@ -151,9 +162,36 @@ export const approveArticle = async (req, res) => {
         approvedAt: new Date(),
         publishedAt: new Date(),
       },
+      include: {
+        Company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        User_Post_createdByIdToUser: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
     })
 
-    res.json(post)
+    let eligibility = null
+    if (post.Company?.id) {
+      eligibility = await getArticlePostingEligibility(post.Company.id)
+    }
+
+    res.json({
+      ...post,
+      Company: post.Company
+        ? {
+          ...post.Company,
+          eligibility,
+        }
+        : null,
+    })
   } catch (err) {
     console.error("Approve article error:", err)
     res.status(500).json({
@@ -168,6 +206,10 @@ export const approveArticle = async (req, res) => {
 export const rejectArticle = async (req, res) => {
   try {
     const postId = Number(req.params.id)
+
+    if (!req.params.id || !Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({ error: "Invalid article id" })
+    }
 
     const existingPost = await prisma.post.findUnique({
       where: {

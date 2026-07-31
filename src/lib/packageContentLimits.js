@@ -4,6 +4,12 @@ import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
 import { getActiveSubscription } from "./packagePurchases.js";
 import { countGalleryItems } from "./galleryUtils.js";
+// ✅ FIX: recruiter articles are tagged with real topic slugs
+// ("machine", "cuttingtools", "factory-automation", etc.), never with a
+// literal "articles" slug. Every query below that used to hardcode
+// `category: { slug: "articles" }` now checks against this whole list,
+// otherwise it can never match anything a recruiter actually creates.
+import { ARTICLE_TOPIC_SLUGS } from "./topics.js";
 
 /*
   ✅ FIXED: Explicit plan lookup - NEVER use ?? with null values
@@ -406,15 +412,18 @@ export async function getArticlePostingEligibility(companyId) {
   const isUnlimited = yearlyLimit === null;
   const yearStart = getYearStart();
 
-  // ✅ CRITICAL FIX: Count ONLY APPROVED articles
-  // PENDING and REJECTED articles should NOT count toward the limit
+  // ✅ FIX: recruiter articles live under real topic slugs (see
+  // ARTICLE_TOPIC_SLUGS), never under a literal "articles" category slug.
+  // Counting APPROVED articles that fall under any of those topics is
+  // what actually reflects usage — the old `slug: "articles"` filter
+  // could never match a single recruiter-created post.
   const articlesThisYear = await prisma.post.count({
     where: {
       companyId,
       category: {
-        slug: "articles",
+        slug: { in: ARTICLE_TOPIC_SLUGS },
       },
-      status: "APPROVED",  // ✅ Only count APPROVED articles
+      status: "APPROVED", // Only count APPROVED articles toward the quota
       createdAt: {
         gte: yearStart,
       },
