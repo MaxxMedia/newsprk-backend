@@ -35,21 +35,23 @@ export const getAllPosts = async (req, res) => {
     const where = {
       AND: [
         publishCondition,
+        { status: "APPROVED" }, // ✅ Only show approved posts
+        { publishedAt: { not: null, lte: new Date() } }, // ✅ Only published
         q
           ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { excerpt: { contains: q, mode: "insensitive" } },
-              { content: { contains: q, mode: "insensitive" } },
-            ],
-          }
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { excerpt: { contains: q, mode: "insensitive" } },
+                { content: { contains: q, mode: "insensitive" } },
+              ],
+            }
           : {},
         category
           ? {
-            category: {
-              is: { slug: category },
-            },
-          }
+              category: {
+                is: { slug: category },
+              },
+            }
           : {},
         author ? { authorId: author } : {},
       ],
@@ -61,7 +63,7 @@ export const getAllPosts = async (req, res) => {
       prisma.post.findMany({
         where,
         include: { author: true, category: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: { publishedAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -178,9 +180,9 @@ function industryTalkToPostShape(talk) {
     },
     qa: Array.isArray(talk.questions)
       ? talk.questions.map((q) => ({
-        question: q.question,
-        answer: q.answer || "",
-      }))
+          question: q.question,
+          answer: q.answer || "",
+        }))
       : [],
   };
 }
@@ -252,6 +254,42 @@ export const getFeaturedPosts = async (req, res) => {
   }
 };
 
+// GET /api/posts/popular
+export const getPopularPosts = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || "5"), 20);
+    
+    const popularPosts = await prisma.post.findMany({
+      where: {
+        status: "APPROVED",  // ✅ Only approved posts
+        publishedAt: { 
+          not: null,
+          lte: new Date() // ✅ Only published posts (not future)
+        }
+      },
+      include: { 
+        author: true, 
+        category: true 
+      },
+      orderBy: { 
+        views: "desc"  // ✅ Sort by views (highest first)
+      },
+      take: limit,
+    });
+    
+    res.json({ 
+      data: popularPosts,
+      meta: {
+        total: popularPosts.length,
+        limit
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch popular posts" });
+  }
+};
+
 // POST /api/posts
 export const createPost = async (req, res) => {
   try {
@@ -308,6 +346,7 @@ export const createPost = async (req, res) => {
         authorId: Number(authorId),
         categoryId: Number(categoryId),
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+        status: "APPROVED", // Default status
       },
       include: { author: true, category: true },
     });
@@ -479,26 +518,5 @@ export const incrementPostShare = async (req, res) => {
   } catch (err) {
     console.error("Share increment error:", err);
     res.status(500).json({ error: "Failed to increment share" });
-  }
-};
-
-export const getPopularPosts = async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit || "5"), 20);
-
-    const popularPosts = await prisma.post.findMany({
-      where: {
-        status: "APPROVED",
-        publishedAt: { not: null },
-      },
-      include: { author: true, category: true },
-      orderBy: { views: "desc" },
-      take: limit,
-    });
-
-    res.json({ data: popularPosts });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch popular posts" });
   }
 };

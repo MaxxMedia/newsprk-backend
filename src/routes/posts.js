@@ -1,4 +1,3 @@
-// src/routes/posts.js
 import express from "express";
 import {
   getAllPosts,
@@ -19,16 +18,17 @@ const router = express.Router();
 /* ================= PUBLIC ROUTES ================= */
 router.get("/", getAllPosts);
 
-// ✅ SLUG ROUTES FIRST (VERY IMPORTANT)
+// ✅ SPECIFIC ROUTES FIRST (MORE SPECIFIC)
+router.get("/popular", getPopularPosts);  // ← MOVED UP
+router.get("/articles/:slug", getRecruiterArticleBySlug);
+
+// ✅ SLUG ROUTES
 router.get("/slug/:slug", getPostBySlug);
 router.post("/slug/:slug/view", incrementPostView);
-router.post("/:slug/share", incrementPostShare)
+router.post("/:slug/share", incrementPostShare);
 
-
-// ❗ ID ROUTE AFTER slug routes
+// ❗ ID ROUTE LAST (MOST GENERAL)
 router.get("/:id", getPostById);
-
-router.get("/articles/:slug", getRecruiterArticleBySlug);
 
 /* ================= PROTECTED ROUTES ================= */
 router.post("/", requireAuth, requireAdmin, createPost);
