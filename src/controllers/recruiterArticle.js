@@ -4,6 +4,7 @@ import {
   assertCanCreateArticle,
   getArticlePostingEligibility,
 } from "../lib/packageContentLimits.js"
+import { ARTICLE_TOPIC_SLUGS } from "../lib/topics.js" // 👈 mirror of frontend list, see note below
 
 /**
  * CREATE recruiter article
@@ -12,30 +13,35 @@ export const createRecruiterArticle = async (req, res) => {
   try {
     const user = req.user
 
-    // 🔐 Recruiter guard
     if (!user || user.role !== "recruiter") {
       return res.status(403).json({ error: "Only recruiters can create articles" })
     }
 
-   const recruiter = await prisma.user.findUnique({
-  where: { id: user.id },
-  select: {
-    companyId: true,
-  },
-})
+    const recruiter = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { companyId: true },
+    })
 
-if (!recruiter?.companyId) {
-  return res.status(400).json({
-    error: "Recruiter must be linked to a company",
-  })
-}
+    if (!recruiter?.companyId) {
+      return res.status(400).json({
+        error: "Recruiter must be linked to a company",
+      })
+    }
 
-    const { title, content, excerpt, imageUrl, badge } = req.body
+    const { title, content, excerpt, imageUrl, badge, categorySlug } = req.body
 
     if (!title || !content) {
-      return res
-        .status(400)
-        .json({ error: "Title and content are required" })
+      return res.status(400).json({ error: "Title and content are required" })
+    }
+
+    if (!categorySlug) {
+      return res.status(400).json({ error: "Please select a topic category" })
+    }
+
+    // Whitelist check — recruiters can only post into designated article topics,
+    // not into "events", "suppliers", "webinars" etc.
+    if (!ARTICLE_TOPIC_SLUGS.includes(categorySlug)) {
+      return res.status(400).json({ error: "Invalid topic category" })
     }
 
     try {
@@ -48,40 +54,40 @@ if (!recruiter?.companyId) {
       })
     }
 
-    // 🔒 Force category = articles
     const category = await prisma.category.findUnique({
-      where: { slug: "articles" },
+      where: { slug: categorySlug },
     })
 
     if (!category) {
-      return res.status(500).json({
-        error: "Articles category not found. Contact admin.",
+      return res.status(400).json({
+        error: "Selected category does not exist. Contact admin.",
       })
     }
 
     const slug = `${slugify(title, {
-  lower: true,
-  strict: true,
-  trim: true,
-})}-${Date.now()}`
+      lower: true,
+      strict: true,
+      trim: true,
+    })}-${Date.now()}`
 
     const post = await prisma.post.create({
-  data: {
-    title,
-    slug,
-    content,
-    excerpt,
-    imageUrl,
-    badge,
-    companyId: recruiter.companyId,
-    categoryId: category.id,
-
-    status: "PENDING",
-    createdById: user.id,
-
-    publishedAt: null,
-  },
-})
+      data: {
+        title,
+        slug,
+        content,
+        excerpt,
+        imageUrl,
+        badge,
+        companyId: recruiter.companyId,
+        categoryId: category.id,
+        status: "PENDING",
+        createdById: user.id,
+        publishedAt: null,
+      },
+      include: {
+        category: true,
+      },
+    })
 
     return res.status(201).json(post)
   } catch (error) {
@@ -116,6 +122,10 @@ export const getArticlePostingEligibilityHandler = async (req, res) => {
   }
 }
 
+/**
+ * GET recruiter's own articles (across ALL topic categories now,
+ * not just a single "articles" category)
+ */
 export const getMyRecruiterArticles = async (req, res) => {
   try {
     const user = req.user
@@ -126,9 +136,7 @@ export const getMyRecruiterArticles = async (req, res) => {
 
     const recruiter = await prisma.user.findUnique({
       where: { id: user.id },
-      select: {
-        companyId: true,
-      },
+      select: { companyId: true },
     })
 
     if (!recruiter?.companyId) {
@@ -137,13 +145,13 @@ export const getMyRecruiterArticles = async (req, res) => {
 
     const posts = await prisma.post.findMany({
       where: {
-        category: {
-          slug: "articles",
-        },
         companyId: recruiter.companyId,
       },
       orderBy: {
         createdAt: "desc",
+      },
+      include: {
+        category: true, // 👈 needed so the edit page can prefill categorySlug
       },
     })
 
@@ -155,7 +163,6 @@ export const getMyRecruiterArticles = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch articles" })
   }
 }
-
 
 /**
  * UPDATE recruiter article (own only)
@@ -181,7 +188,25 @@ export const updateRecruiterArticle = async (req, res) => {
       return res.status(404).json({ error: "Article not found" })
     }
 
-    const { title, content, excerpt, imageUrl, badge } = req.body
+    const { title, content, excerpt, imageUrl, badge, categorySlug } = req.body
+
+    let categoryId = undefined
+
+    if (categorySlug) {
+      if (!ARTICLE_TOPIC_SLUGS.includes(categorySlug)) {
+        return res.status(400).json({ error: "Invalid topic category" })
+      }
+
+      const category = await prisma.category.findUnique({
+        where: { slug: categorySlug },
+      })
+
+      if (!category) {
+        return res.status(400).json({ error: "Selected category does not exist" })
+      }
+
+      categoryId = category.id
+    }
 
     const updatedPost = await prisma.post.update({
       where: { id: postId },
@@ -191,6 +216,7 @@ export const updateRecruiterArticle = async (req, res) => {
         excerpt,
         imageUrl,
         badge,
+        ...(categoryId !== undefined && { categoryId }),
         ...(title && {
           slug: slugify(title, { lower: true, strict: true }),
         }),
@@ -243,5 +269,3 @@ export const deleteRecruiterArticle = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" })
   }
 }
-
-

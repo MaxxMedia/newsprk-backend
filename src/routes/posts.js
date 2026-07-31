@@ -9,7 +9,8 @@ import {
   deletePost,
   getRecruiterArticleBySlug,
   incrementPostView,
-  incrementPostShare
+  incrementPostShare,
+  getPopularPosts
 } from "../controllers/postsController.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 

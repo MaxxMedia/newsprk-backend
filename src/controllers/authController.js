@@ -342,6 +342,7 @@ export const completeOnboarding = async (req, res) => {
       where: { id: userId },
       include: { Company: true },
     })
+    
 
     res.json({
       message: "Onboarding completed successfully",
@@ -352,6 +353,8 @@ export const completeOnboarding = async (req, res) => {
         username: updatedUser.username,
         isOnboarded: updatedUser.isOnboarded,
         companyId: updatedUser.companyId,
+        companyName: updatedUser.Company?.name ?? null,
+
         lastLoginAt: updatedUser.lastLoginAt,
       },
     })

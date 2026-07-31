@@ -29,7 +29,8 @@ model Post {
   slug                         String      @unique
   badge                        String?
   excerpt                      String?
-  content                      String
+  content                      String?
+  contentBlocks                Json?
   imageUrl                     String?
   facebookUrl                  String?
   linkedinUrl                  String?
