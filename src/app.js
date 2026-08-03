@@ -69,6 +69,9 @@ import adminActivityRoutes from "./routes/adminActivityRoutes.js";
 import adminPermissionRoutes from "./routes/adminPermissionRoutes.js";
 import industryTalkRoutes from "./routes/industryTalkRoutes.js";
 
+import webinarRoutes from "./routes/Webinarroutes.js";
+import publicWebinarRoutes from "./routes/Publicwebinarroutes.js";
+
 // ✅ auto-seed Permission table + prisma client for it
 import { prisma } from "./lib/prisma.js";
 import { ensurePermissionsSeeded } from "./lib/permissions.js";
@@ -205,6 +208,10 @@ app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
 app.use("/api/industry-talks", industryTalkRoutes);
+
+
+app.use("/api", webinarRoutes);       
+app.use("/api", publicWebinarRoutes);  
 
 // ✅ RBAC — sub-admin CRUD
 console.log("🔵 Mounting admin sub-admin (RBAC) routes...");
