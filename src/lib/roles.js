@@ -53,6 +53,10 @@ export const DEFAULT_ROLES = [
             "magazine.view",
             "magazine.create",
             "magazine.edit",
+            "industries.view",
+            "industries.create",
+            "industries.edit",
+            "industries.delete",
         ],
     },
     {

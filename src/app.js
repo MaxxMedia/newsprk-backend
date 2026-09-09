@@ -29,7 +29,9 @@ import calendarRoutes from "./routes/calendar.js";
 import publicRoutes from "./routes/public.js";
 import magazineRoutes from "./routes/magazineRoutes.js";
 import adminUsersRoutes from "./routes/adminUsers.js";
-import adminIndustriesRoutes from "./routes/adminIndustryRoutes.js";
+import adminIndustriesRoutes, {
+  publicIndustryRouter,
+} from "./routes/adminIndustryRoutes.js";
 import jobAlertsRoutes from "./routes/jobAlerts.js";
 import paymentsRoutes from "./routes/payments.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
@@ -207,6 +209,7 @@ app.use("/api/admin", adminDirectoryRoutes);
 app.use("/api/admin", adminArticlesRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/admin", adminAnalyticsRoutes);
+app.use("/api/admin", adminIndustriesRoutes);
 app.use("/api/industry-talks", industryTalkRoutes);
 
 
@@ -243,7 +246,7 @@ app.use("/api/connections", connectionRoutes);
 app.use("/api/magazines", magazineRoutes);
 app.use("/api/job-alerts", jobAlertsRoutes);
 app.use("/api/payments", paymentsRoutes);
-app.use("/api", adminIndustriesRoutes);
+app.use("/api", publicIndustryRouter);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/quotes", quoteRoutes);

@@ -68,19 +68,25 @@ export async function bulkCreateFullSetup(req, res) {
       let recruiter = null
 
       try {
-        if (!row.email || !row.companyName || !row.industryPath) {
+        const email = String(row.email || "").trim()
+        const companyName = String(row.companyName || "").trim()
+        const directoryDescription = String(
+          row.directoryDescription || row.description || ""
+        ).trim()
+
+        if (!email || !companyName || !row.industryPath) {
           throw new Error("Missing required fields")
         }
 
         const existingUser = await prisma.user.findUnique({
-          where: { email: row.email },
+          where: { email },
         })
 
         if (existingUser) {
           throw new Error("Email already exists")
         }
 
-        const username = row.email
+        const username = email
           .split("@")[0]
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "")
@@ -91,20 +97,20 @@ export async function bulkCreateFullSetup(req, res) {
         await prisma.$transaction(async (tx) => {
           const industryId = await resolveIndustryPath(tx, row.industryPath)
 
-          const companySlug = slugify(row.companyName, {
+          const companySlug = slugify(companyName, {
             lower: true,
             strict: true,
           })
 
           const company = await tx.company.create({
             data: {
-              name: row.companyName,
+              name: companyName,
               slug: companySlug + "-" + Date.now(),
-              website: row.website || null,
+              website: row.website ? String(row.website).trim() : null,
               location: `${row.city || ""}, ${row.state || ""}, ${row.country || ""}`,
               address: row.address || null,
               industryId: industryId,
-              description: row.description || null,
+              description: row.description ? String(row.description).trim() : null,
               logoUrl: row.logoUrl || null,
               isVerified: true,
             },
@@ -112,7 +118,7 @@ export async function bulkCreateFullSetup(req, res) {
 
           recruiter = await tx.user.create({
             data: {
-              email: row.email,
+              email,
               username,
               password: hashedPassword,
               role: "recruiter",
@@ -126,12 +132,12 @@ export async function bulkCreateFullSetup(req, res) {
 
           await tx.supplierDirectory.create({
             data: {
-              name: row.companyName,
+              name: companyName,
               slug: companySlug + "-directory-" + Date.now(),
-              description: row.directoryDescription || null,
-              phoneNumber: row.phoneNumber || null,
-              email: row.email,
-              website: row.website || null,
+              description: directoryDescription,
+              phoneNumber: row.phoneNumber != null ? String(row.phoneNumber).trim() : null,
+              email,
+              website: row.website ? String(row.website).trim() : null,
               logoUrl: row.logoUrl || null,
               videoGallery: row.videoGallery
                 ? row.videoGallery.split(",").map(v => v.trim())
@@ -154,14 +160,14 @@ export async function bulkCreateFullSetup(req, res) {
         })
 
         success.push({
-          email: row.email,
-          company: row.companyName,
+          email,
+          company: companyName,
           userId: recruiter ? recruiter.id : null,
         })
 
       } catch (err) {
         failed.push({
-          email: row.email || "Unknown",
+          email: String(row.email || "Unknown").trim(),
           error: err.message,
         })
       }
