@@ -6,7 +6,8 @@ import {
   updateContactStatus,
   deleteContact
 } from '../controllers/contactController.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requirePermission, requireModule } from '../middleware/permissions.js';
 
 const router = express.Router();
 
@@ -30,27 +31,27 @@ router.post('/', createContact);
  * @desc    Get all contact messages (Admin only)
  * @access  Private - Admin only
  */
-router.get('/', requireAuth, requireAdmin, getAllContacts);
+router.get('/', requireAuth, requireModule("contact"), getAllContacts);
 
 /**
  * @route   GET /api/contact/:id
  * @desc    Get a single contact message by ID (Admin only)
  * @access  Private - Admin only
  */
-router.get('/:id', requireAuth, requireAdmin, getContactById);
+router.get('/:id', requireAuth, requireModule("contact"), getContactById);
 
 /**
  * @route   PATCH /api/contact/:id/status
  * @desc    Update contact message status (Admin only)
  * @access  Private - Admin only
  */
-router.patch('/:id/status', requireAuth, requireAdmin, updateContactStatus);
+router.patch('/:id/status', requireAuth, requirePermission("contact.edit"), updateContactStatus);
 
 /**
  * @route   DELETE /api/contact/:id
  * @desc    Delete a contact message (Admin only)
  * @access  Private - Admin only
  */
-router.delete('/:id', requireAuth, requireAdmin, deleteContact);
+router.delete('/:id', requireAuth, requirePermission("contact.edit"), deleteContact);
 
 export default router;

@@ -1,5 +1,6 @@
 import { Router } from "express"
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 import {
     createWebinar,
     getAdminWebinars,
@@ -20,7 +21,7 @@ const router = Router()
 router.get(
     "/admin/webinars",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     getAdminWebinars
 )
 
@@ -29,77 +30,77 @@ router.get(
 router.get(
     "/admin/webinars/stats",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     getAdminWebinarStats
 )
 
 router.get(
     "/admin/webinars/:id",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     getAdminWebinarById
 )
 
 router.post(
     "/admin/webinars",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     createWebinar
 )
 
 router.put(
     "/admin/webinars/:id",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     updateWebinar
 )
 
 router.delete(
     "/admin/webinars/:id",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     deleteWebinar
 )
 
 router.put(
     "/admin/webinars/:id/approve",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     approveWebinar
 )
 
 router.put(
     "/admin/webinars/:id/reject",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     rejectWebinar
 )
 
 router.put(
     "/admin/webinars/:id/publish",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     publishWebinar
 )
 
 router.put(
     "/admin/webinars/:id/draft",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     draftWebinar
 )
 
 router.put(
     "/admin/webinars/:id/feature",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     toggleFeatureWebinar
 )
 
 router.put(
     "/admin/webinars/:id/on-demand",
     requireAuth,
-    requireAdmin,
+    requireModule("webinar"),
     toggleOnDemandWebinar
 )
 

@@ -1,6 +1,7 @@
 // backend/controllers/eventsController.js
 import { PrismaClient } from "@prisma/client"
 import slugify from "slugify"
+import { isAdminStaff } from "../lib/permissions.js"
 
 const prisma = new PrismaClient()
 
@@ -29,7 +30,7 @@ function parseArrayField(value) {
  */
 export const createEvent = async (req, res) => {
   try {
-    if (!["recruiter", "admin"].includes(req.user.role)) {
+    if (req.user.role !== "recruiter" && !isAdminStaff(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Only recruiters or admins can submit events",
@@ -99,9 +100,9 @@ export const createEvent = async (req, res) => {
     // directly for them. Recruiters keep the existing review flow.
     let status = "DRAFT"
     if (action === "submit") {
-      status = req.user.role === "admin" ? "PUBLISHED" : "PENDING"
+      status = isAdminStaff(req.user.role) ? "PUBLISHED" : "PENDING"
     }
-    if (action === "publish" && req.user.role === "admin") {
+    if (action === "publish" && isAdminStaff(req.user.role)) {
       status = "PUBLISHED"
     }
 
@@ -178,7 +179,7 @@ export const getEventById = async (req, res) => {
       })
     }
 
-    const isAdmin = userRole === "admin"
+    const isAdmin = isAdminStaff(userRole)
     const isOwner = event.createdById === userId
 
     if (!isAdmin && !isOwner) {
@@ -239,7 +240,7 @@ export const getEventById = async (req, res) => {
  */
 export const getMyEvents = async (req, res) => {
   try {
-    if (!["recruiter", "admin"].includes(req.user.role)) {
+    if (req.user.role !== "recruiter" && !isAdminStaff(req.user.role)) {
       return res.status(403).json({ success: false, message: "Not allowed" })
     }
 
@@ -310,16 +311,25 @@ export const rejectEvent = async (req, res) => {
 }
 
 /**
- * 🌍 PUBLIC: Get Upcoming Events (Search by title)
+ * 🌍 PUBLIC: Get published events that have not ended yet.
+ * Uses endDate (not startDate) so currently-running events still appear —
+ * startDate is stored as midnight UTC, so a show that started earlier today
+ * or last week would otherwise be missing from /events.
  */
 export const getUpcomingEvents = async (req, res) => {
   try {
     const { q } = req.query
+    const now = new Date()
+    const startOfTodayUtc = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate()
+    ))
 
     const events = await prisma.event.findMany({
       where: {
         status: "PUBLISHED",
-        startDate: { gte: new Date() },
+        endDate: { gte: startOfTodayUtc },
         ...(q && { title: { contains: q } }),
       },
       orderBy: { startDate: "asc" },
@@ -394,7 +404,7 @@ export const updateEvent = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ success: false, message: "Event not found" })
     }
-    if (req.user.role !== "admin" && existing.createdById !== req.user.id) {
+    if (!isAdminStaff(req.user.role) && existing.createdById !== req.user.id) {
       return res.status(403).json({ success: false, message: "Not authorized" })
     }
 
@@ -442,7 +452,7 @@ export const updateEvent = async (req, res) => {
     // ✅ FIX: status now transitions on ANY "submit" action, regardless
     // of the event's current status — not just when it was REJECTED.
     if (action === "submit") {
-      if (req.user.role === "admin") {
+      if (isAdminStaff(req.user.role)) {
         data.status = "PUBLISHED"
         data.publishedAt = new Date()
         data.approvedById = req.user.id
@@ -453,7 +463,7 @@ export const updateEvent = async (req, res) => {
       }
     }
 
-    if (action === "publish" && req.user.role === "admin") {
+    if (action === "publish" && isAdminStaff(req.user.role)) {
       data.status = "PUBLISHED"
       data.publishedAt = new Date()
       data.approvedById = req.user.id
@@ -679,7 +689,7 @@ export const getEventEnquiries = async (req, res) => {
     }
 
     // Check permissions
-    const isAdmin = userRole === "admin"
+    const isAdmin = isAdminStaff(userRole)
     const isOwner = event.createdById === userId
 
     if (!isAdmin && !isOwner) {
@@ -746,7 +756,7 @@ export const getEventEnquiryById = async (req, res) => {
     }
 
     // Check permissions
-    const isAdmin = userRole === "admin"
+    const isAdmin = isAdminStaff(userRole)
     const isOwner = enquiry.Event.createdById === userId
 
     if (!isAdmin && !isOwner) {
@@ -809,7 +819,7 @@ export const updateEventEnquiryStatus = async (req, res) => {
     }
 
     // Check permissions
-    const isAdmin = userRole === "admin"
+    const isAdmin = isAdminStaff(userRole)
     const isOwner = enquiry.Event.createdById === userId
 
     if (!isAdmin && !isOwner) {
@@ -874,7 +884,7 @@ export const deleteEventEnquiry = async (req, res) => {
     }
 
     // Check permissions
-    const isAdmin = userRole === "admin"
+    const isAdmin = isAdminStaff(userRole)
     const isOwner = enquiry.Event.createdById === userId
 
     if (!isAdmin && !isOwner) {

@@ -16,7 +16,8 @@ import {
 
 import { createQuoteRequest } from "../controllers/Quotecontroller.js"
 
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 
 const router = express.Router()
 
@@ -41,12 +42,12 @@ router.get(
 )
 
 // Admin
-router.patch("/admin/:id/approve", requireAuth, requireAdmin, approveDirectory)
+router.patch("/admin/:id/approve", requireAuth, requirePermission("supplier.approve"), approveDirectory)
 // Admin
 router.get(
   "/admin",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   getAllDirectoriesForAdmin
 )
 

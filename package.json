@@ -10,7 +10,10 @@
     "start": "node src/app.js",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "seed:industries": "node prisma/seedIndustries.js",
+    "seed:latest-industries": "node prisma/seedTagmaIndustries.js",
+    "seed:tagma-industries": "node prisma/seedTagmaIndustries.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

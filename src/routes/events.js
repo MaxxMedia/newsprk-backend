@@ -20,7 +20,8 @@ import {
   deleteEventEnquiry,
 } from "../controllers/eventsController.js"
 
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 
 const router = express.Router()
 
@@ -35,10 +36,10 @@ router.put("/:id", requireAuth, updateEvent)
 /**
  * 🔐 ADMIN ONLY — review queue & moderation
  */
-router.get("/admin/all", requireAuth, requireAdmin, getAllEventsAdmin)
-router.put("/publish/:id", requireAuth, requireAdmin, publishEvent)
-router.put("/reject/:id", requireAuth, requireAdmin, rejectEvent)
-router.get("/admin/:id/registrations", requireAuth, requireAdmin, getEventRegistrations)
+router.get("/admin/all", requireAuth, requireModule("events"), getAllEventsAdmin)
+router.put("/publish/:id", requireAuth, requirePermission("events.edit"), publishEvent)
+router.put("/reject/:id", requireAuth, requirePermission("events.edit"), rejectEvent)
+router.get("/admin/:id/registrations", requireAuth, requireModule("events"), getEventRegistrations)
 
 /**
  * 🔐 Get single event by ID (for editing)

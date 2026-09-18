@@ -1,7 +1,7 @@
 // src/middleware/permissions.js
 
 import { prisma } from "../lib/prisma.js";
-import { SUPER_ROLES, hasPermission } from "../lib/permissions.js";
+import { ALL_PERMISSIONS, SUPER_ROLES, hasPermission } from "../lib/permissions.js";
 
 export function requireSuperAdmin(req, res, next) {
     if (!req.user) {
@@ -107,4 +107,16 @@ export function requireAnyPermission(permissionKeys = []) {
             return res.status(500).json({ error: "Permission check failed" });
         }
     };
+}
+
+/**
+ * Passes if the user has ANY permission in this module
+ * (e.g. requireModule("banners") matches banners.view/create/edit/delete).
+ */
+export function requireModule(moduleName) {
+    const keys = ALL_PERMISSIONS.filter((p) => p.module === moduleName).map((p) => p.key);
+    if (!keys.length) {
+        return requirePermission(`${moduleName}.view`);
+    }
+    return requireAnyPermission(keys);
 }

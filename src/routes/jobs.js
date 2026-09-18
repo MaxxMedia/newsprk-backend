@@ -1,5 +1,6 @@
 import express from "express"
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 import {
   createJob,
   getAllJobs,
@@ -76,7 +77,7 @@ router.post(
 router.get(
   "/admin/company-jobs",
   requireAuth,
-  requireAdmin,
+  requireModule("jobs"),
   getAdminCompanyJobs
 )
 
@@ -84,7 +85,7 @@ router.get(
 router.put(
   "/:id/deactivate",
   requireAuth,
-  requireAdmin,
+  requirePermission("jobs.edit"),
   deactivateJob
 )
 

@@ -1,5 +1,6 @@
 import express from "express";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requirePermission } from "../middleware/permissions.js";
 
 import {
   /* ===========================
@@ -79,14 +80,14 @@ router.post("/unsubscribe", unsubscribeNewsletter);
 router.get(
   "/analytics",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getAnalytics
 );
 
 router.get(
   "/analytics/campaign/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getCampaignAnalytics
 );
 
@@ -97,49 +98,49 @@ router.get(
 router.get(
   "/subscribers",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getSubscribers
 );
 
 router.get(
   "/subscribers/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getSubscriber
 );
 
 router.post(
   "/subscribers",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   createSubscriber
 );
 
 router.put(
   "/subscribers/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   updateSubscriber
 );
 
 router.delete(
   "/subscribers/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   deleteSubscriber
 );
 
 router.post(
   "/subscribers/import",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   importSubscribers
 );
 
 router.get(
   "/subscribers/export",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   exportSubscribers
 );
 
@@ -150,49 +151,49 @@ router.get(
 router.get(
   "/templates",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getTemplates
 );
 
 router.get(
   "/templates/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getTemplate
 );
 
 router.post(
   "/templates",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   createTemplate
 );
 
 router.put(
   "/templates/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   updateTemplate
 );
 
 router.delete(
   "/templates/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   deleteTemplate
 );
 
 router.post(
   "/templates/:id/duplicate",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   duplicateTemplate
 );
 
 router.get(
   "/templates/:id/preview",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   previewTemplate
 );
 
@@ -203,70 +204,70 @@ router.get(
 router.get(
   "/campaigns",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getCampaigns
 );
 
 router.get(
   "/campaigns/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getCampaign
 );
 
 router.post(
   "/campaigns",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   createCampaign
 );
 
 router.put(
   "/campaigns/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   updateCampaign
 );
 
 router.delete(
   "/campaigns/:id",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   deleteCampaign
 );
 
 router.post(
   "/campaigns/:id/send",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   sendCampaign
 );
 
 router.post(
   "/campaigns/:id/schedule",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   scheduleCampaign
 );
 
 router.post(
   "/campaigns/:id/cancel",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   cancelCampaign
 );
 
 router.post(
   "/campaigns/:id/test",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   sendTestCampaign
 );
 
 router.get(
   "/campaigns/:id/recipients",
   requireAuth,
-  requireAdmin,
+  requirePermission("newsletter.view"),
   getCampaignRecipients
 );
 

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getPlanLabel } from "../lib/packagePricing.js";
+import { isAdminStaff } from "../lib/permissions.js";
 
 /**
  * Admin: list companies, optionally filtered by subscription plan.
@@ -19,7 +20,7 @@ import { getPlanLabel } from "../lib/packagePricing.js";
  */
 export async function getCompaniesForAdmin(req, res) {
   try {
-    if (req.user.role !== "admin") {
+    if (!isAdminStaff(req.user.role)) {
       return res.status(403).json({ error: "Not allowed" });
     }
 
@@ -83,7 +84,7 @@ export async function getCompaniesForAdmin(req, res) {
  */
 export async function getCompanyForAdmin(req, res) {
   try {
-    if (req.user.role !== "admin") {
+    if (!isAdminStaff(req.user.role)) {
       return res.status(403).json({ error: "Not allowed" });
     }
 

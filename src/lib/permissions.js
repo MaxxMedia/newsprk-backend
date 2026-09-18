@@ -87,6 +87,11 @@ export const ALL_PERMISSIONS = [
     { key: "industry_talks.create", label: "Create Industry Talks", module: "industry_talks" },
     { key: "industry_talks.edit", label: "Edit Industry Talks", module: "industry_talks" },
 
+    // Webinars
+    { key: "webinar.view", label: "View Webinars", module: "webinar" },
+    { key: "webinar.create", label: "Create Webinars", module: "webinar" },
+    { key: "webinar.edit", label: "Edit Webinars", module: "webinar" },
+
     // Industries
     { key: "industries.view", label: "View Industries", module: "industries" },
     { key: "industries.create", label: "Create Industries", module: "industries" },
@@ -108,6 +113,11 @@ export const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map((p) => p.key);
  */
 export const SUPER_ROLES = ["super_admin", "admin"];
 
+export function isAdminStaff(role) {
+    const normalized = String(role || "").toLowerCase().replace(/\s+/g, "_");
+    return SUPER_ROLES.includes(normalized) || normalized === "sub_admin";
+}
+
 /**
  * Resolve the effective list of permission keys for a user.
  *
@@ -124,34 +134,54 @@ export const SUPER_ROLES = ["super_admin", "admin"];
  * - sub_admin with no roleId (legacy)  -> raw UserPermission grants only
  * - anything else                      -> no admin permissions
  */
+function permissionKey(row) {
+    return row?.permission?.key || null;
+}
+
+// Schema default is `granted: true`. Treat anything other than an
+// explicit `false` as a GRANT — otherwise missing/undefined `granted`
+// (older Prisma selects, pre-migration rows) was read as a DENY and
+// wiped every extra module off the sub-admin sidebar.
+function isGrant(granted) {
+    return granted !== false;
+}
+
 export async function getUserPermissionKeys(prisma, userId, role) {
-    const normalizedRole = role?.toLowerCase();
+    const normalizedRole = String(role || "").toLowerCase().replace(/\s+/g, "_");
+    const uid = Number(userId);
 
     if (SUPER_ROLES.includes(normalizedRole)) {
         const all = await prisma.permission.findMany({ select: { key: true } });
         return all.map((p) => p.key);
     }
 
+    if (!Number.isInteger(uid)) return [];
+
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: uid },
         select: { roleId: true, role: true },
     });
 
     const overrides = await prisma.userPermission.findMany({
-        where: { userId },
-        select: { permission: { select: { key: true } } },
+        where: { userId: uid },
+        include: { permission: { select: { key: true } } },
     });
-    const grantedOverrides = overrides.filter((o) => o.granted).map((o) => o.permission.key);
-    const deniedOverrides = new Set(
-        overrides.filter((o) => !o.granted).map((o) => o.permission.key)
-    );
+
+    const grantedOverrides = [];
+    const deniedOverrides = new Set();
+    for (const o of overrides) {
+        const key = permissionKey(o);
+        if (!key) continue;
+        if (isGrant(o.granted)) grantedOverrides.push(key);
+        else deniedOverrides.add(key);
+    }
 
     if (user?.roleId) {
         const roleDefaults = await prisma.rolePermission.findMany({
             where: { roleId: user.roleId, role: { isActive: true } },
-            select: { permission: { select: { key: true } } },
+            include: { permission: { select: { key: true } } },
         });
-        const defaultKeys = roleDefaults.map((rp) => rp.permission.key);
+        const defaultKeys = roleDefaults.map(permissionKey).filter(Boolean);
 
         const effective = new Set([...defaultKeys, ...grantedOverrides]);
         for (const denied of deniedOverrides) effective.delete(denied);
@@ -174,32 +204,35 @@ export async function getUserPermissionKeys(prisma, userId, role) {
  * getUserPermissionKeys, without materializing the full set.
  */
 export async function hasPermission(prisma, userId, role, permissionKey) {
-    const normalizedRole = role?.toLowerCase();
+    const normalizedRole = String(role || "").toLowerCase().replace(/\s+/g, "_");
+    const uid = Number(userId);
 
     if (SUPER_ROLES.includes(normalizedRole)) {
         return true;
     }
 
+    if (!Number.isInteger(uid)) return false;
+
     // 1. UserPermission override always wins if present, in either direction.
     const override = await prisma.userPermission.findFirst({
         where: {
-            userId,
+            userId: uid,
             permission: {
                 key: permissionKey,
             },
         },
         select: {
-            id: true,
+            granted: true,
         },
     });
 
     if (override) {
-        return true;
+        return isGrant(override.granted);
     }
 
     // 2. Fall back to the user's Role defaults.
     const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: uid },
         select: { roleId: true },
     });
 

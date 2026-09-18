@@ -6,6 +6,7 @@ import multer from "multer"
 import {
   getPendingDirectories,
   getDirectoryForReview,
+  adminUpdateDirectory,
   approveDirectory,
   rejectDirectory,
   adminCreateDirectory,
@@ -22,7 +23,8 @@ import {
   getBulkImportedUsers
 } from "../controllers/adminBulkController.js"
 
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 import prisma from "../prismaClient.js"
 
 const router = express.Router()
@@ -37,7 +39,7 @@ const upload = multer({
 router.get(
   "/suppliers/admin",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   async (req, res) => {
     try {
       console.log("🔍 Fetching suppliers with user fields...")
@@ -89,16 +91,17 @@ router.get(
 // =============================================
 // Directory review routes
 // =============================================
-router.get("/directories/pending", requireAuth, requireAdmin, getPendingDirectories)
-router.get("/directories/:id", requireAuth, requireAdmin, getDirectoryForReview)
-router.patch("/directories/:id/approve", requireAuth, requireAdmin, approveDirectory)
-router.patch("/directories/:id/reject", requireAuth, requireAdmin, rejectDirectory)
+router.get("/directories/pending", requireAuth, requireModule("supplier"), getPendingDirectories)
+router.get("/directories/:id", requireAuth, requireModule("supplier"), getDirectoryForReview)
+router.put("/directories/:id", requireAuth, requireModule("supplier"), adminUpdateDirectory)
+router.patch("/directories/:id/approve", requireAuth, requirePermission("supplier.approve"), approveDirectory)
+router.patch("/directories/:id/reject", requireAuth, requirePermission("supplier.reject"), rejectDirectory)
 
 // =============================================
 // Create routes
 // =============================================
-router.post("/create-directory", requireAuth, requireAdmin, adminCreateDirectory)
-router.post("/create-full-setup", requireAuth, requireAdmin, adminCreateFullSetup)
+router.post("/create-directory", requireAuth, requireModule("supplier"), adminCreateDirectory)
+router.post("/create-full-setup", requireAuth, requireModule("supplier"), adminCreateFullSetup)
 
 // =============================================
 // Bulk upload routes
@@ -106,7 +109,7 @@ router.post("/create-full-setup", requireAuth, requireAdmin, adminCreateFullSetu
 router.post(
   "/bulk-full-setup",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   upload.single("file"),
   bulkCreateFullSetup
 )
@@ -114,7 +117,7 @@ router.post(
 router.get(
   "/bulk-full-setup/template",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   downloadBulkTemplate
 )
 
@@ -124,14 +127,14 @@ router.get(
 router.get(
   "/bulk-import/users",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   getBulkImportedUsers
 )
 
 router.post(
   "/bulk-import/:userId/send-email",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   sendBulkImportEmail
 )
 
@@ -141,7 +144,7 @@ router.post(
 router.get(
   "/debug/recruiters",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   async (req, res) => {
     try {
       console.log("🔍 Debug: Fetching all recruiters")
@@ -186,7 +189,7 @@ router.get(
 router.post(
   "/debug/fix-users",
   requireAuth,
-  requireAdmin,
+  requireModule("supplier"),
   async (req, res) => {
     try {
       const nullUsers = await prisma.user.findMany({

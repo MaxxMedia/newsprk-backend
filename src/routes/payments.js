@@ -1,5 +1,6 @@
 import express from "express";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireAnyPermission } from "../middleware/permissions.js";
 import {
   activateFreePlan,
   createPaymentOrder,
@@ -14,6 +15,11 @@ router.post("/create-order", requireAuth, createPaymentOrder);
 router.post("/verify", requireAuth, verifyPayment);
 router.post("/activate-free", requireAuth, activateFreePlan);
 router.get("/my-packages", requireAuth, getMyPackageInfo);
-router.get("/admin/stats", requireAuth, requireAdmin, getAdminPaymentStats);
+router.get(
+  "/admin/stats",
+  requireAuth,
+  requireAnyPermission(["payments.view", "packages.view"]),
+  getAdminPaymentStats
+);
 
 export default router;

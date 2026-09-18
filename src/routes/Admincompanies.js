@@ -1,5 +1,6 @@
 import express from "express";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireAnyPermission } from "../middleware/permissions.js";
 import {
   getCompaniesForAdmin,
   getCompanyForAdmin,
@@ -9,7 +10,17 @@ const router = express.Router();
 
 // GET /api/admin/companies            -> list, optional ?plan= and ?search=
 // GET /api/admin/companies/:id        -> single company detail
-router.get("/", requireAuth, requireAdmin, getCompaniesForAdmin);
-router.get("/:id", requireAuth, requireAdmin, getCompanyForAdmin);
+router.get(
+  "/",
+  requireAuth,
+  requireAnyPermission(["companies.view", "banners.view", "banners.create", "banners.edit"]),
+  getCompaniesForAdmin
+);
+router.get(
+  "/:id",
+  requireAuth,
+  requireAnyPermission(["companies.view", "banners.view", "banners.create", "banners.edit"]),
+  getCompanyForAdmin
+);
 
 export default router;

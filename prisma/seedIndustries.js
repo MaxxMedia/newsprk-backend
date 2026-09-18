@@ -68,20 +68,57 @@ import slugify from "slugify";
 /* ======================================
    🔁 Recursive Insert Function
 ====================================== */
-async function createIndustryTree(data, parentId = null) {
-  for (const item of data) {
-    const slug = slugify(item.name, { lower: true, strict: true });
-    const created = await prisma.industry.create({
-      data: {
-        name: item.name,
-        slug: slug + "-" + Date.now() + Math.floor(Math.random() * 1000),
-        parentId,
-      },
-    });
-    if (item.children && item.children.length > 0) {
-      await createIndustryTree(item.children, created.id);
+function industryKey(name, parentId) {
+  return `${parentId ?? "root"}::${String(name).trim().toLowerCase()}`;
+}
+
+async function createIndustryTree(data) {
+  const existing = await prisma.industry.findMany({
+    select: { id: true, name: true, parentId: true, slug: true },
+  });
+
+  const byParentAndName = new Map(
+    existing.map((row) => [industryKey(row.name, row.parentId), row])
+  );
+  const usedSlugs = new Set(existing.map((row) => row.slug));
+
+  let createdCount = 0;
+  let skippedCount = 0;
+
+  async function walk(nodes, parentId = null) {
+    for (const item of nodes) {
+      const name = String(item.name || "").trim();
+      if (!name) continue;
+
+      const key = industryKey(name, parentId);
+      let row = byParentAndName.get(key);
+
+      if (!row) {
+        let slug = slugify(name, { lower: true, strict: true }) || "industry";
+        let candidate = slug;
+        let suffix = 2;
+        while (usedSlugs.has(candidate)) {
+          candidate = `${slug}-${suffix++}`;
+        }
+        usedSlugs.add(candidate);
+
+        row = await prisma.industry.create({
+          data: { name, slug: candidate, parentId },
+        });
+        byParentAndName.set(key, row);
+        createdCount += 1;
+      } else {
+        skippedCount += 1;
+      }
+
+      if (item.children && item.children.length > 0) {
+        await walk(item.children, row.id);
+      }
     }
   }
+
+  await walk(data, null);
+  return { createdCount, skippedCount };
 }
 
 /* ======================================
@@ -6931,11 +6968,13 @@ const industries = [
    🚀 RUN
 ====================================== */
 async function main() {
-  console.log("Clearing old industries...");
-  await prisma.industry.deleteMany();
-  console.log("Seeding industries...");
-  await createIndustryTree(industries);
-  console.log("✅ Done!");
+  console.log("Seeding industries (existing rows are kept)...");
+  const { createdCount, skippedCount } = await createIndustryTree(industries);
+  const total = await prisma.industry.count();
+  console.log(`Created: ${createdCount}`);
+  console.log(`Already existed: ${skippedCount}`);
+  console.log(`Total industries in database: ${total}`);
+  console.log("Done!");
 }
 
 main()

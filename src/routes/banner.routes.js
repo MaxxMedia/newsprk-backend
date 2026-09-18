@@ -11,7 +11,8 @@ import {
   getBannerById,
 } from "../controllers/banner.controller.js";
 
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requirePermission, requireModule } from "../middleware/permissions.js";
 
 const router = express.Router();
 
@@ -35,13 +36,13 @@ router.get("/", getBannersByPlacement);
  */
 
 // 🔥 MOST SPECIFIC FIRST
-router.get("/admin/all", requireAuth, requireAdmin, getAllBanners);
-router.put("/reorder", requireAuth, requireAdmin, updateBannerOrder);
+router.get("/admin/all", requireAuth, requireModule("banners"), getAllBanners);
+router.put("/reorder", requireAuth, requirePermission("banners.edit"), updateBannerOrder);
 
 // 🔥 THEN PARAM ROUTES
-router.post("/", requireAuth, requireAdmin, createBanner);
-router.get("/:id", requireAuth, requireAdmin, getBannerById);
-router.put("/:id", requireAuth, requireAdmin, updateBanner);
-router.delete("/:id", requireAuth, requireAdmin, deleteBanner);
+router.post("/", requireAuth, requirePermission("banners.create"), createBanner);
+router.get("/:id", requireAuth, requireModule("banners"), getBannerById);
+router.put("/:id", requireAuth, requirePermission("banners.edit"), updateBanner);
+router.delete("/:id", requireAuth, requirePermission("banners.delete"), deleteBanner);
 
 export default router;

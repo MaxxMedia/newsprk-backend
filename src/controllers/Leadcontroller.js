@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getCompanyPackageDetails } from "../lib/leadHelpers.js";
+import { isAdminStaff } from "../lib/permissions.js";
 
 const VALID_STATUSES = ["NEW", "IN_PROGRESS", "QUALIFIED", "CLOSED"];
 const VALID_PLANS = ["free", "basic", "professional", "enterprise"];
@@ -59,7 +60,7 @@ async function fetchScopedLeads(req) {
     const where = {};
 
     // Admin sees all leads
-    if (user.role !== "admin") {
+    if (!isAdminStaff(user.role)) {
         // Recruiters and company users only see their company's leads
         if (!user.companyId) {
             return [];
@@ -123,7 +124,7 @@ export const getAllLeads = async (req, res) => {
         if (source) where.source = source;
         if (status) where.status = status;
 
-        if (requester.role === "admin") {
+        if (isAdminStaff(requester.role)) {
             if (companyId) where.companyId = parseInt(companyId);
         } else {
             if (!requester.companyId) {
@@ -229,7 +230,7 @@ export const getLeadById = async (req, res) => {
             });
         }
 
-        if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
+        if (!isAdminStaff(user?.role) && user?.companyId !== lead.companyId) {
             return res.status(403).json({
                 success: false,
                 message: "Access denied"
@@ -305,7 +306,7 @@ export const updateLeadStatus = async (req, res) => {
             });
         }
 
-        if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
+        if (!isAdminStaff(user?.role) && user?.companyId !== lead.companyId) {
             return res.status(403).json({
                 success: false,
                 message: "Access denied"
@@ -371,7 +372,7 @@ export const deleteLead = async (req, res) => {
             });
         }
 
-        if (user?.role !== 'admin' && user?.companyId !== lead.companyId) {
+        if (!isAdminStaff(user?.role) && user?.companyId !== lead.companyId) {
             return res.status(403).json({
                 success: false,
                 message: "Access denied"
@@ -512,7 +513,7 @@ export const getLeadPackageSummary = async (req, res) => {
         }
 
         const where = {};
-        if (user?.role !== 'admin' && user?.companyId) {
+        if (!isAdminStaff(user?.role) && user?.companyId) {
             where.companyId = user.companyId;
         }
 

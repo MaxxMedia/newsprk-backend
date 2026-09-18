@@ -23,7 +23,8 @@
 
 
 import { Router } from "express"
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+import { requireAuth } from "../middleware/auth.js"
+import { requirePermission, requireModule } from "../middleware/permissions.js"
 import {
   getPendingArticles,
   approveArticle,
@@ -36,28 +37,28 @@ const router = Router()
 router.get(
   "/articles/pending",
   requireAuth,
-  requireAdmin,
+  requireModule("articles"),
   getPendingArticles
 )
 
 router.get(
   "/articles/adminapproved",
   requireAuth,
-  requireAdmin,
+  requireModule("articles"),
   getAdminApprovedArticles
 )
 
 router.put(
   "/articles/:id/approve",
   requireAuth,
-  requireAdmin,
+  requireModule("articles"),
   approveArticle
 )
 
 router.put(
   "/articles/:id/reject",
   requireAuth,
-  requireAdmin,
+  requireModule("articles"),
   rejectArticle
 )
 

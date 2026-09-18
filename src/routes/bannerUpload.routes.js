@@ -1,6 +1,7 @@
 import express from "express";
 import { uploadImage } from "../controllers/uploadController.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireAnyPermission } from "../middleware/permissions.js";
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const router = express.Router();
 router.post(
   "/upload",
   requireAuth,
-  requireAdmin,
+  requireAnyPermission(["banners.create", "banners.edit"]),
   uploadImage
 );
 

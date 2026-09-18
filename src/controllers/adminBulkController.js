@@ -22,26 +22,109 @@ function generateRandomPassword(length = 12) {
   return password
 }
 
+function splitIndustryChunks(industryPath) {
+  const raw = String(industryPath || "").trim()
+  if (!raw) {
+    return { chunks: [], createFrom: "" }
+  }
+
+  const collapsed = raw.replace(/[\n\r]+/g, " ").replace(/\s+/g, " ").trim()
+  const newlineParts = raw.split(/[\n\r]+/).map((part) => part.trim()).filter(Boolean)
+  const commaParts = collapsed.split(/\s*,\s*/).map((part) => part.trim()).filter(Boolean)
+
+  const chunks = [collapsed, ...newlineParts]
+  if (commaParts.length > 1) chunks.push(...commaParts)
+
+  const seen = new Set()
+  const uniqueChunks = chunks.filter((chunk) => {
+    const key = chunk.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return {
+    chunks: uniqueChunks,
+    createFrom: newlineParts.length > 1 ? newlineParts[0] : commaParts.length > 1 ? commaParts[0] : collapsed,
+  }
+}
+
+async function uniqueIndustrySlug(tx, name) {
+  const base = slugify(name, { lower: true, strict: true }) || "industry"
+  let slug = base
+  let suffix = 2
+
+  while (await tx.industry.findUnique({ where: { slug } })) {
+    slug = `${base}-${suffix++}`
+  }
+
+  return slug
+}
+
+async function findIndustryByName(tx, name, parentId) {
+  const where = {
+    name: { equals: name, mode: "insensitive" },
+  }
+
+  if (parentId != null) {
+    const underParent = await tx.industry.findFirst({
+      where: { ...where, parentId },
+    })
+    if (underParent) return underParent
+  }
+
+  return tx.industry.findFirst({ where })
+}
+
+async function resolveOneIndustryPath(tx, pathOrName, { createIfMissing = false } = {}) {
+  const levels = String(pathOrName)
+    .split(">")
+    .map((level) => level.trim())
+    .filter(Boolean)
+
+  if (!levels.length) return null
+
+  let parentId = null
+  let current = null
+
+  for (const levelName of levels) {
+    current = await findIndustryByName(tx, levelName, parentId)
+
+    if (!current) {
+      if (!createIfMissing) return null
+      current = await tx.industry.create({
+        data: {
+          name: levelName,
+          slug: await uniqueIndustrySlug(tx, levelName),
+          parentId,
+        },
+      })
+    }
+
+    parentId = current.id
+  }
+
+  return current?.id || null
+}
+
 /* =====================================================
-   🔍 Resolve Industry (Leaf-based)
+   🔍 Resolve Industry (creates missing names)
 ===================================================== */
 async function resolveIndustryPath(tx, industryPath) {
-  if (!industryPath) {
+  const { chunks, createFrom } = splitIndustryChunks(industryPath)
+  if (!chunks.length) {
     throw new Error("Industry path is required")
   }
 
-  const levels = industryPath.split(">").map(l => l.trim())
-  const leafName = levels[levels.length - 1]
-
-  const industry = await tx.industry.findFirst({
-    where: { name: leafName },
-  })
-
-  if (!industry) {
-    throw new Error(`Industry not found: ${leafName}`)
+  for (const chunk of chunks) {
+    const industryId = await resolveOneIndustryPath(tx, chunk, { createIfMissing: false })
+    if (industryId) return industryId
   }
 
-  return industry.id
+  const createdId = await resolveOneIndustryPath(tx, createFrom || chunks[0], { createIfMissing: true })
+  if (createdId) return createdId
+
+  throw new Error(`Industry not found: ${chunks[0]}`)
 }
 
 /* =====================================================

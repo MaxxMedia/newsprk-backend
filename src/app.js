@@ -102,6 +102,9 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:3003",
   "https://www.toolingtrends.com",
   "https://toolingtrends.com",
 ];
@@ -110,6 +113,10 @@ const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Next.js falls back to 3001/3002/... when 3000 is already taken.
+    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
       return callback(null, true);
     }
     console.warn(`❌ Blocked by CORS: ${origin}`);

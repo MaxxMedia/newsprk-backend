@@ -3,6 +3,7 @@
 import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt";
 import slugify from "slugify";
+import { isAdminStaff } from "../lib/permissions.js"
 
 // ✅ Updated include to include lastLoginAt and emailSentForBulkImport
 const submittedByInclude = {
@@ -21,15 +22,29 @@ const submittedByInclude = {
 
 function mapDirectory(directory) {
   if (!directory) return directory
-  const { User_SupplierDirectory_submittedByIdToUser, ...rest } = directory
+  const { User_SupplierDirectory_submittedByIdToUser, Company, ...rest } = directory
   return {
     ...rest,
     submittedBy: User_SupplierDirectory_submittedByIdToUser ?? null,
+    company: Company ?? rest.company ?? null,
   }
 }
 
+function toStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean)
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
 export async function getPendingDirectories(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" })
   }
 
@@ -45,7 +60,7 @@ export async function getPendingDirectories(req, res) {
 }
 
 export async function getDirectoryForReview(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" })
   }
 
@@ -53,7 +68,12 @@ export async function getDirectoryForReview(req, res) {
 
   const directory = await prisma.supplierDirectory.findUnique({
     where: { id: directoryId },
-    include: submittedByInclude,
+    include: {
+      ...submittedByInclude,
+      Company: {
+        select: { id: true, name: true, logoUrl: true },
+      },
+    },
   })
 
   if (!directory) {
@@ -64,7 +84,7 @@ export async function getDirectoryForReview(req, res) {
 }
 
 export async function approveDirectory(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" })
   }
 
@@ -93,7 +113,7 @@ export async function approveDirectory(req, res) {
 }
 
 export async function rejectDirectory(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" })
   }
 
@@ -117,7 +137,7 @@ export async function rejectDirectory(req, res) {
 }
 
 export async function adminCreateDirectory(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" });
   }
 
@@ -176,7 +196,7 @@ async function generateUniqueUsername(email) {
 }
 
 export async function adminCreateFullSetup(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" });
   }
 
@@ -331,5 +351,124 @@ export async function adminCreateFullSetup(req, res) {
     return res.status(400).json({
       error: error.message || "Failed to create full setup",
     });
+  }
+}
+
+export async function adminUpdateDirectory(req, res) {
+  try {
+    if (!isAdminStaff(req.user?.role)) {
+      return res.status(403).json({ error: "Admin only" })
+    }
+
+    const directoryId = Number(req.params.id)
+    if (!Number.isInteger(directoryId)) {
+      return res.status(400).json({ error: "Invalid directory id" })
+    }
+
+    const existing = await prisma.supplierDirectory.findUnique({
+      where: { id: directoryId },
+    })
+
+    if (!existing) {
+      return res.status(404).json({ error: "Directory not found" })
+    }
+
+    const {
+      name,
+      slug,
+      description,
+      website,
+      logoUrl,
+      phoneNumber,
+      email,
+      googleMapUrl,
+      tradeNames,
+      socialLinks,
+    } = req.body
+
+    const data = {}
+
+    if (name !== undefined) {
+      const nextName = String(name).trim()
+      if (!nextName) {
+        return res.status(400).json({ error: "Name is required" })
+      }
+      data.name = nextName
+    }
+
+    if (description !== undefined) {
+      const nextDescription = String(description)
+      if (!nextDescription.trim()) {
+        return res.status(400).json({ error: "Description is required" })
+      }
+      data.description = nextDescription
+    }
+
+    if (website !== undefined) data.website = website ? String(website).trim() : null
+    if (logoUrl !== undefined) data.logoUrl = logoUrl ? String(logoUrl).trim() : null
+    if (phoneNumber !== undefined) data.phoneNumber = phoneNumber ? String(phoneNumber).trim() : null
+    if (email !== undefined) data.email = email ? String(email).trim() : null
+    if (googleMapUrl !== undefined) data.googleMapUrl = googleMapUrl ? String(googleMapUrl).trim() : null
+
+    if (slug !== undefined) {
+      const nextSlug = slugify(String(slug), { lower: true, strict: true })
+      if (!nextSlug) {
+        return res.status(400).json({ error: "Slug is required" })
+      }
+      if (nextSlug !== existing.slug) {
+        const taken = await prisma.supplierDirectory.findUnique({ where: { slug: nextSlug } })
+        if (taken) {
+          return res.status(409).json({ error: "Slug already in use" })
+        }
+        data.slug = nextSlug
+      }
+    }
+
+    if (tradeNames !== undefined) {
+      data.tradeNames = toStringArray(tradeNames)
+    }
+
+    if (socialLinks !== undefined && socialLinks && typeof socialLinks === "object" && !Array.isArray(socialLinks)) {
+      data.socialLinks = socialLinks
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: "No fields to update" })
+    }
+
+    const directory = await prisma.supplierDirectory.update({
+      where: { id: directoryId },
+      data,
+      include: {
+        ...submittedByInclude,
+        Company: {
+          select: { id: true, name: true, logoUrl: true },
+        },
+      },
+    })
+
+    if (logoUrl !== undefined && existing.companyId) {
+      await prisma.company.update({
+        where: { id: existing.companyId },
+        data: { logoUrl: data.logoUrl ?? null },
+      })
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        action: "DIRECTORY_UPDATED",
+        entity: "SupplierDirectory",
+        entityId: directory.id,
+        userId: req.user.userId ?? req.user.id,
+      },
+    })
+
+    res.json({ message: "Directory updated", directory: mapDirectory(directory) })
+  } catch (err) {
+    console.error("Admin update directory error:", err)
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "Slug already in use" })
+    }
+    res.status(500).json({ error: "Failed to update directory" })
   }
 }

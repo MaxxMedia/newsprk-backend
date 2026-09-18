@@ -11,7 +11,8 @@ import {
   incrementPostShare,
   getPopularPosts
 } from "../controllers/postsController.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireModule } from "../middleware/permissions.js";
 
 const router = express.Router();
 
@@ -31,8 +32,8 @@ router.post("/:slug/share", incrementPostShare);
 router.get("/:id", getPostById);
 
 /* ================= PROTECTED ROUTES ================= */
-router.post("/", requireAuth, requireAdmin, createPost);
-router.put("/:id", requireAuth, requireAdmin, updatePost);
-router.delete("/:id", requireAuth, requireAdmin, deletePost);
+router.post("/", requireAuth, requireModule("articles"), createPost);
+router.put("/:id", requireAuth, requireModule("articles"), updatePost);
+router.delete("/:id", requireAuth, requireModule("articles"), deletePost);
 
 export default router;

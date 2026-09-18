@@ -1,6 +1,7 @@
 // controllers/supplierDirectoryController.js
 
 import prisma from "../prismaClient.js";
+import { isAdminStaff } from "../lib/permissions.js";
 import {
   assertProductListingCount,
   assertAndSanitizeSupplierDirectoryMedia,
@@ -308,7 +309,7 @@ export const createDirectory = async (req, res) => {
 export const approveDirectory = async (req, res) => {
   try {
     const user = req.user;
-    if (user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+    if (!isAdminStaff(user.role)) return res.status(403).json({ error: "Admin only" });
 
     const directoryId = Number(req.params.id);
     const directory = await prisma.supplierDirectory.update({
