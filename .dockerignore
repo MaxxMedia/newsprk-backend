@@ -1,0 +1,14 @@
+.git
+.github
+.node_modules
+node_modules
+.env
+.env.*
+*.md
+.DS_Store
+npm-debug.log*
+.vscode
+.cursor
+_tmp*
+prisma/seed-admin.js
+prisma/seed.js
