@@ -44,6 +44,16 @@ export async function applyJob(req, res) {
       },
     });
 
+    // Increment applicationsCount on Job
+    await prisma.job.update({
+      where: { id: Number(req.body.jobId) },
+      data: {
+        applicationsCount: {
+          increment: 1,
+        },
+      },
+    }).catch((err) => console.error("Failed to increment job applicationsCount:", err));
+
     res.json(application);
   } catch (err) {
     if (err.code === "P2002") {

@@ -2,7 +2,7 @@
 
 export const SUBSCRIPTION_PLANS = [
     { id: "free", name: "Free", price: 0 },
-    { id: "basic", name: "Basic", price: 9999 },
+    { id: "basic", name: "Basic", price: 1 },
     { id: "professional", name: "Professional", price: 24999 },
     { id: "enterprise", name: "Enterprise", price: 99999 },
 ];

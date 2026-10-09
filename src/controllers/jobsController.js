@@ -292,6 +292,11 @@ export async function getAllJobs(req, res) {
             email: true,
           },
         },
+        _count: {
+          select: {
+            JobApplication: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -347,6 +352,11 @@ export async function getJobBySlug(req, res) {
       select: {
         id: true,
         email: true,
+      },
+    },
+    _count: {
+      select: {
+        JobApplication: true,
       },
     },
   },
