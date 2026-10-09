@@ -36,6 +36,7 @@ export const DEFAULT_ROLES = [
             "supplier.view",
             "supplier.approve",
             "supplier.reject",
+            "supplier.delete",
             "events.view",
             "events.create",
             "events.edit",

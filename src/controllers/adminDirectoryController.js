@@ -472,3 +472,33 @@ export async function adminUpdateDirectory(req, res) {
     res.status(500).json({ error: "Failed to update directory" })
   }
 }
+
+export async function adminDeleteDirectory(req, res) {
+  try {
+    const id = Number(req.params.id)
+    if (!id || Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid directory ID" })
+    }
+
+    const existing = await prisma.supplierDirectory.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    })
+
+    if (!existing) {
+      return res.status(404).json({ error: "Directory not found" })
+    }
+
+    await prisma.supplierDirectory.delete({
+      where: { id },
+    })
+
+    res.json({ message: "Directory deleted successfully", id })
+  } catch (err) {
+    console.error("Admin delete directory error:", err)
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "Directory not found" })
+    }
+    res.status(500).json({ error: "Failed to delete directory" })
+  }
+}
