@@ -8,9 +8,9 @@ import { isAdminStaff } from "../lib/permissions.js"
 // ✅ Updated include to include lastLoginAt and emailSentForBulkImport
 const submittedByInclude = {
   User_SupplierDirectory_submittedByIdToUser: {
-    select: { 
-      id: true, 
-      email: true, 
+    select: {
+      id: true,
+      email: true,
       fullName: true,
       username: true,
       isOnboarded: true,
@@ -473,32 +473,20 @@ export async function adminUpdateDirectory(req, res) {
   }
 }
 
+// deletion of the directory by admin
 export async function adminDeleteDirectory(req, res) {
   try {
     const id = Number(req.params.id)
-    if (!id || Number.isNaN(id)) {
-      return res.status(400).json({ error: "Invalid directory ID" })
-    }
+    await prisma.supplierDirectory.delete({ where: { id } })
+    res.json({ message: "directory is deleted successfully " })
 
-    const existing = await prisma.supplierDirectory.findUnique({
-      where: { id },
-      select: { id: true, name: true },
-    })
-
-    if (!existing) {
-      return res.status(404).json({ error: "Directory not found" })
-    }
-
-    await prisma.supplierDirectory.delete({
-      where: { id },
-    })
-
-    res.json({ message: "Directory deleted successfully", id })
   } catch (err) {
     console.error("Admin delete directory error:", err)
-    if (err.code === "P2025") {
-      return res.status(404).json({ error: "Directory not found" })
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "Directory is not able to delele" }
+
+      )
     }
-    res.status(500).json({ error: "Failed to delete directory" })
+    res.status(500).json({ error: "failed to delete " })
   }
 }
