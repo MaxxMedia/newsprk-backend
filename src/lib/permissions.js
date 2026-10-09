@@ -40,6 +40,7 @@ export const ALL_PERMISSIONS = [
     { key: "supplier.view", label: "View Supplier Directories", module: "supplier" },
     { key: "supplier.approve", label: "Approve Supplier Directories", module: "supplier" },
     { key: "supplier.reject", label: "Reject Supplier Directories", module: "supplier" },
+    { key: "supplier.delete", label: "Delete Supplier Directories", module: "supplier" },
 
     // Events
     { key: "events.view", label: "View Events", module: "events" },

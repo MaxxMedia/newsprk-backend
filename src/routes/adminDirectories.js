@@ -10,7 +10,8 @@ import {
   approveDirectory,
   rejectDirectory,
   adminCreateDirectory,
-  adminCreateFullSetup
+  adminCreateFullSetup,
+  adminDeleteDirectory
 } from "../controllers/adminDirectoryController.js"
 
 import {
@@ -94,6 +95,7 @@ router.get(
 router.get("/directories/pending", requireAuth, requireModule("supplier"), getPendingDirectories)
 router.get("/directories/:id", requireAuth, requireModule("supplier"), getDirectoryForReview)
 router.put("/directories/:id", requireAuth, requireModule("supplier"), adminUpdateDirectory)
+router.delete("/directories/:id", requireAuth, requirePermission("supplier.delete"), adminDeleteDirectory)
 router.patch("/directories/:id/approve", requireAuth, requirePermission("supplier.approve"), approveDirectory)
 router.patch("/directories/:id/reject", requireAuth, requirePermission("supplier.reject"), rejectDirectory)
 
