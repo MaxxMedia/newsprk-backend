@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Anyone with settings.view (or a super admin) can see the activity feed —
-// adjust the permission key here if you'd rather gate it more tightly...
+// adjust the permission key here if you'd rather gate it more tightly.....
 router.get("/activity", requirePermission("settings.view"), getActivity);
 router.get("/activity/summary", requireSuperAdmin, getActivitySummary);
 
