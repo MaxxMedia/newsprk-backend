@@ -1,8 +1,8 @@
 import { prisma } from "./prisma.js";
 import { getJobPostingEligibility } from "./jobPostingLimits.js";
 
-export async function getCompanyVisibleJobLimit(companyId) {
-  const eligibility = await getJobPostingEligibility(companyId);
+export async function getCompanyVisibleJobLimit(companyId, prismaClient = prisma) {
+  const eligibility = await getJobPostingEligibility(companyId, prismaClient);
 
   if (eligibility.isUnlimited) {
     return null;
@@ -11,12 +11,12 @@ export async function getCompanyVisibleJobLimit(companyId) {
   return eligibility.effectiveLimit;
 }
 
-export async function enforceCompanyJobVisibility(companyId) {
+export async function enforceCompanyJobVisibility(companyId, prismaClient = prisma) {
   if (!companyId) return;
 
-  const limit = await getCompanyVisibleJobLimit(companyId);
+  const limit = await getCompanyVisibleJobLimit(companyId, prismaClient);
 
-  const companyJobs = await prisma.job.findMany({
+  const companyJobs = await prismaClient.job.findMany({
     where: {
       companyId,
       isExternal: false,
@@ -27,7 +27,7 @@ export async function enforceCompanyJobVisibility(companyId) {
 
   if (limit === null) {
     if (companyJobs.length > 0) {
-      await prisma.job.updateMany({
+      await prismaClient.job.updateMany({
         where: { id: { in: companyJobs.map((job) => job.id) } },
         data: { isActive: true },
       });
@@ -39,14 +39,14 @@ export async function enforceCompanyJobVisibility(companyId) {
   const hiddenIds = companyJobs.slice(limit).map((job) => job.id);
 
   if (visibleIds.length > 0) {
-    await prisma.job.updateMany({
+    await prismaClient.job.updateMany({
       where: { id: { in: visibleIds } },
       data: { isActive: true },
     });
   }
 
   if (hiddenIds.length > 0) {
-    await prisma.job.updateMany({
+    await prismaClient.job.updateMany({
       where: { id: { in: hiddenIds } },
       data: { isActive: false },
     });

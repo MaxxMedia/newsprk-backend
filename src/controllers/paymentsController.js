@@ -1,8 +1,9 @@
-// controllers/paymentsController.js - FIXED VERSION
+// controllers/paymentsController.js
 
 import crypto from "crypto";
 import RazorpayPkg from "razorpay";
 import { prisma } from "../lib/prisma.js";
+import { enforceCompanyJobVisibility } from "../lib/jobVisibility.js";
 import { getPlanLabel, resolvePackage } from "../lib/packagePricing.js";
 import {
   dedupeCompanyPurchases,
@@ -24,33 +25,6 @@ function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
-}
-
-async function activatePackage(purchase) {
-  const now = new Date();
-  const startsAt = now;
-  let expiresAt = null;
-
-  if (purchase.durationDays) {
-    expiresAt = addDays(now, purchase.durationDays);
-  }
-
-  if (purchase.packageType === "SUBSCRIPTION" && purchase.companyId) {
-    await prisma.company.update({
-      where: { id: purchase.companyId },
-      data: {
-        subscriptionPlan: purchase.packageId,
-        subscriptionExpiresAt: expiresAt,
-      },
-    });
-  }
-
-  if (purchase.companyId) {
-    // const { enforceCompanyJobVisibility } = await import("../lib/jobVisibility.js");
-    await enforceCompanyJobVisibility(purchase.companyId);
-  }
-
-  return { startsAt, expiresAt };
 }
 
 export async function createPaymentOrder(req, res) {
@@ -167,59 +141,58 @@ export async function verifyPayment(req, res) {
       return res.json({ success: true, purchase });
     }
 
-    let companyId = purchase.companyId;
-    if (!companyId) {
-      const user = await prisma.user.findUnique({
-        where: { id: purchase.userId },
-        select: { companyId: true },
-      });
-      companyId = user?.companyId ?? null;
-      if (companyId) {
-        await prisma.packagePurchase.update({
-          where: { id: purchase.id },
-          data: { companyId },
-        });
-      }
-    }
-
     const resolved = await resolvePackage(purchase.packageType, purchase.packageId);
-    let startsAt = new Date();
-    let expiresAt = null;
+    const startsAt = new Date();
+    const expiresAt = resolved?.durationDays
+      ? addDays(startsAt, resolved.durationDays)
+      : null;
 
-    if (companyId) {
-      const result = await activatePackage({
-        ...purchase,
-        companyId,
-        durationDays: resolved?.durationDays ?? null,
+    // Commit the purchase and its entitlements together. A failed activation
+    // must not leave the company upgraded with a PENDING purchase.
+    const updated = await prisma.$transaction(async (tx) => {
+      // Claim the order once, including when checkout callbacks race or retry.
+      const claimed = await tx.packagePurchase.updateMany({
+        where: { id: purchase.id, status: { not: "PAID" } },
+        data: {
+          status: "PAID",
+          razorpayPaymentId: razorpay_payment_id,
+          startsAt,
+          expiresAt,
+        },
       });
 
-      startsAt = result.startsAt;
-      expiresAt = result.expiresAt;
-    }
+      if (claimed.count === 0) {
+        return tx.packagePurchase.findUnique({ where: { id: purchase.id } });
+      }
 
-    const updated = await prisma.packagePurchase.update({
-      where: { id: purchase.id },
-      data: {
-        status: "PAID",
-        razorpayPaymentId: razorpay_payment_id,
-        startsAt,
-        expiresAt,
-        companyId,
-      },
+      let companyId = purchase.companyId;
+      if (!companyId) {
+        const user = await tx.user.findUnique({
+          where: { id: purchase.userId },
+          select: { companyId: true },
+        });
+        companyId = user?.companyId ?? null;
+      }
 
+      const paidPurchase = await tx.packagePurchase.update({
+        where: { id: purchase.id },
+        data: { companyId },
+      });
+
+      await tx.user.update({
+        where: { id: purchase.userId },
+        data: { packageSelected: true },
+      });
+
+      if (companyId) {
+        // Read the newly PAID purchase through the same transaction so both
+        // subscription tiers and recruitment slots are available immediately.
+        await syncCompanySubscription(companyId, tx);
+        await enforceCompanyJobVisibility(companyId, tx);
+      }
+
+      return paidPurchase;
     });
-    await prisma.user.update({
-      where: {
-        id: purchase.userId,
-      },
-      data: {
-        packageSelected: true,
-      },
-    });
-
-    if (companyId) {
-      await syncCompanySubscription(companyId);
-    }
 
     res.json({ success: true, purchase: updated });
   } catch (err) {

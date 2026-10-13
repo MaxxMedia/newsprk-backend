@@ -38,7 +38,7 @@ function getDisplayValue(value) {
  * `postType` is either "job" or "internship" and controls which quota table,
  * which jobs get counted (employmentType filter), and the wording used.
  */
-async function computeEligibility(companyId, postType) {
+async function computeEligibility(companyId, postType, prismaClient = prisma) {
   const isInternship = postType === "internship";
   const limitsTable = isInternship ? PLAN_INTERNSHIP_LIMITS : PLAN_JOB_LIMITS;
   const noun = isInternship ? "internship listing" : "job posting";
@@ -56,7 +56,7 @@ async function computeEligibility(companyId, postType) {
     };
   }
 
-  const company = await prisma.company.findUnique({
+  const company = await prismaClient.company.findUnique({
     where: { id: companyId },
     select: {
       subscriptionPlan: true,
@@ -78,7 +78,7 @@ async function computeEligibility(companyId, postType) {
     };
   }
 
-  const activeSubscription = await getActiveSubscription(companyId, prisma);
+  const activeSubscription = await getActiveSubscription(companyId, prismaClient);
   const plan = activeSubscription.plan;
 
   // ✅ FIX: Use explicit lookup - this is the key fix!
@@ -87,14 +87,14 @@ async function computeEligibility(companyId, postType) {
 
   // Internship listings don't currently receive bonus slots from recruitment
   // packages (only job postings do), matching the packages table.
-  const activeRecruitment = isInternship ? null : await getActiveRecruitmentPackage(companyId, prisma);
+  const activeRecruitment = isInternship ? null : await getActiveRecruitmentPackage(companyId, prismaClient);
   const recruitmentSlots = activeRecruitment ? 1 : 0;
 
   const employmentTypeFilter = isInternship
     ? { employmentType: INTERNSHIP_TYPE }
     : { employmentType: { not: INTERNSHIP_TYPE } };
 
-  const totalJobs = await prisma.job.count({
+  const totalJobs = await prismaClient.job.count({
     where: {
       companyId,
       isExternal: false,
@@ -102,7 +102,7 @@ async function computeEligibility(companyId, postType) {
     },
   });
 
-  const packageActiveJobs = await prisma.job.count({
+  const packageActiveJobs = await prismaClient.job.count({
     where: {
       companyId,
       isExternal: false,
@@ -176,8 +176,8 @@ async function computeEligibility(companyId, postType) {
   };
 }
 
-export async function getJobPostingEligibility(companyId) {
-  return computeEligibility(companyId, "job");
+export async function getJobPostingEligibility(companyId, prismaClient = prisma) {
+  return computeEligibility(companyId, "job", prismaClient);
 }
 
 export async function getInternshipPostingEligibility(companyId) {
