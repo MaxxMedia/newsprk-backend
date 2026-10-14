@@ -1,3 +1,4 @@
+import { getActiveSubscription } from "../lib/packagePurchases.js";
 // src/controllers/authController.js
 
 import prisma from "../prismaClient.js"
@@ -245,15 +246,15 @@ export const login = async (req, res) => {
     // ✅ Check if user has ANY PAID package purchase
     const packagePurchase = await prisma.packagePurchase.findFirst({
       where: {
-        userId: user.id,
-        status: "PAID",
+        ...(updatedUser.companyId ? { companyId: updatedUser.companyId } : { userId: user.id }),
+        status: { in: ["PAID", "TRIAL"] },
       },
     })
 
-    const packageSelected = !!packagePurchase
+    const packageSelected = updatedUser.packageSelected || !!packagePurchase
 
     // ✅ Get the actual subscription plan from Company (source of truth)
-    const subscriptionPlan = updatedUser?.Company?.subscriptionPlan || "free"
+    const subscriptionPlan = (await getActiveSubscription(updatedUser.companyId)).plan
 
     res.json({
       token,
@@ -289,7 +290,7 @@ export const me = async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" })
 
     const packagePurchase = await prisma.packagePurchase.findFirst({
-      where: { userId: user.id, status: "PAID" },
+      where: { ...(user.companyId ? { companyId: user.companyId } : { userId: user.id }), status: { in: ["PAID", "TRIAL"] } },
     })
 
     // ✅ RBAC: always resolve fresh from the DB — this is exactly why
@@ -304,8 +305,8 @@ export const me = async (req, res) => {
       username: user.username,
       isOnboarded: user.isOnboarded || false,
       companyId: user.companyId ?? null,
-      packageSelected: !!packagePurchase,
-      subscriptionPlan: user.Company?.subscriptionPlan || "free",
+      packageSelected: user.packageSelected || !!packagePurchase,
+      subscriptionPlan: (await getActiveSubscription(user.companyId)).plan,
       lastLoginAt: user.lastLoginAt, // ✅ Include in response
       isActive: user.isActive ?? true, // ✅ NEW
       permissions, // ✅ NEW

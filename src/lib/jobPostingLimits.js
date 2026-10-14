@@ -180,8 +180,8 @@ export async function getJobPostingEligibility(companyId, prismaClient = prisma)
   return computeEligibility(companyId, "job", prismaClient);
 }
 
-export async function getInternshipPostingEligibility(companyId) {
-  return computeEligibility(companyId, "internship");
+export async function getInternshipPostingEligibility(companyId, prismaClient = prisma) {
+  return computeEligibility(companyId, "internship", prismaClient);
 }
 
 export async function assertCanPostJob(companyId) {

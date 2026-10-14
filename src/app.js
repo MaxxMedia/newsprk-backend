@@ -76,6 +76,7 @@ import publicWebinarRoutes from "./routes/Publicwebinarroutes.js";
 
 // ✅ auto-seed Permission table + prisma client for it
 import { prisma } from "./lib/prisma.js";
+import { startTrialExpiryWorker } from "./lib/companyTrials.js";
 import { ensurePermissionsSeeded } from "./lib/permissions.js";
 // ✅ RBAC v2: auto-seed default system Roles (Super Admin, Sub
 // Admin, Moderator, Support Staff) + their default RolePermission sets
@@ -268,6 +269,8 @@ const PORT = process.env.PORT;
 async function start() {
   await ensurePermissionsSeeded(prisma);
   await ensureRolesSeeded(prisma);
+
+  startTrialExpiryWorker();
 
   app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);

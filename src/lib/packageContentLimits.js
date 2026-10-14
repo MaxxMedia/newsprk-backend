@@ -864,16 +864,8 @@ export async function getHomepageFeaturedEligibility(companyId) {
     };
   }
 
-  // Check if subscription is expired
   const now = new Date();
-  const isExpired = company.subscriptionExpiresAt &&
-    new Date(company.subscriptionExpiresAt) < now;
-
-  // If expired, treat as free
-  let plan = company.subscriptionPlan || 'free';
-  if (isExpired) {
-    plan = 'free';
-  }
+  const { plan } = await getActiveSubscription(companyId, prisma);
 
   const planLabel = getPlanLabel(plan);
 

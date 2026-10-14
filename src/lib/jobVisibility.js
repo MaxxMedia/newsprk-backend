@@ -1,131 +1,59 @@
+import { getActiveSubscription } from "./packagePurchases.js";
 import { prisma } from "./prisma.js";
-import { getJobPostingEligibility } from "./jobPostingLimits.js";
+import { getJobPostingEligibility, getInternshipPostingEligibility } from "./jobPostingLimits.js";
 
 export async function getCompanyVisibleJobLimit(companyId, prismaClient = prisma) {
   const eligibility = await getJobPostingEligibility(companyId, prismaClient);
+  return eligibility.isUnlimited ? null : eligibility.effectiveLimit;
+}
 
-  if (eligibility.isUnlimited) {
-    return null;
-  }
-
-  return eligibility.effectiveLimit;
+async function visibleCompanyJobIds(companyId, client) {
+  const [jobs, jobLimit, internships] = await Promise.all([
+    client.job.findMany({ where: { companyId, isExternal: false, OR: [{ isActive: true }, { hiddenByPlan: true }] }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, employmentType: true } }),
+    getCompanyVisibleJobLimit(companyId, client),
+    getInternshipPostingEligibility(companyId, client),
+  ]);
+  const internshipLimit = internships.isUnlimited ? null : internships.effectiveLimit;
+  const regular = jobs.filter(job => job.employmentType !== "Internship");
+  const interns = jobs.filter(job => job.employmentType === "Internship");
+  const visible = (jobLimit === null ? regular : regular.slice(0, jobLimit))
+    .concat(internshipLimit === null ? interns : interns.slice(0, internshipLimit));
+  const ids = visible.map(job => job.id);
+  return { ids, hiddenIds: jobs.filter(job => !ids.includes(job.id)).map(job => job.id) };
 }
 
 export async function enforceCompanyJobVisibility(companyId, prismaClient = prisma) {
   if (!companyId) return;
-
-  const limit = await getCompanyVisibleJobLimit(companyId, prismaClient);
-
-  const companyJobs = await prismaClient.job.findMany({
-    where: {
-      companyId,
-      isExternal: false,
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
-
-  if (limit === null) {
-    if (companyJobs.length > 0) {
-      await prismaClient.job.updateMany({
-        where: { id: { in: companyJobs.map((job) => job.id) } },
-        data: { isActive: true },
-      });
-    }
-    return;
-  }
-
-  const visibleIds = companyJobs.slice(0, limit).map((job) => job.id);
-  const hiddenIds = companyJobs.slice(limit).map((job) => job.id);
-
-  if (visibleIds.length > 0) {
-    await prismaClient.job.updateMany({
-      where: { id: { in: visibleIds } },
-      data: { isActive: true },
-    });
-  }
-
-  if (hiddenIds.length > 0) {
-    await prismaClient.job.updateMany({
-      where: { id: { in: hiddenIds } },
-      data: { isActive: false },
-    });
-  }
+  const { ids, hiddenIds } = await visibleCompanyJobIds(companyId, prismaClient);
+  if (ids.length) await prismaClient.job.updateMany({ where: { id: { in: ids } }, data: { isActive: true, hiddenByPlan: false } });
+  if (hiddenIds.length) await prismaClient.job.updateMany({ where: { id: { in: hiddenIds } }, data: { isActive: false, hiddenByPlan: true } });
 }
 
 export async function filterJobsForPackageVisibility(jobs) {
-  if (!Array.isArray(jobs) || jobs.length === 0) {
-    return [];
-  }
-
-  const externalJobs = jobs.filter((job) => job.isExternal);
-  const internalJobs = jobs.filter((job) => !job.isExternal && job.companyId);
-
-  const jobsByCompany = internalJobs.reduce((groups, job) => {
-    const key = String(job.companyId);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(job);
-    return groups;
-  }, {});
-
-  const visibleInternalJobs = [];
-
-  for (const [companyId, companyJobs] of Object.entries(jobsByCompany)) {
-    const limit = await getCompanyVisibleJobLimit(Number(companyId));
-    const sortedJobs = [...companyJobs].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    if (limit === null) {
-      visibleInternalJobs.push(...sortedJobs);
-    } else {
-      visibleInternalJobs.push(...sortedJobs.slice(0, limit));
-    }
-  }
-
-  return [...externalJobs, ...visibleInternalJobs].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  if (!Array.isArray(jobs) || !jobs.length) return [];
+  const companies = [...new Set(jobs.filter(job => !job.isExternal && job.companyId).map(job => job.companyId))];
+  const entries = await Promise.all(companies.map(async id => [id, new Set((await visibleCompanyJobIds(id, prisma)).ids)]));
+  const plans = new Map(await Promise.all(companies.map(async id => [id, (await getActiveSubscription(id)).plan])));
+  const visible = new Map(entries);
+  return jobs.filter(job => job.isExternal || (!job.companyId ? job.isActive : visible.get(job.companyId)?.has(job.id)))
+    .map(job => job.isExternal ? job : { ...job, isFeatured: Boolean(job.isFeatured && ["professional", "enterprise"].includes(plans.get(job.companyId))) })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 export async function isJobPackageVisible(job) {
-  if (!job || job.isExternal) {
-    return true;
-  }
-
-  if (!job.companyId) {
-    return Boolean(job.isActive);
-  }
-
-  const limit = await getCompanyVisibleJobLimit(job.companyId);
-  if (limit === null) {
-    return true;
-  }
-
-  const companyJobs = await prisma.job.findMany({
-    where: {
-      companyId: job.companyId,
-      isExternal: false,
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-    take: limit,
-  });
-
-  return companyJobs.some((entry) => entry.id === job.id);
+  if (!job) return false;
+  if (job.isExternal) return true;
+  if (!job.companyId) return Boolean(job.isActive);
+  return (await visibleCompanyJobIds(job.companyId, prisma)).ids.includes(job.id);
 }
 
 export async function enforceAllCompanyJobVisibility() {
-  const companies = await prisma.job.findMany({
-    where: {
-      isExternal: false,
-      companyId: { not: null },
-    },
-    distinct: ["companyId"],
-    select: { companyId: true },
-  });
+  const companies = await prisma.job.findMany({ where: { isExternal: false, companyId: { not: null } }, distinct: ["companyId"], select: { companyId: true } });
+  for (const { companyId } of companies) await enforceCompanyJobVisibility(companyId);
+}
 
-  for (const { companyId } of companies) {
-    await enforceCompanyJobVisibility(companyId);
-  }
+export async function jobForCurrentPlan(job) {
+  if (!job || job.isExternal || !job.companyId) return job;
+  const { plan } = await getActiveSubscription(job.companyId);
+  return { ...job, isFeatured: Boolean(job.isFeatured && ["professional", "enterprise"].includes(plan)) };
 }

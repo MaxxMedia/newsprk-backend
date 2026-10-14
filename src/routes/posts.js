@@ -11,10 +11,13 @@ import {
   incrementPostShare,
   getPopularPosts
 } from "../controllers/postsController.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { requireModule } from "../middleware/permissions.js";
 
 const router = express.Router();
+
+router.get("/admin/all", requireAuth, requireAdmin, requireModule("articles"), (req, res) => { req.adminContentView = true; return getAllPosts(req, res); });
+router.get("/admin/:id", requireAuth, requireAdmin, requireModule("articles"), (req, res) => { req.adminContentView = true; return getPostById(req, res); });
 
 /* ================= PUBLIC ROUTES ================= */
 router.get("/", getAllPosts);

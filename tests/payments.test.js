@@ -36,10 +36,13 @@ function transactionClient(draft) {
     if (failure === table) throw new Error("Simulated database failure");
     const row = draft[table].find((entry) => matches(entry, where));
     assert.ok(row, "Fixture row must exist");
-    Object.assign(row, data);
+    for (const [key, value] of Object.entries(data)) {
+      row[key] = value && typeof value === "object" && "increment" in value ? (row[key] || 0) + value.increment : value;
+    }
     return structuredClone(row);
   }
   return {
+    companyTrial: { findUnique: async () => null },
     packagePurchase: {
       findUnique: async ({ where }) => structuredClone(draft.purchases.find((row) => matches(row, where)) ?? null),
       findMany: async ({ where }) => structuredClone(draft.purchases.filter((row) => matches(row, where))),
@@ -80,7 +83,7 @@ beforeEach(() => {
     purchases: [{ id: 1, userId: 10, companyId: 20, packageType: "SUBSCRIPTION", packageId: "basic", status: "PENDING", razorpayOrderId: "order_test", startsAt: null, expiresAt: null }],
     users: [{ id: 10, companyId: 20, packageSelected: false }],
     companies: [{ id: 20, subscriptionPlan: "free", subscriptionExpiresAt: null, jobPostingCredits: 0 }],
-    jobs: Array.from({ length: 21 }, (_, index) => ({ id: index + 1, companyId: 20, isExternal: false, isActive: false, employmentType: "Full-time" })),
+    jobs: Array.from({ length: 21 }, (_, index) => ({ id: index + 1, companyId: 20, isExternal: false, isActive: false, hiddenByPlan: true, employmentType: "Full-time" })),
   };
   replaceMethod(prisma.package, "findUnique", async () => null);
   replaceMethod(prisma.packagePurchase, "findUnique", async ({ where }) => structuredClone(state.purchases.find((row) => matches(row, where)) ?? null));
@@ -213,4 +216,16 @@ test("missing purchase returns 404 without database changes", async () => {
 test("admin can verify a purchase and updates the purchasing user", async () => {
   assert.equal((await verify({ userId: 11, role: "admin" })).body.success, true);
   assert.equal(state.users[0].packageSelected, true);
+});
+
+test("renewal uses the duration saved at order creation", async () => {
+  state.purchases[0].metadata = { durationDays: 90 };
+  assert.equal((await verify()).body.success, true);
+  assert.equal(state.purchases[0].expiresAt - state.purchases[0].startsAt, 90 * 86400000);
+});
+test("an existing signed order can be verified after its catalog package is disabled", async () => {
+  state.purchases[0].metadata = { durationDays: 365 };
+  prisma.package.findUnique = async () => ({ id: "basic", isActive: false });
+  assert.equal((await verify()).body.success, true);
+  assert.equal(state.purchases[0].status, "PAID");
 });

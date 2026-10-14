@@ -1,3 +1,5 @@
+import { hiddenDirectoryIds, featuredSupplierIds } from "../lib/companyPlanVisibility.js";
+import { directoryForPlan, preserveHiddenDirectoryContent } from "../lib/directoryPlanVisibility.js";
 // controllers/supplierDirectoryController.js
 
 import prisma from "../prismaClient.js";
@@ -353,6 +355,7 @@ export const getMyDirectoryById = async (req, res) => {
     });
 
     if (!directory) return res.status(404).json({ error: "Directory not found" });
+    if ((await hiddenDirectoryIds(prisma)).includes(directory.id)) return res.status(403).json({ error: "This saved listing is hidden by your current plan. Renew to access it.", code: "PACKAGE_LIMIT_EXCEEDED" });
 
     // Ensure coverImageUrl is array
     let coverImageUrl = directory.coverImageUrl;
@@ -362,12 +365,11 @@ export const getMyDirectoryById = async (req, res) => {
       coverImageUrl = [];
     }
 
+    const active = await getActiveSubscription(directory.companyId ?? user.companyId);
+    const visibleDirectory = directoryForPlan(normalizeGalleryFields(directory), active.plan);
     res.json({
-      ...normalizeGalleryFields(directory),
-      coverImageUrl,
-      manufacturingCapabilityImages: directory.manufacturingCapabilityImages || [],
-      manufacturingCapabilityVideos: directory.manufacturingCapabilityVideos || [],
-      machineryImages: directory.machineryImages || [],
+      ...visibleDirectory,
+      coverImageUrl: visibleDirectory.coverImageUrl,
     });
   } catch (err) {
     console.error("Get directory by id error:", err);
@@ -414,7 +416,11 @@ export const getMyDirectories = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const sanitizedDirectories = directories.map((dir) => {
+    const active = await getActiveSubscription(user.companyId);
+    const profileLimits = await getCompanyProfileEligibility(user.companyId);
+    const visibleDirectories = profileLimits.productListings === null ? directories : directories.slice(0, profileLimits.productListings);
+    const sanitizedDirectories = visibleDirectories.map((saved) => {
+      const dir = directoryForPlan(saved, active.plan);
       let coverImageUrl = dir.coverImageUrl;
       if (typeof coverImageUrl === "string") {
         coverImageUrl = coverImageUrl ? [coverImageUrl] : [];
@@ -452,6 +458,7 @@ export const getMyDirectories = async (req, res) => {
         qualityStandards: normalized.qualityStandards,
         enableInquiryForm: normalized.enableInquiryForm,
         googleMapUrl: normalized.googleMapUrl,
+      hiddenSavedContent: dir.hiddenSavedContent,
       };
     });
 
@@ -704,33 +711,17 @@ export const updateDirectory = async (req, res) => {
       updateData.qualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
     }
 
-    // ✅ FIX: gallery fields now truncate to the plan's limit instead of
-    // hard-rejecting the entire update when a Free/Basic-plan recruiter
-    // sends more company/factory/product images than their plan allows.
-    // (Previously this returned a 403 and blocked saving anything else
-    // in the same request.)
+    // Incoming visible content is validated; saved hidden content is retained below.
     if (productGalleryValidation && productGalleryValidation.data) {
-      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      updateData.productGallery = truncateGalleryToLimit(
-        productGalleryValidation.data,
-        profileEligibility.productImages
-      );
+      updateData.productGallery = productGalleryValidation.data;
     }
 
     if (companyGalleryValidation && companyGalleryValidation.data) {
-      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      updateData.companyGallery = truncateGalleryToLimit(
-        companyGalleryValidation.data,
-        profileEligibility.galleryImages
-      );
+      updateData.companyGallery = companyGalleryValidation.data;
     }
 
     if (factoryGalleryValidation && factoryGalleryValidation.data) {
-      const profileEligibility = await getCompanyProfileEligibility(directory.companyId ?? user.companyId);
-      updateData.factoryGallery = truncateGalleryToLimit(
-        factoryGalleryValidation.data,
-        profileEligibility.factoryImages
-      );
+      updateData.factoryGallery = factoryGalleryValidation.data;
     }
 
     // Check if there's anything to update
@@ -742,7 +733,7 @@ export const updateDirectory = async (req, res) => {
 
     const updated = await prisma.supplierDirectory.update({
       where: { id: directoryId },
-      data: updateData,
+      data: preserveHiddenDirectoryContent(directory, updateData, plan),
     });
 
     await prisma.auditLog.create({
@@ -755,12 +746,12 @@ export const updateDirectory = async (req, res) => {
     });
 
     // Return normalized data
-    res.json(normalizeGalleryFields(updated));
+    res.json(directoryForPlan(normalizeGalleryFields(updated), plan));
   } catch (err) {
     console.error("Update directory error:", err);
-    res.status(500).json({
-      error: "Update failed",
-      details: err.message
+    res.status(err.status || 500).json({
+      error: err.status ? err.message : "Update failed",
+      code: err.code
     });
   }
 };
@@ -832,6 +823,7 @@ export const getSuppliers = async (req, res) => {
         sort === "popular" ? { views: "desc" } :
           { name: "asc" };
 
+    where.id = { notIn: await hiddenDirectoryIds(prisma), ...(featured === "true" ? { in: await featuredSupplierIds(prisma) } : {}) };
     const [total, suppliers] = await Promise.all([
       prisma.supplierDirectory.count({ where }),
       prisma.supplierDirectory.findMany({
@@ -857,7 +849,12 @@ export const getSuppliers = async (req, res) => {
     ]);
 
     // Normalize gallery fields for each supplier
-    const normalizedSuppliers = suppliers.map(supplier => normalizeGalleryFields(supplier));
+    const plans = new Map();
+    const normalizedSuppliers = await Promise.all(suppliers.map(async supplier => {
+      if (!plans.has(supplier.companyId)) plans.set(supplier.companyId, getActiveSubscription(supplier.companyId));
+      const active = await plans.get(supplier.companyId);
+      return directoryForPlan(normalizeGalleryFields(supplier), active.plan);
+    }));
 
     res.json({
       data: normalizedSuppliers,
@@ -892,7 +889,7 @@ export const getSupplierBySlug = async (req, res) => {
       },
     });
 
-    if (!supplier || supplier.status !== "APPROVED") {
+    if (!supplier || supplier.status !== "APPROVED" || (await hiddenDirectoryIds(prisma)).includes(supplier.id)) {
       return res.status(404).json({ error: "Supplier not found" });
     }
 
@@ -914,15 +911,12 @@ export const getSupplierBySlug = async (req, res) => {
     const normalized = normalizeGalleryFields(supplier);
 
     return res.json({
-      ...normalized,
-      coverImageUrl,
+      ...directoryForPlan(normalized, activeSubscription.plan),
       googleMapUrl: supplier.googleMapUrl ?? null,
       planTier: activeSubscription.plan,
-      subscription: activeSubscription,
+      subscription: { plan: activeSubscription.plan, expiresAt: activeSubscription.expiresAt },
       profileLimits,
-      manufacturingCapabilityImages: supplier.manufacturingCapabilityImages || [],
-      manufacturingCapabilityVideos: supplier.manufacturingCapabilityVideos || [],
-      machineryImages: supplier.machineryImages || [],
+
     });
   } catch (err) {
     console.error(err);

@@ -1,3 +1,4 @@
+import { getContentEntitlements } from "../controllers/trialEntitlementsController.js";
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAnyPermission } from "../middleware/permissions.js";
@@ -9,7 +10,11 @@ import {
   verifyPayment,
 } from "../controllers/paymentsController.js";
 
+import { activateTrial } from "../controllers/trialsController.js";
+
 const router = express.Router();
+router.get("/admin/entitlements", requireAuth, requireAnyPermission(["payments.view", "packages.view", "banners.view", "articles.view"]), getContentEntitlements);
+router.post("/start-trial", requireAuth, activateTrial);
 
 router.post("/create-order", requireAuth, createPaymentOrder);
 router.post("/verify", requireAuth, verifyPayment);

@@ -1,3 +1,6 @@
+import { hiddenDirectoryIds } from "../lib/companyPlanVisibility.js";
+import { directoryForPlan } from "../lib/directoryPlanVisibility.js";
+import { getActiveSubscription } from "../lib/packagePurchases.js";
 import prisma from "../prismaClient.js"
 
 export async function getSuppliers(req, res) {
@@ -7,6 +10,7 @@ export async function getSuppliers(req, res) {
     const suppliers = await prisma.supplierDirectory.findMany({
       where: {
         status: "APPROVED",
+        id: { notIn: await hiddenDirectoryIds(prisma) },
         ...(q && {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
@@ -17,6 +21,7 @@ export async function getSuppliers(req, res) {
       orderBy: { name: "asc" },
       select: {
         id: true,
+        companyId: true,
         name: true,
         slug: true,
         logoUrl: true,
@@ -25,7 +30,7 @@ export async function getSuppliers(req, res) {
       },
     })
 
-    res.json(suppliers)
+    res.json(await Promise.all(suppliers.map(async row => directoryForPlan(row, (await getActiveSubscription(row.companyId)).plan))))
   } catch (err) {
     console.error("Public suppliers error:", err)
     res.status(500).json({ error: "Failed to load suppliers" })
@@ -52,11 +57,11 @@ export async function getSupplierShowroom(req, res) {
       },
     })
 
-    if (!supplier) {
+    if (!supplier || (await hiddenDirectoryIds(prisma)).includes(supplier.id)) {
       return res.status(404).json({ error: "Supplier not found" })
     }
 
-    res.json(supplier)
+    res.json(directoryForPlan(supplier, (await getActiveSubscription(supplier.companyId)).plan))
   } catch (err) {
     console.error("Supplier showroom error:", err)
     res.status(500).json({ error: "Failed to load supplier" })
@@ -82,11 +87,11 @@ export async function getSupplierBySlug(req, res) {
       },
     })
 
-    if (!supplier) {
+    if (!supplier || (await hiddenDirectoryIds(prisma)).includes(supplier.id)) {
       return res.status(404).json({ error: "Supplier not found" })
     }
 
-    res.json(supplier)
+    res.json(directoryForPlan(supplier, (await getActiveSubscription(supplier.companyId)).plan))
   } catch (err) {
     console.error("Supplier showroom error:", err)
     res.status(500).json({ error: "Failed to load supplier" })

@@ -8,6 +8,7 @@ import {
   enforceCompanyJobVisibility,
   filterJobsForPackageVisibility,
   isJobPackageVisible,
+  jobForCurrentPlan,
 } from "../lib/jobVisibility.js";
 
 /**
@@ -375,7 +376,7 @@ export async function getJobBySlug(req, res) {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    res.json(job);
+    res.json(await jobForCurrentPlan(job));
   } catch (err) {
   console.error("GET JOB ERROR:", err)
   res.status(500).json({
@@ -479,7 +480,7 @@ export async function getJobById(req, res) {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    res.json(job);
+    res.json(await jobForCurrentPlan(job));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch job" });
@@ -798,7 +799,7 @@ export async function deactivateJob(req, res) {
   try {
     const job = await prisma.job.update({
       where: { id: Number(req.params.id) },
-      data: { isActive: false },
+      data: { isActive: false, hiddenByPlan: false },
     });
 
     res.json({ success: true, job });
@@ -883,7 +884,7 @@ export async function incrementJobView(req, res) {
 
     console.log("New view count:", job.views);
 
-    res.json(job);
+    res.json(await jobForCurrentPlan(job));
   } catch (err) {
     console.error("Increment job view error:", err);
     res.status(500).json({
