@@ -1,3 +1,5 @@
+import { limitCompanyRows } from "../lib/companyPlanVisibility.js";
+import { ACTIVE_PURCHASE_STATUSES } from "../lib/trialInfo.js";
 import { prisma } from "../lib/prisma.js"
 import slugify from "slugify"
 import { getPlanLabel } from "../lib/packagePricing.js"
@@ -393,8 +395,8 @@ export async function getRecruiterDashboard(req, res) {
     const recentPurchases = dedupeCompanyPurchases(
       await prisma.packagePurchase.findMany({
         where: recruiter?.companyId
-          ? { companyId: recruiter.companyId, status: "PAID" }
-          : { userId: recruiterId, status: "PAID" },
+          ? { companyId: recruiter.companyId, status: { in: ACTIVE_PURCHASE_STATUSES } }
+          : { userId: recruiterId, status: { in: ACTIVE_PURCHASE_STATUSES } },
         orderBy: { createdAt: "desc" },
         take: 5,
         select: {
@@ -449,8 +451,8 @@ export async function getRecruiterDashboard(req, res) {
       applicationsCount,
       shortlistedCount,
       recentJobs,
-      articles,
-      directories,
+      articles: await limitCompanyRows(articles, recruiter?.companyId, "articles"),
+      directories: await limitCompanyRows(directories, recruiter?.companyId, "directories"),
       recentActivity,
       subscription,
       recentPurchases,

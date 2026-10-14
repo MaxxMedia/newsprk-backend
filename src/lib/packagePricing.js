@@ -63,23 +63,28 @@ const RECRUITMENT_PACKAGES = {
 // Look up a live DB override for a given package id.
 // Returns null if there's no row, it's deleted, or it's inactive
 // (an inactive package shouldn't be purchasable even if someone has the link).
-async function getDbPackage(id) {
+async function getDbPackage(id, requireActive = false) {
   try {
     const pkg = await prisma.package.findUnique({ where: { id } });
-    if (!pkg || pkg.deletedAt || !pkg.isActive) return null;
+    if (!pkg) return null;
+    if (pkg.deletedAt || !pkg.isActive) {
+      if (requireActive) throw Object.assign(new Error("This package is currently unavailable."), { status: 400, code: "PACKAGE_UNAVAILABLE" });
+      return null;
+    }
     return pkg;
   } catch (err) {
+    if (err.status) throw err;
     console.error(`Failed to look up DB package "${id}":`, err);
     return null; // fail safe — falls back to hardcoded price below
   }
 }
 
-export async function resolvePackage(packageType, packageId) {
+export async function resolvePackage(packageType, packageId, { requireActive = false } = {}) {
   const type = String(packageType || "").toUpperCase();
 
   if (type === "SUBSCRIPTION") {
     const fallback = SUBSCRIPTION_PLANS[packageId];
-    const dbPkg = await getDbPackage(packageId);
+    const dbPkg = await getDbPackage(packageId, requireActive);
     if (!fallback && !dbPkg) return null;
 
     return {
@@ -94,7 +99,7 @@ export async function resolvePackage(packageType, packageId) {
   if (type === "BANNER") {
     const [bannerKey, duration] = String(packageId).split(":");
     const fallback = BANNER_PACKAGES[bannerKey];
-    const dbPkg = await getDbPackage(bannerKey);
+    const dbPkg = await getDbPackage(bannerKey, requireActive);
 
     // DB banner packages store per-duration pricing in metadata: { monthly, quarterly, annual }
     const dbAmount = dbPkg?.metadata?.[duration];
@@ -115,7 +120,7 @@ export async function resolvePackage(packageType, packageId) {
 
   if (type === "SPONSORED") {
     const fallback = SPONSORED_PACKAGES[packageId];
-    const dbPkg = await getDbPackage(packageId);
+    const dbPkg = await getDbPackage(packageId, requireActive);
     if (!fallback && !dbPkg) return null;
 
     return {
@@ -129,7 +134,7 @@ export async function resolvePackage(packageType, packageId) {
 
   if (type === "RECRUITMENT") {
     const fallback = RECRUITMENT_PACKAGES[packageId];
-    const dbPkg = await getDbPackage(packageId);
+    const dbPkg = await getDbPackage(packageId, requireActive);
     if (!fallback && !dbPkg) return null;
 
     return {
@@ -154,7 +159,7 @@ export function getEffectivePlan(company) {
   if (
     plan !== "free" &&
     company?.subscriptionExpiresAt &&
-    new Date(company.subscriptionExpiresAt) < new Date()
+    new Date(company.subscriptionExpiresAt) <= new Date()
   ) {
     return "free";
   }

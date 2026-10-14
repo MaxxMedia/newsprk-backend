@@ -1,3 +1,4 @@
+import { limitCompanyRows } from "../lib/companyPlanVisibility.js";
 // controllers/teamController.js
 import { prisma } from "../lib/prisma.js";
 import { assertCanAddTeamMember, getTeamMemberEligibility } from "../lib/packageContentLimits.js";
@@ -1261,10 +1262,12 @@ export const getCompanyTeamMembers = async (req, res) => {
     // any existing response shape or behavior.
     const eligibility = await getTeamMemberEligibility(recruiter.companyId);
 
+    const visibleMembers = await limitCompanyRows(members, recruiter.companyId, "team");
     return res.json({
       success: true,
-      total: members.length,
-      data: members,
+      total: visibleMembers.length,
+      data: visibleMembers,
+      hiddenSavedCount: members.length - visibleMembers.length,
       eligibility,
     });
 

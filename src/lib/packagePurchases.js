@@ -2,6 +2,7 @@
 
 import { prisma } from "./prisma.js";
 import { getPlanLabel } from "./packagePricing.js";
+import { ACTIVE_PURCHASE_STATUSES, getCompanyTrialInfo } from "./trialInfo.js";
 
 // ✅ NEW: explicit tier ranking. This is the single source of truth for
 // "which plan wins" when a company has more than one currently-active
@@ -32,58 +33,34 @@ export function dedupeCompanyPurchases(purchases) {
   });
 }
 
-export async function getActiveSubscription(companyId, prismaClient = prisma) {
-  if (!companyId) {
-    return { plan: "free", expiresAt: null, purchase: null };
+export async function getActiveSubscription(companyId, prismaClient = prisma, now = new Date()) {
+  if (!companyId) return { plan: "free", expiresAt: null, purchase: null };
+  const [purchases, company, trial] = await Promise.all([
+    prismaClient.packagePurchase.findMany({
+      where: { companyId, packageType: "SUBSCRIPTION", packageId: { not: "free" }, status: { in: ACTIVE_PURCHASE_STATUSES },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      orderBy: { createdAt: "desc" },
+    }),
+    prismaClient.company.findUnique({ where: { id: companyId }, select: { subscriptionPlan: true, subscriptionExpiresAt: true } }),
+    prismaClient.companyTrial.findUnique({ where: { companyId } }),
+  ]);
+  // A trial must preserve older paid companies that have no purchase history.
+  const baselinePlan = trial ? trial.previousSubscriptionPlan : company?.subscriptionPlan;
+  const baselineExpiry = trial ? trial.previousSubscriptionExpiresAt : company?.subscriptionExpiresAt;
+  let best = { plan: "free", expiresAt: null, purchase: null };
+  if (rankOf(baselinePlan) && (!baselineExpiry || baselineExpiry > now)) {
+    best = { plan: baselinePlan, expiresAt: baselineExpiry ?? null, purchase: null };
   }
-
-  // ✅ FIX: fetch ALL currently-active (unexpired) PAID subscription
-  // purchases for this company, not just the most recently created one.
-  const activeSubscriptions = await prismaClient.packagePurchase.findMany({
-    where: {
-      companyId,
-      packageType: "SUBSCRIPTION",
-      packageId: { not: "free" },
-      status: "PAID",
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (activeSubscriptions.length > 0) {
-    // ✅ FIX: pick the HIGHEST-TIER plan among all active purchases,
-    // never just the newest row. This is what makes "I bought
-    // Professional/Enterprise" win over a still-unexpired older Basic
-    // purchase, regardless of row order or creation timestamps.
-    const best = activeSubscriptions.reduce((top, current) =>
-      rankOf(current.packageId) > rankOf(top.packageId) ? current : top
-    );
-
-    return {
-      plan: best.packageId,
-      expiresAt: best.expiresAt,
-      purchase: best,
-    };
+  for (const purchase of purchases) {
+    const purchaseExpiry = purchase.expiresAt ? new Date(purchase.expiresAt).getTime() : Infinity;
+    const bestExpiry = best.expiresAt ? new Date(best.expiresAt).getTime() : Infinity;
+    const sameTierWins = purchase.packageId === best.plan && (purchaseExpiry > bestExpiry ||
+      (purchaseExpiry === bestExpiry && (!best.purchase || (purchase.status === "PAID" && best.purchase.status !== "PAID"))));
+    if (rankOf(purchase.packageId) > rankOf(best.plan) || sameTierWins) {
+      best = { plan: purchase.packageId, expiresAt: purchase.expiresAt, purchase };
+    }
   }
-
-  const company = await prismaClient.company.findUnique({
-    where: { id: companyId },
-    select: { subscriptionPlan: true, subscriptionExpiresAt: true },
-  });
-
-  let plan = company?.subscriptionPlan || "free";
-  let expiresAt = company?.subscriptionExpiresAt ?? null;
-
-  if (
-    plan !== "free" &&
-    expiresAt &&
-    new Date(expiresAt) < new Date()
-  ) {
-    plan = "free";
-    expiresAt = null;
-  }
-
-  return { plan, expiresAt, purchase: null };
+  return best;
 }
 
 export async function syncCompanySubscription(companyId, prismaClient = prisma) {
@@ -109,7 +86,7 @@ export async function getActiveRecruitmentPackage(companyId, prismaClient = pris
     where: {
       companyId,
       packageType: "RECRUITMENT",
-      status: "PAID",
+      status: { in: ACTIVE_PURCHASE_STATUSES },
       expiresAt: { gt: new Date() },
     },
     orderBy: { expiresAt: "desc" },
@@ -129,9 +106,13 @@ export async function buildSubscriptionDisplay(company, companyId, prismaClient 
   const plan = activeSubscription.plan;
   const planLabel = getPlanLabel(plan);
   const activeRecruitment = await getActiveRecruitmentPackage(companyId, prismaClient);
+  const trial = await getCompanyTrialInfo(companyId, prismaClient);
+  const activePackages = await getActivePackagePurchases(companyId, prismaClient);
 
   if (activeRecruitment) {
     return {
+      trial,
+      activePackages,
       plan,
       planLabel,
       displayPlan: activeRecruitment.packageId,
@@ -144,6 +125,8 @@ export async function buildSubscriptionDisplay(company, companyId, prismaClient 
   }
 
   return {
+    trial,
+    activePackages,
     plan,
     planLabel,
     displayPlan: plan,
@@ -153,4 +136,16 @@ export async function buildSubscriptionDisplay(company, companyId, prismaClient 
     jobPostingCredits: company.jobPostingCredits ?? 0,
     basePlanLabel: planLabel,
   };
+}
+export async function getActivePackagePurchases(companyId, prismaClient = prisma, now = new Date()) {
+  if (!companyId) return [];
+  return prismaClient.packagePurchase.findMany({
+    where: {
+      companyId,
+      status: { in: ACTIVE_PURCHASE_STATUSES },
+      packageId: { not: "free" },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: { createdAt: "desc" },
+  });
 }

@@ -1,3 +1,4 @@
+import { limitCompanyRows } from "../lib/companyPlanVisibility.js";
 import { prisma } from "../lib/prisma.js";
 import slugify from "slugify";
 import { filterJobsForPackageVisibility, enforceCompanyJobVisibility } from "../lib/jobVisibility.js";
@@ -177,6 +178,7 @@ export async function getCompanyBySlug(req, res) {
 
     res.json({
       ...company,
+      Job: visibleJobs,
       jobs: visibleJobs,
       followers: company._count.CompanyFollower,
     })
@@ -433,11 +435,12 @@ export const getCompanyTeam = async (req, res) => {
       },
     });
 
+    const visibleTeam = await limitCompanyRows(team, company.id, "team");
     return res.status(200).json({
       success: true,
       company: company.name,
-      total: team.length,
-      data: team,
+      total: visibleTeam.length,
+      data: visibleTeam,
     });
   } catch (error) {
     console.error(error);

@@ -50,6 +50,8 @@ model Post {
   shares                       Int         @default(0)
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
+  packagePurchaseId            Int?
+  PackagePurchase              PackagePurchase? @relation(fields: [packagePurchaseId], references: [id])
   comments                     Comment[]
   User_Post_approvedByIdToUser User?       @relation("Post_approvedByIdToUser", fields: [approvedById], references: [id])
   author                       Author?     @relation(fields: [authorId], references: [id])
@@ -337,6 +339,8 @@ model AdvertisementBanner {
   createdAt   DateTime                      @default(now())
   updatedAt   DateTime
   User        User                          @relation(fields: [createdById], references: [id])
+  packagePurchaseId Int?
+  PackagePurchase PackagePurchase? @relation(fields: [packagePurchaseId], references: [id])
 
   @@index([createdById])
 }
@@ -374,6 +378,7 @@ model Company {
   teamMembers           CompanyTeamMember[]
   Job                   Job[]
   NewsletterSubscriber  NewsletterSubscriber[]
+  Trial                 CompanyTrial?
   PackagePurchase       PackagePurchase[]
   Post                  Post[]
   SupplierDirectory     SupplierDirectory[]
@@ -425,6 +430,9 @@ model PackagePurchase {
   expiresAt         DateTime?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
+  Trial             CompanyTrial?
+  AdvertisementBanner AdvertisementBanner[]
+  SponsoredPost Post[]
   Company           Company?               @relation(fields: [companyId], references: [id])
   User              User                   @relation(fields: [userId], references: [id])
 
@@ -714,6 +722,7 @@ model Job {
   location            String
   isRemote            Boolean          @default(false)
   isActive            Boolean          @default(true)
+  hiddenByPlan        Boolean          @default(false)
   views               Int              @default(0)
   companyId           Int?
   postedById          Int
@@ -1219,6 +1228,7 @@ enum PackagePurchase_status {
   PENDING
   PAID
   FAILED
+  TRIAL
 }
 
 enum NewsletterStatus {
@@ -1288,4 +1298,18 @@ enum ConnectionRequestStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+}
+model CompanyTrial {
+  companyId   Int @id
+  purchaseId  Int @unique
+  previousSubscriptionPlan String @default("free")
+  previousSubscriptionExpiresAt DateTime?
+  startsAt    DateTime @default(now())
+  expiresAt   DateTime
+  convertedAt DateTime?
+  expiredAt   DateTime?
+  Company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Purchase    PackagePurchase @relation(fields: [purchaseId], references: [id])
+
+  @@index([expiresAt])
 }

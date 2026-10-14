@@ -1,3 +1,4 @@
+import { hiddenPostIds, validateContentPurchase } from "../lib/companyPlanVisibility.js";
 // src/controllers/postsController.js
 import prisma from "../prismaClient.js";
 import * as industryTalkService from "../services/industryTalkService.js";
@@ -42,6 +43,7 @@ export const getAllPosts = async (req, res) => {
       ],
     };
 
+    if (!req.adminContentView) where.AND.push({ id: { notIn: await hiddenPostIds(prisma) } });
     where.AND = where.AND.filter((c) => Object.keys(c).length);
 
     const [data, total] = await Promise.all([
@@ -66,7 +68,7 @@ export const getAllPosts = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(err.status || 500).json({ error: err.status ? err.message : "Internal server error" });
   }
 };
 
@@ -89,11 +91,11 @@ export const getPostById = async (req, res) => {
       where: { id },
       include: { author: true, category: true, comments: true },
     });
-    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (!post || (!req.adminContentView && (await hiddenPostIds(prisma)).includes(post.id))) return res.status(404).json({ error: "Post not found" });
     res.json(post);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(err.status || 500).json({ error: err.status ? err.message : "Internal server error" });
   }
 };
 
@@ -181,7 +183,10 @@ export const getPostBySlug = async (req, res) => {
       include: { author: true, category: true, comments: true },
     });
 
-    if (post) return res.json(post);
+    if (post) {
+      if ((await hiddenPostIds(prisma)).includes(post.id)) return res.status(404).json({ error: "Post not found" });
+      return res.json(post);
+    }
 
     // Fallback: not a regular Post, check IndustryTalk by the same slug
     const talk = await industryTalkService.getIndustryTalkBySlug(slug);
@@ -190,7 +195,7 @@ export const getPostBySlug = async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(err.status || 500).json({ error: err.status ? err.message : "Internal server error" });
   }
 };
 
@@ -206,13 +211,13 @@ export const getRecruiterArticleBySlug = async (req, res) => {
         category: { slug: "articles" },
       },
       include: {
-        company: {
+        Company: {
           select: { id: true, name: true, slug: true },
         },
       },
     })
 
-    if (!article) {
+    if (!article || (await hiddenPostIds(prisma)).includes(article.id)) {
       return res.status(404).json({ error: "Article not found" })
     }
 
@@ -227,7 +232,7 @@ export const getRecruiterArticleBySlug = async (req, res) => {
 export const getFeaturedPosts = async (req, res) => {
   try {
     const trendingPosts = await prisma.post.findMany({
-      where: { category: { slug: "trending" } },
+      where: { category: { slug: "trending" }, id: { notIn: await hiddenPostIds(prisma) } },
       include: { author: true, category: true },
       orderBy: { publishedAt: "desc" },
       take: 2,
@@ -246,6 +251,7 @@ export const getPopularPosts = async (req, res) => {
     
     const popularPosts = await prisma.post.findMany({
       where: {
+        id: { notIn: await hiddenPostIds(prisma) },
         status: "APPROVED",  // ✅ Only approved posts
         publishedAt: { 
           not: null,
@@ -310,8 +316,11 @@ export const createPost = async (req, res) => {
       });
     }
 
+    const entitlement = await validateContentPurchase(req.body.packagePurchaseId, "SPONSORED", prisma);
     const post = await prisma.post.create({
       data: {
+        packagePurchaseId: entitlement?.id,
+        companyId: entitlement?.companyId,
         title,
         slug,
         badge,
@@ -342,7 +351,7 @@ export const createPost = async (req, res) => {
     if (err?.code === "P2002") {
       return res.status(409).json({ error: "Slug must be unique" });
     }
-    res.status(500).json({ error: "Internal server error" });
+    res.status(err.status || 500).json({ error: err.status ? err.message : "Internal server error" });
   }
 };
 
@@ -392,6 +401,12 @@ export const updatePost = async (req, res) => {
       email,
       whatsappNumber,
     };
+
+    if (req.body.packagePurchaseId !== undefined) {
+      const entitlement = await validateContentPurchase(req.body.packagePurchaseId, "SPONSORED", prisma);
+      updateData.packagePurchaseId = entitlement?.id ?? null;
+      if (entitlement) updateData.companyId = entitlement.companyId;
+    }
 
     // Only include if provided
     if (authorId) updateData.authorId = Number(authorId);

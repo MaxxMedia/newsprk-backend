@@ -1,3 +1,4 @@
+import { limitCompanyRows } from "../lib/companyPlanVisibility.js";
 // routes/companyTeam.js
 import express from "express";
 import { prisma } from "../lib/prisma.js";
@@ -52,7 +53,8 @@ router.get("/:slug/team", async (req, res) => {
         });
 
         // Add company info to each member
-        const membersWithCompany = members.map(member => ({
+        const visibleMembers = await limitCompanyRows(members, company.id, "team");
+        const membersWithCompany = visibleMembers.map(member => ({
             ...member,
             company: {
                 id: company.id,

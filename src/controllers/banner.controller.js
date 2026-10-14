@@ -1,3 +1,4 @@
+import { addonPurchaseHasAccess, validateContentPurchase } from "../lib/companyPlanVisibility.js";
 import prisma from "../prismaClient.js";
 
 /**
@@ -28,8 +29,10 @@ export const createBanner = async (req, res) => {
 
     const nextPosition = lastBanner ? lastBanner.position + 1 : 0;
 
+    const entitlement = await validateContentPurchase(req.body.packagePurchaseId, "BANNER", prisma);
     const banner = await prisma.advertisementBanner.create({
     data: {
+    packagePurchaseId: entitlement?.id,
     title,
     imageUrl,
     targetUrl,
@@ -46,7 +49,7 @@ export const createBanner = async (req, res) => {
     res.status(201).json(banner);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to create banner" });
+    res.status(error.status || 500).json({ message: error.status ? error.message : "Failed to create banner" });
   }
 };
 
@@ -78,7 +81,13 @@ export const getBannersByPlacement = async (req, res) => {
       },
     });
 
-    res.json(banners);
+    const visible = [];
+    for (const banner of banners) {
+      if (!banner.packagePurchaseId) { visible.push(banner); continue; }
+      const purchase = await prisma.packagePurchase.findUnique({ where: { id: banner.packagePurchaseId } });
+      if (await addonPurchaseHasAccess(purchase, prisma)) visible.push(banner);
+    }
+    res.json(visible);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch banners" });
   }
@@ -122,14 +131,19 @@ export const updateBanner = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const data = { ...req.body };
+    if (data.packagePurchaseId !== undefined) {
+      const entitlement = await validateContentPurchase(data.packagePurchaseId, "BANNER", prisma);
+      data.packagePurchaseId = entitlement?.id ?? null;
+    }
     const banner = await prisma.advertisementBanner.update({
       where: { id: Number(id) },
-      data: req.body,
+      data,
     });
 
     res.json(banner);
   } catch (error) {
-    res.status(500).json({ message: "Failed to update banner" });
+    res.status(error.status || 500).json({ message: error.status ? error.message : "Failed to update banner" });
   }
 };
 

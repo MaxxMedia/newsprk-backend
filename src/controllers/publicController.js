@@ -1,3 +1,4 @@
+import { hiddenPostIds } from "../lib/companyPlanVisibility.js";
 import prisma from "../prismaClient.js"
 
 /**
@@ -8,6 +9,7 @@ export const getApprovedArticles = async (req, res) => {
   try {
     const articles = await prisma.post.findMany({
       where: {
+        id: { notIn: await hiddenPostIds(prisma) },
         status: "APPROVED",
         category: { slug: "articles" },
         publishedAt: { not: null },
