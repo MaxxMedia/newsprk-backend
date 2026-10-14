@@ -1,4 +1,4 @@
-import { limitCompanyRows, hiddenPostIds } from "../lib/companyPlanVisibility.js";
+import { limitCompanyRows } from "../lib/companyPlanVisibility.js";
 import prisma from "../prismaClient.js"
 import slugify from "slugify"
 import {
@@ -29,9 +29,6 @@ export const createRecruiterArticle = async (req, res) => {
       })
     }
 
-    if ((await hiddenPostIds(prisma)).includes(post.id)) {
-      return res.status(403).json({ error: "This saved article is hidden by your current plan. Renew to edit it.", code: "PACKAGE_LIMIT_EXCEEDED" });
-    }
     const { title, content, excerpt, imageUrl, badge, categorySlug } = req.body
 
     if (!title || !content) {
