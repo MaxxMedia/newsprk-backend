@@ -109,10 +109,16 @@ export async function getAdminAnalytics(req, res) {
         _count: { status: true },
       }),
       prisma.post.groupBy({ by: ["status"], _count: { status: true } }),
-      prisma.packagePurchase.groupBy({
-        by: ["status"],
-        _count: { status: true },
-      }),
+      prisma.$queryRaw`
+        SELECT status, COUNT(*)::int as count 
+        FROM "PackagePurchase" 
+        GROUP BY status
+      `.catch(() =>
+        prisma.packagePurchase.groupBy({
+          by: ["status"],
+          _count: { status: true },
+        })
+      ),
       prisma.jobApplication.groupBy({
         by: ["status"],
         _count: { status: true },
@@ -206,8 +212,8 @@ export async function getAdminAnalytics(req, res) {
       })),
       paymentStatus: paymentStatus.map((row) => ({
         name: row.status,
-        key: row.status.toLowerCase(),
-        value: row._count.status,
+        key: row.status ? String(row.status).toLowerCase() : "unknown",
+        value: row.count !== undefined ? Number(row.count) : row._count?.status ?? 0,
       })),
       applicationStatus: applicationStatus.map((row) => ({
         name: row.status,
