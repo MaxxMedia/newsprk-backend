@@ -40,8 +40,8 @@ export async function addEducation(req, res) {
         institution,
         degree,
         fieldOfStudy,
-        startYear,
-        endYear,
+        startYear: startYear ? parseInt(startYear, 10) : null,
+        endYear: endYear ? parseInt(endYear, 10) : null,
         grade,
         description,
       },
@@ -60,6 +60,15 @@ export async function addEducation(req, res) {
 export async function updateEducation(req, res) {
   try {
     const { id } = req.params;
+    const {
+      institution,
+      degree,
+      fieldOfStudy,
+      startYear,
+      endYear,
+      grade,
+      description,
+    } = req.body;
 
     const existing = await prisma.candidateEducation.findUnique({
       where: {
@@ -77,7 +86,15 @@ export async function updateEducation(req, res) {
       where: {
         id: Number(id),
       },
-      data: req.body,
+      data: {
+        institution,
+        degree,
+        fieldOfStudy,
+        startYear: startYear ? parseInt(startYear, 10) : null,
+        endYear: endYear ? parseInt(endYear, 10) : null,
+        grade,
+        description,
+      },
     });
 
     res.json(updated);

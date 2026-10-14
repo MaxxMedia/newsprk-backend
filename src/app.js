@@ -220,8 +220,8 @@ app.use("/api/admin", adminIndustriesRoutes);
 app.use("/api/industry-talks", industryTalkRoutes);
 
 
-app.use("/api", webinarRoutes);       
-app.use("/api", publicWebinarRoutes);  
+app.use("/api", webinarRoutes);
+app.use("/api", publicWebinarRoutes);
 
 // ✅ RBAC — sub-admin CRUD
 console.log("🔵 Mounting admin sub-admin (RBAC) routes...");

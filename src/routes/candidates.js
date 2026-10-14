@@ -16,8 +16,9 @@ router.put("/me", requireAuth, updateCandidateProfile)
 
 router.post("/onboarding", requireAuth, onboardCandidate)
 
+router.get("/me/application-readiness", requireAuth, getApplicationReadiness)
+
 // ⚠️ Keep LAST
 router.get("/:username", getCandidateProfile)
-router.get("/me/application-readiness", requireAuth, getApplicationReadiness)
 
 export default router

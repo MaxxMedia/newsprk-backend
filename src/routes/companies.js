@@ -14,6 +14,7 @@ import {
   getFollowStatus,
   getCompanyTeam,
 } from "../controllers/companiesController.js";
+import { getCompaniesForAdmin } from "../controllers/adminCompaniesController.js";
 
 const router = express.Router();
 
@@ -90,6 +91,7 @@ router.get("/search", async (req, res) => {
 });
 
 // Public routes
+router.get("/admin/list", requireAuth, getCompaniesForAdmin);
 router.get("/", getAllCompanies);
 router.get("/:slug", getCompanyBySlug);
 router.get("/:slug/people", getCompanyPeople);
