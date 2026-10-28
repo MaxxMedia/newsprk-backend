@@ -4,6 +4,7 @@ import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt";
 import slugify from "slugify";
 import { isAdminStaff } from "../lib/permissions.js"
+import { withUniqueSupplierDirectoryName } from "../lib/supplierDirectoryUniqueness.js"
 
 // ✅ Updated include to include lastLoginAt and emailSentForBulkImport
 const submittedByInclude = {
@@ -150,22 +151,29 @@ export async function adminCreateDirectory(req, res) {
     submittedById,
   } = req.body;
 
-  const directory = await prisma.supplierDirectory.create({
-    data: {
-      name,
-      slug,
-      description,
-      logoUrl,
-      companyId: Number(companyId),
-      submittedById: Number(submittedById),
-      status: "APPROVED",
-      isLiveEditable: true,
-      approvedById: req.user.userId ?? req.user.id,
-      approvedAt: new Date(),
-    },
-  });
+  try {
+    const directory = await withUniqueSupplierDirectoryName(prisma, name, (tx, normalizedName) =>
+    tx.supplierDirectory.create({
+      data: {
+        name: normalizedName,
+        slug,
+        description,
+        logoUrl,
+        companyId: Number(companyId),
+        submittedById: Number(submittedById),
+        status: "APPROVED",
+        isLiveEditable: true,
+        approvedById: req.user.userId ?? req.user.id,
+        approvedAt: new Date(),
+      },
+    }));
 
-  res.status(201).json(directory);
+    res.status(201).json(directory);
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      error: error.status ? error.message : "Failed to create directory",
+    });
+  }
 }
 
 /* =========================================
@@ -206,7 +214,8 @@ export async function adminCreateFullSetup(req, res) {
     // Generate unique username
     const uniqueUsername = await generateUniqueUsername(recruiter.email);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withUniqueSupplierDirectoryName(
+      prisma, [directory.name, company.name], async (tx, normalizedName) => {
 
       /* ==============================
          1️⃣ VALIDATE INDUSTRY
@@ -237,7 +246,7 @@ export async function adminCreateFullSetup(req, res) {
 
       const newCompany = await tx.company.create({
         data: {
-          name: company.name,
+          name: company.name.trim(),
           slug: companySlug,
           description: company.description,
           website: company.website,
@@ -300,7 +309,7 @@ export async function adminCreateFullSetup(req, res) {
 
       const newDirectory = await tx.supplierDirectory.create({
         data: {
-          name: directory.name,
+          name: normalizedName,
           slug: directorySlug,
           description: directory.description,
           website: directory.website,
@@ -348,7 +357,7 @@ export async function adminCreateFullSetup(req, res) {
       });
     }
 
-    return res.status(400).json({
+    return res.status(error.status || 400).json({
       error: error.message || "Failed to create full setup",
     });
   }
@@ -436,9 +445,9 @@ export async function adminUpdateDirectory(req, res) {
       return res.status(400).json({ error: "No fields to update" })
     }
 
-    const directory = await prisma.supplierDirectory.update({
+    const saveDirectory = (tx, normalizedName) => tx.supplierDirectory.update({
       where: { id: directoryId },
-      data,
+      data: name !== undefined ? { ...data, name: normalizedName } : data,
       include: {
         ...submittedByInclude,
         Company: {
@@ -446,6 +455,9 @@ export async function adminUpdateDirectory(req, res) {
         },
       },
     })
+    const directory = name === undefined
+      ? await saveDirectory(prisma)
+      : await withUniqueSupplierDirectoryName(prisma, name, saveDirectory, directoryId)
 
     if (logoUrl !== undefined && existing.companyId) {
       await prisma.company.update({
@@ -466,6 +478,7 @@ export async function adminUpdateDirectory(req, res) {
     res.json({ message: "Directory updated", directory: mapDirectory(directory) })
   } catch (err) {
     console.error("Admin update directory error:", err)
+    if (err.status) return res.status(err.status).json({ error: err.message })
     if (err.code === "P2002") {
       return res.status(409).json({ error: "Slug already in use" })
     }

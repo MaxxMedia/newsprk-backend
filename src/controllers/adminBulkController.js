@@ -4,6 +4,8 @@ import prisma from "../prismaClient.js"
 import bcrypt from "bcrypt"
 import slugify from "slugify"
 import xlsx from "xlsx"
+import { isAdminStaff } from "../lib/permissions.js"
+import { withUniqueSupplierDirectoryName } from "../lib/supplierDirectoryUniqueness.js"
 
 /* =====================================================
    🔐 Generate Strong Random Password
@@ -131,7 +133,7 @@ async function resolveIndustryPath(tx, industryPath) {
    🚀 BULK CREATE FULL SETUP
 ===================================================== */
 export async function bulkCreateFullSetup(req, res) {
-  if (req.user.role?.toLowerCase() !== "admin") {
+  if (!isAdminStaff(req.user?.role)) {
     return res.status(403).json({ error: "Admin only" })
   }
 
@@ -146,8 +148,9 @@ export async function bulkCreateFullSetup(req, res) {
 
     const success = []
     const failed = []
+    const skipped = []
 
-    for (const row of rows) {
+    for (const [index, row] of rows.entries()) {
       let recruiter = null
 
       try {
@@ -161,23 +164,22 @@ export async function bulkCreateFullSetup(req, res) {
           throw new Error("Missing required fields")
         }
 
-        const existingUser = await prisma.user.findUnique({
-          where: { email },
-        })
-
-        if (existingUser) {
-          throw new Error("Email already exists")
-        }
-
         const username = email
           .split("@")[0]
           .toLowerCase()
           .replace(/[^a-z0-9]/g, "")
 
-        const plainPassword = generateRandomPassword()
-        const hashedPassword = await bcrypt.hash(plainPassword, 10)
+        await withUniqueSupplierDirectoryName(prisma, companyName, async (tx) => {
+          const existingUser = await tx.user.findUnique({ where: { email } })
+          if (existingUser) {
+            throw Object.assign(new Error("Email already exists"), {
+              code: "SUPPLIER_DIRECTORY_EMAIL_EXISTS",
+            })
+          }
 
-        await prisma.$transaction(async (tx) => {
+          const plainPassword = generateRandomPassword()
+          const hashedPassword = await bcrypt.hash(plainPassword, 10)
+
           const industryId = await resolveIndustryPath(tx, row.industryPath)
 
           const companySlug = slugify(companyName, {
@@ -236,7 +238,7 @@ export async function bulkCreateFullSetup(req, res) {
               submittedById: recruiter.id,
               status: "APPROVED",
               isLiveEditable: true,
-              approvedById: req.user.id,
+              approvedById: req.user.userId ?? req.user.id,
               approvedAt: new Date(),
             },
           })
@@ -249,10 +251,16 @@ export async function bulkCreateFullSetup(req, res) {
         })
 
       } catch (err) {
-        failed.push({
+        const details = {
+          row: row.__rowNum__ != null ? row.__rowNum__ + 1 : index + 2,
+          companyName: String(row.companyName || "").trim(),
           email: String(row.email || "Unknown").trim(),
-          error: err.message,
-        })
+        }
+        if (["SUPPLIER_DIRECTORY_NAME_EXISTS", "SUPPLIER_DIRECTORY_EMAIL_EXISTS"].includes(err.code)) {
+          skipped.push({ ...details, reason: err.message })
+        } else {
+          failed.push({ ...details, error: err.message })
+        }
       }
     }
 
@@ -261,8 +269,10 @@ export async function bulkCreateFullSetup(req, res) {
       total: rows.length,
       successCount: success.length,
       failedCount: failed.length,
+      skippedCount: skipped.length,
       success,
       failed,
+      skipped,
     })
 
   } catch (error) {
@@ -357,7 +367,7 @@ export async function getBulkImportedUsers(req, res) {
   try {
     // ✅ Fetch ALL recruiter users - no filters
     const users = await prisma.$queryRaw`
-      SELECT 
+      SELECT
         u.id,
         u.email,
         u.username,

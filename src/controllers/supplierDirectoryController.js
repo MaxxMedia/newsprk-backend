@@ -4,6 +4,7 @@ import { directoryForPlan, preserveHiddenDirectoryContent } from "../lib/directo
 
 import prisma from "../prismaClient.js";
 import { isAdminStaff } from "../lib/permissions.js";
+import { withUniqueSupplierDirectoryName } from "../lib/supplierDirectoryUniqueness.js";
 import {
   assertProductListingCount,
   assertAndSanitizeSupplierDirectoryMedia,
@@ -252,58 +253,61 @@ export const createDirectory = async (req, res) => {
     const safeQualityStandards = profileEligibility.qualityStandards ? qualityStandards : null;
     const safeExportMarkets = profileEligibility.exportMarkets ? exportMarkets : [];
 
-    // Update company
-    await prisma.company.update({
-      where: { id: user.companyId },
-      data: {
-        location,
-        address,
-        industryId: Number(industryId),
-      },
-    });
+    const directory = await withUniqueSupplierDirectoryName(prisma, name, async (tx, normalizedName) => {
+      // Update company
+      await tx.company.update({
+        where: { id: user.companyId },
+        data: {
+          location,
+          address,
+          industryId: Number(industryId),
+        },
+      });
 
-    // Create directory with validated (and plan-truncated) gallery data
-    const directory = await prisma.supplierDirectory.create({
-      data: {
-        name,
-        slug,
-        description,
-        website,
-        logoUrl,
-        coverImageUrl: sanitizedMedia.coverImages,
-        phoneNumber,
-        email,
-        googleMapUrl: safeGoogleMapUrl,
-        tradeNames,
-        videoGallery,
-        productGallery: truncatedProductGallery,
-        companyGallery: truncatedCompanyGallery,
-        factoryGallery: truncatedFactoryGallery,
-        productCatalogues,
-        companyBrochure,
-        certifications,
-        brandsRepresented,
-        industriesServed,
-        exportMarkets: safeExportMarkets,
-        manufacturingCapabilities: safeManufacturingCapabilities,
-        manufacturingCapabilityImages: safeManufacturingCapabilityImages,
-        manufacturingCapabilityVideos: safeManufacturingCapabilityVideos,
-        machineryList: safeMachineryList,
-        machineryImages: safeMachineryImages,
-        qualityStandards: safeQualityStandards,
-        enableInquiryForm,
-        socialLinks: sanitizedMedia.socialLinks,
-        productSupplies,
-        companyId: user.companyId,
-        status: "PENDING",
-        isLiveEditable: false,
-        submittedById: user.id,
-      },
+      // Create directory with validated (and plan-truncated) gallery data
+      return tx.supplierDirectory.create({
+        data: {
+          name: normalizedName,
+          slug,
+          description,
+          website,
+          logoUrl,
+          coverImageUrl: sanitizedMedia.coverImages,
+          phoneNumber,
+          email,
+          googleMapUrl: safeGoogleMapUrl,
+          tradeNames,
+          videoGallery,
+          productGallery: truncatedProductGallery,
+          companyGallery: truncatedCompanyGallery,
+          factoryGallery: truncatedFactoryGallery,
+          productCatalogues,
+          companyBrochure,
+          certifications,
+          brandsRepresented,
+          industriesServed,
+          exportMarkets: safeExportMarkets,
+          manufacturingCapabilities: safeManufacturingCapabilities,
+          manufacturingCapabilityImages: safeManufacturingCapabilityImages,
+          manufacturingCapabilityVideos: safeManufacturingCapabilityVideos,
+          machineryList: safeMachineryList,
+          machineryImages: safeMachineryImages,
+          qualityStandards: safeQualityStandards,
+          enableInquiryForm,
+          socialLinks: sanitizedMedia.socialLinks,
+          productSupplies,
+          companyId: user.companyId,
+          status: "PENDING",
+          isLiveEditable: false,
+          submittedById: user.id,
+        },
+      });
     });
 
     res.status(201).json(normalizeGalleryFields(directory));
   } catch (err) {
     console.error("Create directory error:", err);
+    if (err.status) return res.status(err.status).json({ error: err.message });
     res.status(500).json({ error: "Failed to create directory" });
   }
 };
@@ -731,10 +735,17 @@ export const updateDirectory = async (req, res) => {
 
     console.log("Update data:", JSON.stringify(updateData, null, 2));
 
-    const updated = await prisma.supplierDirectory.update({
+    const saveDirectory = (tx, normalizedName) => tx.supplierDirectory.update({
       where: { id: directoryId },
-      data: preserveHiddenDirectoryContent(directory, updateData, plan),
+      data: preserveHiddenDirectoryContent(
+        directory,
+        name !== undefined ? { ...updateData, name: normalizedName } : updateData,
+        plan,
+      ),
     });
+    const updated = name === undefined
+      ? await saveDirectory(prisma)
+      : await withUniqueSupplierDirectoryName(prisma, name, saveDirectory, directoryId);
 
     await prisma.auditLog.create({
       data: {
